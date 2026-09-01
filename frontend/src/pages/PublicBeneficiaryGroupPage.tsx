@@ -5,7 +5,8 @@ import {
     ArrowLeft, Users, BarChart3, FileText, MapPin, Calendar,
     BookOpen, Camera, MessageSquare, DollarSign, Info
 } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Tooltip, useMap } from 'react-leaflet'
+import { BasemapLayer } from '../components/map/BasemapLayer'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { publicApi, PublicBeneficiaryGroupDetail, PublicMetricTag } from '../services/publicApi'
@@ -28,29 +29,6 @@ import {
 } from '../components/public/publicStyles'
 import PublicTagChip from '../components/public/PublicTagChip'
 import { formatDate } from '../utils'
-
-const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-
-function TileLayerWithFallback() {
-    const [useFallback, setUseFallback] = useState(false)
-    const map = useMap()
-    useEffect(() => {
-        if (useFallback) return
-        const testImg = new Image()
-        testImg.onerror = () => setUseFallback(true)
-        testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
-        return () => { testImg.onerror = null }
-    }, [useFallback])
-    return (
-        <TileLayer
-            attribution={useFallback ? '&copy; OpenStreetMap contributors' : CARTO_ATTRIBUTION}
-            url={useFallback ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' : CARTO_VOYAGER_URL}
-            subdomains={['a', 'b', 'c', 'd']}
-            maxZoom={20}
-        />
-    )
-}
 
 function MapResizeHandler() {
     const map = useMap()
@@ -594,7 +572,7 @@ export default function PublicBeneficiaryGroupPage() {
                                     zoomControl={false}
                                     scrollWheelZoom={true}
                                 >
-                                    <TileLayerWithFallback />
+                                    <BasemapLayer />
                                     <MapResizeHandler />
                                     <FitBoundsToLocations locations={mapLocations} />
                                     {mapLocations.map(loc => (

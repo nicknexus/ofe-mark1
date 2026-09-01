@@ -17,14 +17,12 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { MapContainer, TileLayer, Marker, Tooltip as LeafletTooltip } from "react-leaflet";
+import { MapContainer, Marker, Tooltip as LeafletTooltip } from "react-leaflet";
+import { BasemapLayer } from "../map/BasemapLayer";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
-
-const CARTO_VOYAGER_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 const sampleMetricData = [
   { date: "Jan", cumulative: 120 },
@@ -217,12 +215,7 @@ function LocationsSlide() {
           dragging={false}
           attributionControl={false}
         >
-          <TileLayer
-            attribution={CARTO_ATTRIBUTION}
-            url={CARTO_VOYAGER_URL}
-            subdomains={["a", "b", "c", "d"]}
-            maxZoom={20}
-          />
+          <BasemapLayer />
           {sampleLocations.map((loc) => (
             <MapMarker key={loc.id} location={loc} />
           ))}

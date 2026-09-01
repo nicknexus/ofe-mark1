@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Users, BarChart3, FileText, Calendar, Info, Edit, MessageSquare, MapPin } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Tooltip, useMap } from 'react-leaflet'
+import { BasemapLayer } from './map/BasemapLayer'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { BeneficiaryGroup, KPIUpdate, Evidence, Story, Location } from '../types'
@@ -17,36 +18,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
-
-const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-const OSM_FALLBACK_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-
-function TileLayerWithFallback() {
-  const [useFallback, setUseFallback] = useState(false)
-  const map = useMap()
-  useEffect(() => {
-    if (useFallback) return
-    const testImg = new Image()
-    testImg.onerror = () => setUseFallback(true)
-    testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
-    return () => { testImg.onerror = null }
-  }, [useFallback])
-  useEffect(() => {
-    const handleTileError = () => { if (!useFallback) setUseFallback(true) }
-    map.on('tileerror', handleTileError)
-    return () => { map.off('tileerror', handleTileError) }
-  }, [map, useFallback])
-  return (
-    <TileLayer
-      attribution={useFallback ? OSM_ATTRIBUTION : CARTO_ATTRIBUTION}
-      url={useFallback ? OSM_FALLBACK_URL : CARTO_VOYAGER_URL}
-      subdomains={useFallback ? ['a', 'b', 'c'] : ['a', 'b', 'c', 'd']}
-      maxZoom={20}
-    />
-  )
-}
 
 function MapResizeHandler() {
   const map = useMap()
@@ -291,7 +262,7 @@ export default function BeneficiaryGroupDetailsModal({
                       zoomControl={false}
                       scrollWheelZoom
                     >
-                      <TileLayerWithFallback />
+                      <BasemapLayer />
                       <MapResizeHandler />
                       <FitBoundsToLocations locations={mapLocations} />
                       {mapLocations.map(loc => (

@@ -1,36 +1,10 @@
 import './leafletSetup'
 import React, { useEffect, useMemo, useState } from 'react'
-import { TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import { Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { PublicLocation } from '../../../services/publicApi'
 
-const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-const CARTO_ATTRIBUTION =
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-
-export function TileLayerWithFallback() {
-    const [useFallback, setUseFallback] = useState(false)
-    const map = useMap()
-
-    useEffect(() => {
-        if (useFallback) return
-        const testImg = new Image()
-        testImg.onerror = () => setUseFallback(true)
-        testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
-        return () => {
-            testImg.onerror = null
-        }
-    }, [useFallback])
-
-    return (
-        <TileLayer
-            attribution={useFallback ? '&copy; OpenStreetMap contributors' : CARTO_ATTRIBUTION}
-            url={useFallback ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' : CARTO_VOYAGER_URL}
-            subdomains={['a', 'b', 'c', 'd']}
-            maxZoom={20}
-        />
-    )
-}
+export { TileLayerWithFallback, BasemapLayer } from '../../map/BasemapLayer'
 
 export function LocationMarker({ location }: { location: PublicLocation }) {
     const [isHovered, setIsHovered] = useState(false)

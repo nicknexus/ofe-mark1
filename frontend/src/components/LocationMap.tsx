@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Tooltip } from 'react-leaflet'
+import { MapContainer, Marker, useMapEvents, useMap, Tooltip } from 'react-leaflet'
+import { BasemapLayer } from './map/BasemapLayer'
 import { createPortal } from 'react-dom'
 import L from 'leaflet'
 import { MapPin, X } from 'lucide-react'
@@ -13,12 +14,6 @@ L.Icon.Default.mergeOptions({
  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
-
-// Carto Voyager tile configuration - modern with blue water and colors
-const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-const OSM_FALLBACK_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 interface LocationMapProps {
  locations: Location[]
@@ -155,53 +150,6 @@ function MapResizeHandler() {
  }, [map])
  
  return null
-}
-
-// Tile layer with fallback handling
-function TileLayerWithFallback() {
- const [useFallback, setUseFallback] = useState(false)
- const map = useMap()
- 
- useEffect(() => {
- if (useFallback) return
- 
- // Test Carto tile availability
- const testImg = new Image()
- testImg.onerror = () => {
- console.warn('Carto tiles unavailable, falling back to OpenStreetMap')
- setUseFallback(true)
- }
- testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
- 
- return () => {
- testImg.onerror = null
- }
- }, [useFallback])
- 
- // Handle tile load errors at runtime
- useEffect(() => {
- const handleTileError = () => {
- if (!useFallback) {
- console.warn('Carto tile load failed, falling back to OpenStreetMap')
- setUseFallback(true)
- }
- }
- 
- map.on('tileerror', handleTileError)
- 
- return () => {
- map.off('tileerror', handleTileError)
- }
- }, [map, useFallback])
- 
- return (
- <TileLayer
- attribution={useFallback ? OSM_ATTRIBUTION : CARTO_ATTRIBUTION}
- url={useFallback ? OSM_FALLBACK_URL : CARTO_VOYAGER_URL}
- subdomains={useFallback ? ['a', 'b', 'c'] : ['a', 'b', 'c', 'd']}
- maxZoom={20}
- />
- )
 }
 
 // Custom marker component wrapper
@@ -518,7 +466,7 @@ export default function LocationMap({
  >
  <MapInstanceSetter mapRef={mapInstanceRef} />
  <MapResizeHandler />
- <TileLayerWithFallback />
+ <BasemapLayer />
  <MapClickHandler onMapClick={onMapClick} onMapClickPosition={handleMapClickWithPosition} />
  {/* When autoFit is on, MapAutoFit takes over framing. Otherwise
  MapViewUpdater drives the view from local center/zoom state. */}
