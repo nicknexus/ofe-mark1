@@ -198,16 +198,33 @@ function SortableInitiativeCard({
               </div>
             )}
 
-            {/* Exactly one action: log when ready, set up when not. */}
-            {ready && canLog && (
-              <button type="button" onClick={(e) => { stop(e); openAddLog(initiative) }} className="app-btn app-btn-primary app-btn-sm w-full">
-                <Plus className="w-3.5 h-3.5" /> Add log
-              </button>
-            )}
-            {!ready && canEditInitiatives && (
-              <button type="button" onClick={(e) => { stop(e); openSetup(initiative) }} className="app-btn app-btn-secondary app-btn-sm w-full">
-                <Settings2 className="w-3.5 h-3.5" /> Set up program
-              </button>
+            {/* Add log leads; Set up sits beside it, smaller but always visible. */}
+            {(canLog || canEditInitiatives) && (
+              <div className="flex items-center gap-2">
+                {canLog && (
+                  <button
+                    type="button"
+                    onClick={(e) => { stop(e); openAddLog(initiative) }}
+                    disabled={!ready}
+                    title={ready ? 'Log a claim or evidence' : 'Add a metric and a location first'}
+                    className="app-btn app-btn-primary app-btn-sm flex-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add log
+                  </button>
+                )}
+                {canEditInitiatives && (
+                  <button
+                    type="button"
+                    onClick={(e) => { stop(e); openSetup(initiative) }}
+                    title="Metrics, tags, locations, groups"
+                    className={`app-btn app-btn-sm flex-shrink-0 ${ready
+                      ? 'app-btn-secondary'
+                      : 'app-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'} ${canLog ? '' : 'flex-1'}`}
+                  >
+                    <Settings2 className="w-3.5 h-3.5" /> Set up
+                  </button>
+                )}
+              </div>
             )}
           </>
         ) : (
