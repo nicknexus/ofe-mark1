@@ -6,7 +6,8 @@ import { Initiative, CreateInitiativeForm } from '../../types'
 import { apiService } from '../../services/api'
 import { SubscriptionService } from '../../services/subscription'
 import { useTeam } from '../../context/TeamContext'
-import CreateInitiativeModal from '../CreateInitiativeModal'
+import CreateInitiativeModal, { type CreateInitiativeSource } from '../CreateInitiativeModal'
+import { createProgramFromSource } from '../setup/createProgram'
 import UpgradeModal from '../UpgradeModal'
 import { notify } from '../../lib/notify'
 import { EmptyState, SectionLoader } from '../ui'
@@ -59,11 +60,11 @@ export default function MobileDashboard({
  return set
  }, [initiatives, initiativesLimit])
 
- const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
- try {
- const newInitiative = await apiService.createInitiative(formData)
- notify.success('Program created!')
- onRefresh()
+  const handleCreateInitiative = async (formData: CreateInitiativeForm, source: CreateInitiativeSource) => {
+    try {
+      const { initiative: newInitiative, summary } = await createProgramFromSource(formData, source)
+      notify.success(summary)
+      onRefresh()
  if (newInitiative?.id) {
  // Enter the newly created initiative
  onEnterInitiative(newInitiative)
@@ -290,12 +291,13 @@ export default function MobileDashboard({
  {showCreateModal && (
  <CreateInitiativeModal
  isOpen={showCreateModal}
- onClose={() => setShowCreateModal(false)}
- onSubmit={handleCreateInitiative}
- />
- )}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateInitiative}
+          duplicateCandidates={initiatives}
+        />
+      )}
 
- {/* Edit Modal */}
+      {/* Edit Modal */}
  {showEditModal && editingInitiative && (
  <CreateInitiativeModal
  isOpen={showEditModal}

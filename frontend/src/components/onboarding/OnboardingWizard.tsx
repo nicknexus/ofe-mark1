@@ -58,6 +58,14 @@ export default function OnboardingWizard() {
   const [dir, setDir] = useState(1)
   const [completed, setCompleted] = useState({ account: false, initiative: false })
   const hydratedFor = useRef<string | null>(null)
+  // Bumped by the in-wizard ProgramSetupDrawer (writes bypass the draft) so
+  // the lists below re-pull without closing the wizard.
+  const [rehydrateTick, setRehydrateTick] = useState(0)
+  useEffect(() => {
+    const onUpdated = () => { hydratedFor.current = null; setRehydrateTick(t => t + 1) }
+    window.addEventListener('onboarding-rehydrate', onUpdated)
+    return () => window.removeEventListener('onboarding-rehydrate', onUpdated)
+  }, [])
 
   // Hydrate existing org data once per activation so re-opening setup shows
   // prior work (with those items locked, create-only).
@@ -101,7 +109,7 @@ export default function OnboardingWizard() {
       } catch { /* non-fatal — start empty */ }
     })()
     return () => { cancelled = true }
-  }, [isActive, orgId, hydrate])
+  }, [isActive, orgId, hydrate, rehydrateTick])
 
   // When the wizard closes, reset so re-opening always lands on the selection
   // hub (not wherever you left off) and re-pulls fresh data.

@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
- Plus,
- MapPin,
- Edit,
- Trash2,
- BarChart3,
+  Plus,
+  MapPin,
+  Edit,
+  Trash2,
+  BarChart3,
   GripVertical,
-  ChevronRight
+  ChevronRight,
+  Settings2,
+  Tag as TagIcon,
+  Users,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react'
 import {
  DndContext,
@@ -27,9 +33,12 @@ import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
 import { apiService } from '../services/api'
 import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location } from '../types'
-import { formatDate, truncateText } from '../utils'
+import { truncateText } from '../utils'
 import { notify } from '../lib/notify'
-import CreateInitiativeModal from '../components/CreateInitiativeModal'
+import CreateInitiativeModal, { type CreateInitiativeSource } from '../components/CreateInitiativeModal'
+import ProgramSetupDrawer from '../components/setup/ProgramSetupDrawer'
+import UploadWizardLauncher from '../components/upload/UploadWizardLauncher'
+import { createProgramFromSource } from '../components/setup/createProgram'
 import ModalFrame from '../components/ModalFrame'
 import UpgradeModal from '../components/UpgradeModal'
 import { SubscriptionService } from '../services/subscription'
@@ -48,47 +57,57 @@ import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
 // like the Metrics-tab cards: hairline border, crisp shadow, hover lift, and a
 // chevron as the "this opens" affordance.
 function SortableInitiativeCard({
- initiative,
- stats,
- canEditInitiatives,
- canDeleteInitiatives,
+  initiative,
+  stats,
+  canEditInitiatives,
+  canDeleteInitiatives,
+  canLog,
   openEditModal,
   openDeleteConfirm,
+  openSetup,
+  openAddLog,
+  openDuplicate,
   locked = false,
   onLockedClick,
   orgLogoUrl,
 }: {
   initiative: Initiative
   /** Per-initiative counts; null while background stats are still loading. */
-  stats: { metrics: number; locations: number } | null
+  stats: { metrics: number; locations: number; tags: number; groups: number } | null
   canEditInitiatives: boolean
   canDeleteInitiatives: boolean
+  canLog: boolean
   openEditModal: (i: Initiative) => void
   openDeleteConfirm: (i: Initiative) => void
+  openSetup: (i: Initiative) => void
+  openAddLog: (i: Initiative) => void
+  openDuplicate: (i: Initiative) => void
   locked?: boolean
   onLockedClick?: () => void
   /** Organization logo; falls back to the Nexus mark when absent. */
   orgLogoUrl?: string | null
 }) {
- const {
- attributes,
- listeners,
- setNodeRef,
- transform,
- transition,
- isDragging,
- } = useSortable({ id: initiative.id! })
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: initiative.id! })
 
- const style = {
- transform: CSS.Transform.toString(transform),
- transition,
- opacity: isDragging ? 0.5 : 1,
- zIndex: isDragging ? 10 : 'auto' as const,
- }
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 'auto' as const,
+  }
+
+  const ready = !!stats && stats.metrics > 0 && stats.locations > 0
 
   const inner = (
     <div className="p-4 h-full flex flex-col gap-2.5">
-      <div className="flex items-start gap-3 pr-14">
+      <div className="flex items-start gap-3 pr-20">
         {locked ? (
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100">
             <Lock className="w-4 h-4" />
@@ -108,11 +127,12 @@ function SortableInitiativeCard({
             {initiative.title}
           </h3>
           <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
-            {locked ? 'Locked — upgrade to unlock this program' : truncateText(initiative.description, 110)}
+            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, 110)}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-3.5 mt-auto pt-2.5 border-t border-gray-100">
+
+      <div className="mt-auto pt-2.5 border-t border-gray-100 space-y-2.5">
         {locked ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
             <Lock className="w-3.5 h-3.5" />
@@ -120,93 +140,141 @@ function SortableInitiativeCard({
           </span>
         ) : stats ? (
           <>
-            <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-              <BarChart3 className="w-3.5 h-3.5" />
-              {stats.metrics} metric{stats.metrics === 1 ? '' : 's'}
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-              <MapPin className="w-3.5 h-3.5" />
-              {stats.locations} location{stats.locations === 1 ? '' : 's'}
-            </span>
-            {initiative.updated_at && (
-              <span className="ml-auto text-[11px] text-gray-400">
-                {formatDate(initiative.updated_at)}
-              </span>
+            {/* Readiness: what exists, what's missing before logging works. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <ReadinessChip icon={BarChart3} label={`${stats.metrics} metric${stats.metrics === 1 ? '' : 's'}`} ok={stats.metrics > 0} missing="Add a metric" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />
+              <ReadinessChip icon={MapPin} label={`${stats.locations} location${stats.locations === 1 ? '' : 's'}`} ok={stats.locations > 0} missing="Add a location" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />
+              {stats.tags > 0 && <ReadinessChip icon={TagIcon} label={`${stats.tags} tag${stats.tags === 1 ? '' : 's'}`} ok optional />}
+              {stats.groups > 0 && <ReadinessChip icon={Users} label={`${stats.groups} group${stats.groups === 1 ? '' : 's'}`} ok optional />}
+              {ready && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-impact-700 ml-auto">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                </span>
+              )}
+            </div>
+            {(canLog || canEditInitiatives) && (
+              <div className="flex items-center gap-1.5" onClick={(e) => { e.preventDefault(); e.stopPropagation() }}>
+                {canLog && (
+                  <button
+                    type="button"
+                    onClick={() => openAddLog(initiative)}
+                    disabled={!ready}
+                    title={ready ? 'Log a claim or evidence' : 'Add a metric and a location first'}
+                    className="app-btn app-btn-primary app-btn-sm flex-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add log
+                  </button>
+                )}
+                {canEditInitiatives && (
+                  <button type="button" onClick={() => openSetup(initiative)} className="app-btn app-btn-secondary app-btn-sm flex-1">
+                    <Settings2 className="w-3.5 h-3.5" /> Set up
+                  </button>
+                )}
+              </div>
             )}
           </>
         ) : (
-          <span className="h-4 w-28 rounded bg-gray-100 animate-pulse" />
+          <span className="block h-4 w-28 rounded bg-gray-100 animate-pulse" />
         )}
       </div>
     </div>
   )
 
- return (
- <div ref={setNodeRef} style={style} className="h-full">
- <div
- className={`group relative h-full bg-white rounded-2xl border shadow-card transition-all duration-200 ${locked
- ? 'border-gray-200/70 hover:border-amber-300/70 hover:shadow-card-hover'
- : 'border-gray-200/70 hover:border-primary-300/70 hover:shadow-card-hover hover:-translate-y-0.5'
- }`}
- >
- {locked ? (
- <button type="button" onClick={onLockedClick} className="block w-full h-full text-left">
- {inner}
- </button>
- ) : (
- <Link to={`/programs/${initiative.id}`} className="block h-full">
- {inner}
- </Link>
- )}
+  return (
+    <div ref={setNodeRef} style={style} className="h-full">
+      <div
+        className={`group relative h-full bg-white rounded-2xl border shadow-card transition-all duration-200 ${locked
+          ? 'border-gray-200/70 hover:border-amber-300/70 hover:shadow-card-hover'
+          : 'border-gray-200/70 hover:border-primary-300/70 hover:shadow-card-hover hover:-translate-y-0.5'
+        }`}
+      >
+        {locked ? (
+          <button type="button" onClick={onLockedClick} className="block w-full h-full text-left">
+            {inner}
+          </button>
+        ) : (
+          <Link to={`/programs/${initiative.id}`} className="block h-full">
+            {inner}
+          </Link>
+        )}
 
- {/* Top-right: hover actions (drag / edit / delete) + open indicator */}
- <div className="absolute top-3 right-3 flex items-center gap-0.5">
- {!locked && canEditInitiatives && (
- <button
- type="button"
- {...attributes}
- {...listeners}
- onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
- className="hidden md:flex p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all cursor-grab active:cursor-grabbing"
- title="Drag to reorder"
- aria-label="Drag to reorder program"
- >
- <GripVertical className="w-3.5 h-3.5" />
- </button>
- )}
- {!locked && canEditInitiatives && (
- <button
- onClick={(e) => {
- e.preventDefault()
- e.stopPropagation()
- openEditModal(initiative)
- }}
- className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
- title="Edit Program"
- >
- <Edit className="w-3.5 h-3.5" />
- </button>
- )}
- {!locked && canDeleteInitiatives && (
- <button
- onClick={(e) => {
- e.preventDefault()
- e.stopPropagation()
- openDeleteConfirm(initiative)
- }}
- className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
- title="Delete Program"
- >
- <Trash2 className="w-3.5 h-3.5" />
- </button>
- )}
- {locked
- ? <Lock className="w-4 h-4 text-amber-500" />
- : <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />}
- </div>
- </div>
- </div>
- )
+        {/* Top-right: hover actions (drag / duplicate / edit / delete) + open indicator */}
+        <div className="absolute top-3 right-3 flex items-center gap-0.5">
+          {!locked && canEditInitiatives && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+              className="hidden md:flex p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all cursor-grab active:cursor-grabbing"
+              title="Drag to reorder"
+              aria-label="Drag to reorder program"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!locked && canEditInitiatives && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDuplicate(initiative) }}
+              className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
+              title="Duplicate structure"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!locked && canEditInitiatives && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditModal(initiative) }}
+              className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
+              title="Edit program"
+            >
+              <Edit className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!locked && canDeleteInitiatives && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDeleteConfirm(initiative) }}
+              className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+              title="Delete program"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {locked
+            ? <Lock className="w-4 h-4 text-amber-500" />
+            : <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReadinessChip({ icon: Icon, label, ok, missing, optional, onClick }: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  ok: boolean
+  missing?: string
+  optional?: boolean
+  onClick?: () => void
+}) {
+  const cls = ok
+    ? 'text-gray-500 bg-gray-50 border-gray-200'
+    : 'text-amber-700 bg-amber-50 border-amber-200'
+  const content = (
+    <>
+      {ok ? <Icon className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+      {ok ? label : (missing || label)}
+    </>
+  )
+  const base = `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls} ${optional ? 'opacity-80' : ''}`
+  if (onClick && !ok) {
+    return (
+      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} className={`${base} hover:bg-amber-100 transition-colors`}>
+        {content}
+      </button>
+    )
+  }
+  return <span className={base}>{content}</span>
 }
 
 export default function Dashboard() {
@@ -219,9 +287,11 @@ export default function Dashboard() {
  ownedOrganization,
  activeOrganization,
  canCreateInitiatives,
- canEditInitiatives,
- canDelete,
- } = useTeam()
+    canEditInitiatives,
+    canDelete,
+    canAddImpactClaims,
+    canAddEvidence,
+  } = useTeam()
  // Team members see the full dashboard. Widgets read from activeOrganization
  // so a team member sees the org they're scoped into, not a missing
  // ownedOrganization.
@@ -241,7 +311,11 @@ export default function Dashboard() {
  const [deleteConfirmText, setDeleteConfirmText] = useState('')
  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
- const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
+  const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
+  const [setupInitiative, setSetupInitiative] = useState<Initiative | null>(null)
+  const [addLogInitiative, setAddLogInitiative] = useState<Initiative | null>(null)
+  const [createSource, setCreateSource] = useState<CreateInitiativeSource | undefined>(undefined)
+  const [allGroups, setAllGroups] = useState<Array<{ initiative_id?: string }>>([])
  // Plan program limit — used to lock over-limit programs after a downgrade.
  const [initiativesLimit, setInitiativesLimit] = useState<number | null>(null)
 
@@ -393,14 +467,16 @@ export default function Dashboard() {
  .catch(() => { /* non-fatal */ })
 
  // Load KPIs, evidence, and locations in background
- const [{ kpis }, locations] = await Promise.all([
- apiService.loadKPIsAndEvidence(),
- apiService.getLocations() // Get all locations across all initiatives
- ])
- if (isStale()) return
- setAllKPIs(kpis)
- setAllLocations(locations)
- setIsLoadingStats(false)
+ const [{ kpis }, locations, groups] = await Promise.all([
+        apiService.loadKPIsAndEvidence(),
+        apiService.getLocations(), // Get all locations across all initiatives
+        apiService.getBeneficiaryGroups().catch(() => []),
+      ])
+      if (isStale()) return
+      setAllKPIs(kpis)
+      setAllLocations(locations)
+      setAllGroups(groups || [])
+      setIsLoadingStats(false)
 
  console.log('Dashboard data loaded successfully')
 
@@ -433,25 +509,32 @@ export default function Dashboard() {
  const refreshKPIsAndEvidence = async () => {
  try {
  setIsLoadingStats(true)
- const [kpis, locations] = await Promise.all([
- apiService.getKPIs(),
- apiService.getLocations()
- ])
- setAllKPIs(kpis)
- setAllLocations(locations)
- setIsLoadingStats(false)
+ const [kpis, locations, groups] = await Promise.all([
+        apiService.getKPIs(),
+        apiService.getLocations(),
+        apiService.getBeneficiaryGroups().catch(() => []),
+      ])
+      setAllKPIs(kpis)
+      setAllLocations(locations)
+      setAllGroups(groups || [])
+      setIsLoadingStats(false)
  } catch (error) {
  console.error('Failed to refresh KPIs and evidence:', error)
  setIsLoadingStats(false)
  }
  }
 
- const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
- try {
- const newInitiative = await apiService.createInitiative(formData)
- notify.success('Program created successfully!')
- // Only refresh initiatives, not all data
- await refreshInitiatives()
+ const handleCreateInitiative = async (formData: CreateInitiativeForm, source: CreateInitiativeSource) => {
+    try {
+      const { initiative: newInitiative, summary } = await createProgramFromSource(formData, source)
+      notify.success(summary)
+      apiService.clearCache()
+      await refreshInitiatives()
+      refreshKPIsAndEvidence()
+      // Blank programs land straight in Set up so the next step is obvious.
+      if (source.kind === 'blank' && newInitiative?.id) {
+        setSetupInitiative(newInitiative)
+      }
 
  } catch (error: any) {
  // Check if it's an initiative limit error
@@ -561,18 +644,27 @@ export default function Dashboard() {
 
  // Per-initiative counts for the hero cards (metrics + locations).
  const initiativeStats = useMemo(() => {
- const map: Record<string, { metrics: number; locations: number }> = {}
- for (const i of initiatives) {
- if (i.id) map[i.id] = { metrics: 0, locations: 0 }
- }
- for (const k of allKPIs) {
- if (k.initiative_id && map[k.initiative_id]) map[k.initiative_id].metrics++
- }
- for (const l of allLocations) {
- if (l.initiative_id && map[l.initiative_id]) map[l.initiative_id].locations++
- }
- return map
- }, [initiatives, allKPIs, allLocations])
+    const map: Record<string, { metrics: number; locations: number; tags: number; groups: number }> = {}
+    for (const i of initiatives) {
+      if (i.id) map[i.id] = { metrics: 0, locations: 0, tags: 0, groups: 0 }
+    }
+    for (const k of allKPIs) {
+      if (k.initiative_id && map[k.initiative_id] && !k.archived_at) {
+        map[k.initiative_id].metrics++
+        map[k.initiative_id].tags += (k.tag_ids || []).length
+      }
+    }
+    for (const l of allLocations) {
+      const seen = new Set<string>()
+      if (l.initiative_id) seen.add(l.initiative_id)
+      for (const iid of l.initiative_ids || []) seen.add(iid)
+      for (const iid of seen) if (map[iid]) map[iid].locations++
+    }
+    for (const g of allGroups) {
+      if (g.initiative_id && map[g.initiative_id]) map[g.initiative_id].groups++
+    }
+    return map
+  }, [initiatives, allKPIs, allLocations, allGroups])
 
 
  if (loadingState.isLoading) {
@@ -610,7 +702,7 @@ export default function Dashboard() {
  title={isSharedMember ? 'Team programs' : 'Programs'}
  subtitle={isSharedMember && organizationName
  ? `Team · ${organizationName}`
- : 'Open a program to add metrics, locations, and evidence.'}
+ : 'Set up metrics and locations here, then log claims and evidence.'}
  help={<InitiativesHelp />}
  actions={canCreateInitiatives ? (
  <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary app-btn-sm">
@@ -647,11 +739,15 @@ export default function Dashboard() {
  <SortableInitiativeCard
  key={initiative.id}
  initiative={initiative}
- stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0 }}
- canEditInitiatives={canEditInitiatives}
- canDeleteInitiatives={canDelete}
- openEditModal={openEditModal}
- openDeleteConfirm={openDeleteConfirm}
+ stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0, tags: 0, groups: 0 }}
+                      canEditInitiatives={canEditInitiatives}
+                      canDeleteInitiatives={canDelete}
+                      canLog={canAddImpactClaims || canAddEvidence}
+                      openEditModal={openEditModal}
+                      openDeleteConfirm={openDeleteConfirm}
+                      openSetup={(i) => setSetupInitiative(i)}
+                      openAddLog={(i) => setAddLogInitiative(i)}
+                      openDuplicate={(i) => { setCreateSource({ kind: 'duplicate', sourceInitiativeId: i.id! }); setShowCreateModal(true) }}
  locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
  onLockedClick={() => setShowUpgradeModal(true)}
  orgLogoUrl={dashboardOrg?.logo_url}
@@ -675,12 +771,32 @@ export default function Dashboard() {
  </motion.div>
 
  {showCreateModal && (
- <CreateInitiativeModal
- isOpen={showCreateModal}
- onClose={() => setShowCreateModal(false)}
- onSubmit={handleCreateInitiative}
- />
- )}
+        <CreateInitiativeModal
+          isOpen={showCreateModal}
+          onClose={() => { setShowCreateModal(false); setCreateSource(undefined) }}
+          onSubmit={handleCreateInitiative}
+          duplicateCandidates={initiatives.filter(i => !!i.id && !lockedInitiativeIds.has(i.id))}
+          initialSource={createSource}
+        />
+      )}
+
+      {setupInitiative?.id && (
+        <ProgramSetupDrawer
+          initiativeId={setupInitiative.id}
+          initiativeTitle={setupInitiative.title}
+          isOpen
+          onClose={() => setSetupInitiative(null)}
+          onChanged={() => refreshKPIsAndEvidence()}
+        />
+      )}
+
+      {addLogInitiative?.id && (
+        <UploadWizardLauncher
+          initiativeId={addLogInitiative.id}
+          onClose={() => setAddLogInitiative(null)}
+          onCreated={() => { apiService.clearCache(); refreshKPIsAndEvidence() }}
+        />
+      )}
 
  {/* Edit Initiative Modal */}
  {selectedInitiative && (

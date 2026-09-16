@@ -715,6 +715,23 @@
     animation: slideUp 0.3s ease-out;
 }
 
+/* Right-side drawers (program setup, detail panels). */
+@keyframes slideInRight {
+    from {
+        transform: translateX(24px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.animate-slide-in-right {
+    animation: slideInRight 0.25s ease-out;
+}
+
 .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

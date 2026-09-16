@@ -6,6 +6,7 @@ import { apiService } from '../../../services/api'
 import { notify } from '../../../lib/notify'
 import TagPicker from '../../MetricTags/TagPicker'
 import { CreateKPIForm } from '../../../types'
+import ProgramSetupDrawer from '../../setup/ProgramSetupDrawer'
 
 interface Props {
   draftApi: OnboardingDraftApi
@@ -20,6 +21,7 @@ const CATEGORIES: { value: CreateKPIForm['category']; label: string; desc: strin
 export default function SetupInitiativesStep({ draftApi }: Props) {
   const { draft, addMetric, removeMetric, addGroup, removeGroup, isLocked } = draftApi
   const [activeId, setActiveId] = useState<string | null>(draft.initiatives[0]?.id ?? null)
+  const [setupOpen, setSetupOpen] = useState(false)
 
   // Keep the active tab valid as initiatives change.
   useEffect(() => {
@@ -77,6 +79,13 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
       )}
 
       <div className="max-w-5xl space-y-6">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/60 px-4 py-3">
+          <p className="text-sm text-secondary-600">
+            Prefer one screen? Open the full setup for <span className="font-medium text-secondary-900">{active.title}</span> to add metrics, tags, locations and groups together.
+          </p>
+          <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary app-btn-sm flex-shrink-0">Open full setup</button>
+        </div>
+
         <MetricsSection
           key={`metrics-${active.id}`}
           initiativeId={active.id!}
@@ -95,6 +104,20 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
           isLocked={isLocked}
         />
       </div>
+
+      {setupOpen && active.id && (
+        <ProgramSetupDrawer
+          initiativeId={active.id}
+          initiativeTitle={active.title}
+          isOpen
+          onClose={() => {
+            setSetupOpen(false)
+            // Drawer writes go straight to the API; re-pull the draft lists.
+            apiService.clearCache()
+            window.dispatchEvent(new Event('onboarding-rehydrate'))
+          }}
+        />
+      )}
     </div>
   )
 }

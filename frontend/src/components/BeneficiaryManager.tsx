@@ -140,7 +140,7 @@ interface CreateGroupModalProps {
  initiativeId: string
 }
 
-function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }: CreateGroupModalProps) {
+export function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }: CreateGroupModalProps) {
  const [formData, setFormData] = useState({
  name: '',
  description: '',
