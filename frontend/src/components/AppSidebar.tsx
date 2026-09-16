@@ -73,6 +73,8 @@ function pathActive(pathname: string, to: string) {
   if (to === '/tags') return pathname === '/tags' || pathname.startsWith('/tags/')
   if (to === '/account') return pathname === '/account' || pathname.startsWith('/account')
   if (to === '/share/org') return pathname === '/share/org' || pathname === '/share/brand'
+  // A program workspace belongs to Programs.
+  if (to === '/tracking/programs') return pathname === to || pathname.startsWith(`${to}/`) || pathname.startsWith('/programs/') || pathname.startsWith('/initiatives/')
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
@@ -135,7 +137,7 @@ function NavRow({
 
 /**
  * Org-level sidebar for Home / Tracking / Share.
- * Hidden on initiative pages (those keep InitiativeSidebar) and on mobile via `.desktop-sidebar`.
+ * Hidden on mobile via `.desktop-sidebar` (the program page shows it too).
  */
 export default function AppSidebar({ user }: AppSidebarProps) {
   const location = useLocation()
@@ -165,6 +167,8 @@ export default function AppSidebar({ user }: AppSidebarProps) {
   const trackingOpen =
     pathname === '/tracking' ||
     pathname.startsWith('/tracking/') ||
+    pathname.startsWith('/programs/') ||
+    pathname.startsWith('/initiatives/') ||
     pathname.startsWith('/metrics') ||
     pathname === '/locations' ||
     pathname === '/tags' ||

@@ -357,7 +357,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
 
  if (!initiativeId) {
  return (
- <div className="min-h-screen flex items-center justify-center">
+ <div className="h-full flex items-center justify-center">
  <div className="text-center">
  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
  <p className="text-gray-600">Invalid program ID</p>
@@ -367,7 +367,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  }
 
  return (
- <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
+ <div className="h-full overflow-hidden flex flex-col mobile-content-padding">
  {/* Header */}
  <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
  <div className="flex items-center justify-between gap-3">

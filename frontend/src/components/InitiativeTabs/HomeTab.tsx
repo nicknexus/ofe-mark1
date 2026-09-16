@@ -6,7 +6,7 @@ interface HomeTabProps {
 
 export default function HomeTab({ children }: HomeTabProps) {
  return (
- <div className="h-screen overflow-hidden mobile-content-padding">
+ <div className="h-full overflow-hidden mobile-content-padding">
  {children}
  </div>
  )

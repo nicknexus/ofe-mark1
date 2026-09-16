@@ -263,7 +263,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }
 
  return (
-    <div className={embedded ? 'flex flex-col' : 'h-screen max-md:h-full overflow-hidden flex flex-col'}>
+    <div className={embedded ? 'flex flex-col' : 'h-full overflow-hidden flex flex-col'}>
       {/* Header + toolbar (kept compact so the list below is the focus) */}
       <div className={`px-4 sm:px-6 pt-3 sm:pt-5 pb-2.5 sm:pb-3 border-b border-gray-100 space-y-2 md:space-y-3 flex-shrink-0 ${embedded ? 'bg-gray-50' : 'bg-white'}`}>
         {/* Title row — Add is hidden on phone (center FAB owns that action) */}

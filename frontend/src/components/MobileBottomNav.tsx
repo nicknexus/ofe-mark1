@@ -6,7 +6,6 @@ import {
   MapPin,
   Users,
   BookOpen,
-  FileBarChart,
   ArrowLeft
 } from 'lucide-react'
 
@@ -22,14 +21,13 @@ export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottom
     { id: 'location', label: 'Locations', icon: MapPin },
  { id: 'beneficiaries', label: 'People', icon: Users },
  { id: 'stories', label: 'Stories', icon: BookOpen },
- { id: 'report', label: 'Report', icon: FileBarChart },
  ]
 
  return (
  <div className="mobile-bottom-nav">
  {/* Back to Dashboard */}
  <Link
- to="/"
+ to="/tracking/programs"
  className="mobile-nav-item"
  >
  <ArrowLeft className="w-6 h-6" />

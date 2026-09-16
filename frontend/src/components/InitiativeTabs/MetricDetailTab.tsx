@@ -87,7 +87,7 @@ export default function MetricDetailTab({
   }), [updates, kpi, timeFrame, isCumulative, isPct])
 
   return (
-    <div className="h-screen overflow-y-auto bg-gray-50 mobile-content-padding">
+    <div className="h-full overflow-y-auto bg-gray-50 mobile-content-padding">
         <motion.div
           className="px-4 sm:px-6 py-5 space-y-4"
           variants={staggerContainer}

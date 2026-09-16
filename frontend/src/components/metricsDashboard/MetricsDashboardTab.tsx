@@ -180,12 +180,15 @@ function MetricCard({
   total,
   canReorder,
   onOpen,
+  tagNames = [],
 }: {
   kpi: any
   color: string
   total: number
   canReorder: boolean
   onOpen: () => void
+  /** Names of the tags attached to this metric, shown as a compact hint row. */
+  tagNames?: string[]
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: kpi.id, disabled: !canReorder })
   const style: React.CSSProperties = {
@@ -221,12 +224,18 @@ function MetricCard({
             {kpi.title}
           </p>
         </div>
-        <div className="flex items-baseline gap-1.5 mt-auto">
+        <div className="flex items-baseline gap-1.5 mt-auto min-w-0">
           <span className="text-2xl font-semibold text-gray-900 tabular-nums">
             {isPct ? `${Math.round(total)}%` : total.toLocaleString()}
           </span>
           {!isPct && kpi.unit_of_measurement && (
             <span className="text-xs text-gray-400 truncate">{kpi.unit_of_measurement}</span>
+          )}
+          {tagNames.length > 0 && (
+            <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-gray-400 truncate max-w-[45%]" title={tagNames.join(', ')}>
+              <TagIcon className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{tagNames.length === 1 ? tagNames[0] : `${tagNames.length} tags`}</span>
+            </span>
           )}
         </div>
       </div>
@@ -273,6 +282,7 @@ export default function MetricsDashboardTab({
   const [datePickerValue, setDatePickerValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const tagNameById = useMemo(() => new Map(allTags.map(t => [t.id, t.name])), [allTags])
   const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
 
   const sensors = useSensors(
@@ -702,6 +712,7 @@ export default function MetricsDashboardTab({
                   total={filteredTotals[kpi.id] ?? 0}
                   canReorder={canEditMetrics}
                   onOpen={() => (onMetricDetailClick ? onMetricDetailClick(kpi.id) : openLogsForMetric(kpi.id))}
+                  tagNames={((kpi.tag_ids || []) as string[]).map(tid => tagNameById.get(tid)).filter(Boolean) as string[]}
                 />
                 </motion.div>
               ))}

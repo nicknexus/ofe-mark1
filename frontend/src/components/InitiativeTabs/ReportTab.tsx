@@ -545,9 +545,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
 
  return (
- <div className="h-screen overflow-hidden flex flex-col mobile-content-padding relative">
+ <div className="h-full overflow-hidden flex flex-col relative">
  {loadingReport && (
- <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+ <div className="absolute inset-0 bg-white z-50 flex items-center justify-center">
  <div className="text-center max-w-md mx-auto px-6">
  <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center mx-auto mb-4">
  <Sparkles className="w-7 h-7 text-primary-600" />

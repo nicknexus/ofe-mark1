@@ -177,7 +177,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
  }
 
  return (
-   <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
+   <div className="h-full overflow-hidden flex flex-col mobile-content-padding">
      {/* Header + filters */}
      <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white space-y-3 flex-shrink-0">
        <div className="flex items-center justify-between gap-3">
