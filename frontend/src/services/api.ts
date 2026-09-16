@@ -28,6 +28,7 @@ import {
     ProgramTemplate,
     StructureSummary,
     ProgramReadiness,
+  InitiativeActivity,
     MatchPreviewScope,
     MatchPreviewResult,
     EvidenceMatchDiagnostics,
@@ -446,6 +447,10 @@ class ApiService {
             method: 'POST',
             body: JSON.stringify(data)
         })
+    }
+
+    async getInitiativeActivity(): Promise<Record<string, InitiativeActivity>> {
+        return (await this.request<Record<string, InitiativeActivity>>('/initiatives/activity')) || {}
     }
 
     async getInitiativeReadiness(id: string): Promise<ProgramReadiness> {

@@ -46,6 +46,21 @@ export function compareClaimsByEffectiveDateDesc<T extends {
 }
 
 // Format date for display — default "Feb 24, 2025", pass options to customize
+/** "just now", "3 hours ago", "2 days ago", "Mar 4" (beyond ~4 weeks). */
+export function formatRelativeTime(date: string | Date): string {
+  const then = new Date(date).getTime()
+  if (Number.isNaN(then)) return ''
+  const diff = Math.max(0, Date.now() - then)
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min} min ago`
+  const hrs = Math.floor(min / 60)
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 28) return `${days} day${days === 1 ? '' : 's'} ago`
+  return formatDate(date, { month: 'short', day: 'numeric' })
+}
+
 export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
  return new Intl.DateTimeFormat('en-US', options ?? {
  year: 'numeric',

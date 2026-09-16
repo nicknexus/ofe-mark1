@@ -121,6 +121,16 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
+// Per-program activity (last log, claim/evidence counts) for dashboard cards.
+router.get('/activity', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        res.json(await InitiativeService.getActivity(req.user!.id, requestedOrgId));
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Update display order for multiple initiatives (drag-and-drop on dashboard).
 // Org-scoped: any team member can reorder.
 router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest, res) => {

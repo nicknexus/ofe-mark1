@@ -7,13 +7,11 @@ import {
   Trash2,
   BarChart3,
   GripVertical,
-  ChevronRight,
   Settings2,
-  Tag as TagIcon,
-  Users,
   Copy,
-  CheckCircle2,
   AlertCircle,
+  MoreHorizontal,
+  Clock,
 } from 'lucide-react'
 import {
  DndContext,
@@ -30,10 +28,10 @@ import {
  rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location } from '../types'
-import { truncateText } from '../utils'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, InitiativeActivity } from '../types'
+import { truncateText, formatRelativeTime } from '../utils'
 import { notify } from '../lib/notify'
 import CreateInitiativeModal, { type CreateInitiativeSource } from '../components/CreateInitiativeModal'
 import ProgramSetupDrawer from '../components/setup/ProgramSetupDrawer'
@@ -48,7 +46,7 @@ import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
 import { Button, PageLoader, InlineAlert, EmptyState, PageHeader } from '../components/ui'
 import { InitiativesHelp } from '../components/tracking/TrackingHelp'
-import { easeOut } from '../components/timeline/motion'
+import { easeOut, dropdownPop } from '../components/timeline/motion'
 import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
 
 // ============ Sortable initiative card ============
@@ -59,6 +57,7 @@ import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
 function SortableInitiativeCard({
   initiative,
   stats,
+  activity,
   canEditInitiatives,
   canDeleteInitiatives,
   canLog,
@@ -70,10 +69,13 @@ function SortableInitiativeCard({
   locked = false,
   onLockedClick,
   orgLogoUrl,
+  size = 'compact',
 }: {
   initiative: Initiative
   /** Per-initiative counts; null while background stats are still loading. */
   stats: { metrics: number; locations: number; tags: number; groups: number } | null
+  /** Last log + counts; undefined while loading, null if the endpoint failed. */
+  activity?: InitiativeActivity | null
   canEditInitiatives: boolean
   canDeleteInitiatives: boolean
   canLog: boolean
@@ -86,6 +88,8 @@ function SortableInitiativeCard({
   onLockedClick?: () => void
   /** Organization logo; falls back to the Nexus mark when absent. */
   orgLogoUrl?: string | null
+  /** 'large' when the org has only a few programs (2-col grid). */
+  size?: 'compact' | 'large'
 }) {
   const {
     attributes,
@@ -103,36 +107,63 @@ function SortableInitiativeCard({
     zIndex: isDragging ? 10 : 'auto' as const,
   }
 
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [menuOpen])
+
   const ready = !!stats && stats.metrics > 0 && stats.locations > 0
+  const hasMenu = !locked && (canEditInitiatives || canDeleteInitiatives)
+  const large = size === 'large'
+  const stop = (e: React.SyntheticEvent) => { e.preventDefault(); e.stopPropagation() }
+
+  // One line that says whether this program is alive.
+  const activityLine = (() => {
+    if (activity === undefined) return null
+    if (!activity || (activity.claims === 0 && activity.evidence === 0)) return { text: 'No logs yet', quiet: true }
+    const parts = [
+      activity.claims > 0 ? `${activity.claims} claim${activity.claims === 1 ? '' : 's'}` : null,
+      activity.evidence > 0 ? `${activity.evidence} evidence` : null,
+    ].filter(Boolean).join(', ')
+    return { text: `Last log ${activity.last_log_at ? formatRelativeTime(activity.last_log_at) : ''}`.trim(), detail: parts, quiet: false }
+  })()
 
   const inner = (
-    <div className="p-4 h-full flex flex-col gap-2.5">
-      <div className="flex items-start gap-3 pr-20">
+    <div className={`${large ? 'p-5 gap-3.5' : 'p-4 gap-3'} h-full flex flex-col`}>
+      <div className={`flex items-start gap-3 ${hasMenu ? 'pr-8' : ''}`}>
         {locked ? (
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100">
+          <div className={`${large ? 'w-12 h-12' : 'w-10 h-10'} rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100`}>
             <Lock className="w-4 h-4" />
           </div>
         ) : (
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+          <div className={`${large ? 'w-12 h-12' : 'w-10 h-10'} rounded-xl flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-200/80 shadow-card overflow-hidden`}>
             <img
               src={orgLogoUrl || '/Nexuslogo.png'}
               alt=""
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain p-1"
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
             />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className={`text-[15px] font-semibold leading-snug line-clamp-1 tracking-tight transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
+          <h3 className={`${large ? 'text-base' : 'text-[15px]'} font-semibold leading-snug line-clamp-1 tracking-tight transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
             {initiative.title}
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
-            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, 110)}
+          <p className={`text-xs text-gray-500 mt-0.5 leading-relaxed ${large ? 'line-clamp-3' : 'line-clamp-2'}`}>
+            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, large ? 180 : 110)}
           </p>
         </div>
       </div>
 
-      <div className="mt-auto pt-2.5 border-t border-gray-100 space-y-2.5">
+      <div className="mt-auto pt-3 border-t border-gray-100 space-y-2.5">
         {locked ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
             <Lock className="w-3.5 h-3.5" />
@@ -140,37 +171,43 @@ function SortableInitiativeCard({
           </span>
         ) : stats ? (
           <>
-            {/* Readiness: what exists, what's missing before logging works. */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <ReadinessChip icon={BarChart3} label={`${stats.metrics} metric${stats.metrics === 1 ? '' : 's'}`} ok={stats.metrics > 0} missing="Add a metric" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />
-              <ReadinessChip icon={MapPin} label={`${stats.locations} location${stats.locations === 1 ? '' : 's'}`} ok={stats.locations > 0} missing="Add a location" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />
-              {stats.tags > 0 && <ReadinessChip icon={TagIcon} label={`${stats.tags} tag${stats.tags === 1 ? '' : 's'}`} ok optional />}
-              {stats.groups > 0 && <ReadinessChip icon={Users} label={`${stats.groups} group${stats.groups === 1 ? '' : 's'}`} ok optional />}
-              {ready && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-impact-700 ml-auto">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+            {/* Ready: one quiet structure line + last activity. Not ready: what to fix. */}
+            {ready ? (
+              <div className="flex items-center justify-between gap-3 min-w-0">
+                <span className="text-[11px] text-gray-400 truncate">
+                  {[
+                    `${stats.metrics} metric${stats.metrics === 1 ? '' : 's'}`,
+                    `${stats.locations} location${stats.locations === 1 ? '' : 's'}`,
+                    stats.tags > 0 ? `${stats.tags} tag${stats.tags === 1 ? '' : 's'}` : null,
+                    stats.groups > 0 ? `${stats.groups} group${stats.groups === 1 ? '' : 's'}` : null,
+                  ].filter(Boolean).join(' · ')}
                 </span>
-              )}
-            </div>
-            {(canLog || canEditInitiatives) && (
-              <div className="flex items-center gap-1.5" onClick={(e) => { e.preventDefault(); e.stopPropagation() }}>
-                {canLog && (
-                  <button
-                    type="button"
-                    onClick={() => openAddLog(initiative)}
-                    disabled={!ready}
-                    title={ready ? 'Log a claim or evidence' : 'Add a metric and a location first'}
-                    className="app-btn app-btn-primary app-btn-sm flex-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add log
-                  </button>
-                )}
-                {canEditInitiatives && (
-                  <button type="button" onClick={() => openSetup(initiative)} className="app-btn app-btn-secondary app-btn-sm flex-1">
-                    <Settings2 className="w-3.5 h-3.5" /> Set up
-                  </button>
+                {activityLine && (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-medium flex-shrink-0 ${activityLine.quiet ? 'text-gray-400' : 'text-gray-600'}`} title={activityLine.detail}>
+                    <Clock className="w-3 h-3" /> {activityLine.text}
+                  </span>
                 )}
               </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {stats.metrics === 0 && <FixChip icon={BarChart3} label="Add a metric" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />}
+                {stats.locations === 0 && <FixChip icon={MapPin} label="Add a location" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />}
+                {activityLine && !activityLine.quiet && (
+                  <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-gray-500"><Clock className="w-3 h-3" /> {activityLine.text}</span>
+                )}
+              </div>
+            )}
+
+            {/* Exactly one action: log when ready, set up when not. */}
+            {ready && canLog && (
+              <button type="button" onClick={(e) => { stop(e); openAddLog(initiative) }} className="app-btn app-btn-primary app-btn-sm w-full">
+                <Plus className="w-3.5 h-3.5" /> Add log
+              </button>
+            )}
+            {!ready && canEditInitiatives && (
+              <button type="button" onClick={(e) => { stop(e); openSetup(initiative) }} className="app-btn app-btn-secondary app-btn-sm w-full">
+                <Settings2 className="w-3.5 h-3.5" /> Set up program
+              </button>
             )}
           </>
         ) : (
@@ -186,7 +223,7 @@ function SortableInitiativeCard({
         className={`group relative h-full ${locked
           ? 'app-tile-static transition-all duration-200 hover:border-amber-300/70 hover:shadow-card-hover'
           : 'app-tile'
-        }`}
+        } ${menuOpen ? 'z-20' : ''}`}
       >
         {locked ? (
           <button type="button" onClick={onLockedClick} className="block w-full h-full text-left">
@@ -198,84 +235,106 @@ function SortableInitiativeCard({
           </Link>
         )}
 
-        {/* Top-right: hover actions (drag / duplicate / edit / delete) + open indicator */}
-        <div className="absolute top-3 right-3 flex items-center gap-0.5">
-          {!locked && canEditInitiatives && (
+        {/* Left edge: drag grip, hover-only, desktop only. */}
+        {!locked && canEditInitiatives && (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            onClick={stop}
+            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-9 items-center justify-center rounded-md bg-white border border-gray-200/80 shadow-card text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-all cursor-grab active:cursor-grabbing"
+            title="Drag to reorder"
+            aria-label="Drag to reorder program"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Top-right: one menu. */}
+        {hasMenu && (
+          <div ref={menuRef} className="absolute top-3 right-3">
             <button
               type="button"
-              {...attributes}
-              {...listeners}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-              className="hidden md:flex p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all cursor-grab active:cursor-grabbing"
-              title="Drag to reorder"
-              aria-label="Drag to reorder program"
+              onClick={(e) => { stop(e); setMenuOpen(v => !v) }}
+              className={`p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all ${menuOpen ? 'bg-gray-100 text-gray-700 opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+              title="Program options"
+              aria-label="Program options"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
-              <GripVertical className="w-3.5 h-3.5" />
+              <MoreHorizontal className="w-4 h-4" />
             </button>
-          )}
-          {!locked && canEditInitiatives && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDuplicate(initiative) }}
-              className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
-              title="Duplicate structure"
-            >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {!locked && canEditInitiatives && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditModal(initiative) }}
-              className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
-              title="Edit program"
-            >
-              <Edit className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {!locked && canDeleteInitiatives && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDeleteConfirm(initiative) }}
-              className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-              title="Delete program"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {locked
-            ? <Lock className="w-4 h-4 text-amber-500" />
-            : <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />}
-        </div>
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  role="menu"
+                  initial={dropdownPop.initial}
+                  animate={dropdownPop.animate}
+                  exit={dropdownPop.exit}
+                  className="absolute right-0 top-full mt-1 w-48 app-card-elevated p-1.5 origin-top-right"
+                >
+                  {canEditInitiatives && (
+                    <MenuItem icon={Settings2} label="Set up" onClick={() => { setMenuOpen(false); openSetup(initiative) }} />
+                  )}
+                  {canEditInitiatives && (
+                    <MenuItem icon={Edit} label="Edit details" onClick={() => { setMenuOpen(false); openEditModal(initiative) }} />
+                  )}
+                  {canEditInitiatives && (
+                    <MenuItem icon={Copy} label="Duplicate structure" onClick={() => { setMenuOpen(false); openDuplicate(initiative) }} />
+                  )}
+                  {canDeleteInitiatives && (
+                    <>
+                      <div className="my-1 border-t border-gray-100" />
+                      <MenuItem icon={Trash2} label="Delete program" tone="danger" onClick={() => { setMenuOpen(false); openDeleteConfirm(initiative) }} />
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+        {locked && <Lock className="absolute top-4 right-4 w-4 h-4 text-amber-500" />}
       </div>
     </div>
   )
 }
 
-function ReadinessChip({ icon: Icon, label, ok, missing, optional, onClick }: {
+function MenuItem({ icon: Icon, label, onClick, tone = 'default' }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
-  ok: boolean
-  missing?: string
-  optional?: boolean
+  onClick: () => void
+  tone?: 'default' | 'danger'
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }}
+      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] font-medium transition-colors ${tone === 'danger'
+        ? 'text-red-600 hover:bg-red-50'
+        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'}`}
+    >
+      <Icon className={`w-4 h-4 flex-shrink-0 ${tone === 'danger' ? 'text-red-500' : 'text-gray-400'}`} />
+      {label}
+    </button>
+  )
+}
+
+/** Amber "fix this" chip shown only while something required is missing. */
+function FixChip({ icon: Icon, label, onClick }: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
   onClick?: () => void
 }) {
-  // Present dimensions read like the metric card's tag hint (quiet, icon +
-  // text); a missing one becomes an amber pill you can click to fix.
-  const content = (
-    <>
-      {ok ? <Icon className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-      {ok ? label : (missing || label)}
-    </>
-  )
-  const base = ok
-    ? `inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 ${optional ? 'text-gray-400' : ''}`
-    : 'inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700'
-  if (onClick && !ok) {
+  const cls = 'inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700'
+  if (onClick) {
     return (
-      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} className={`${base} hover:bg-amber-100 transition-colors`}>
-        {content}
+      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} className={`${cls} hover:bg-amber-100 transition-colors`}>
+        <Icon className="w-3 h-3" /> {label}
       </button>
     )
   }
-  return <span className={base}>{content}</span>
+  return <span className={cls}><AlertCircle className="w-3 h-3" /> {label}</span>
 }
 
 export default function Dashboard() {
@@ -317,6 +376,7 @@ export default function Dashboard() {
   const [addLogInitiative, setAddLogInitiative] = useState<Initiative | null>(null)
   const [createSource, setCreateSource] = useState<CreateInitiativeSource | undefined>(undefined)
   const [allGroups, setAllGroups] = useState<Array<{ initiative_id?: string }>>([])
+  const [activity, setActivity] = useState<Record<string, InitiativeActivity> | null>(null)
  // Plan program limit — used to lock over-limit programs after a downgrade.
  const [initiativesLimit, setInitiativesLimit] = useState<number | null>(null)
 
@@ -478,6 +538,7 @@ export default function Dashboard() {
       setAllLocations(locations)
       setAllGroups(groups || [])
       setIsLoadingStats(false)
+      apiService.getInitiativeActivity().then(setActivity).catch(() => setActivity({}))
 
  console.log('Dashboard data loaded successfully')
 
@@ -667,6 +728,9 @@ export default function Dashboard() {
     return map
   }, [initiatives, allKPIs, allLocations, allGroups])
 
+  // A handful of programs gets roomier two-column cards; a long list stays compact.
+  const largeCards = initiatives.length <= 4
+
 
  if (loadingState.isLoading) {
  return <PageLoader />
@@ -735,11 +799,13 @@ export default function Dashboard() {
  items={initiatives.map(i => i.id!).filter(Boolean)}
  strategy={rectSortingStrategy}
  >
- <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+ <div className={`grid grid-cols-1 md:grid-cols-2 ${largeCards ? 'gap-4' : 'xl:grid-cols-3 gap-3'}`}>
  {initiatives.map((initiative) => (
  <SortableInitiativeCard
  key={initiative.id}
  initiative={initiative}
+ size={largeCards ? 'large' : 'compact'}
+ activity={activity === null ? undefined : (initiative.id ? activity[initiative.id] ?? null : null)}
  stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0, tags: 0, groups: 0 }}
                       canEditInitiatives={canEditInitiatives}
                       canDeleteInitiatives={canDelete}
@@ -758,7 +824,7 @@ export default function Dashboard() {
  <button
  type="button"
  onClick={() => setShowCreateModal(true)}
- className="min-h-[9.5rem] flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
+ className="min-h-[9.5rem] flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
  >
  <Plus className="w-4 h-4" />
  New program

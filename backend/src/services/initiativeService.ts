@@ -152,6 +152,46 @@ export class InitiativeService {
         return initiatives.filter((i: any) => sr.scope.initiativeIds.includes(i.id));
     }
 
+    /**
+     * Per-program activity for the dashboard cards: when the last claim or
+     * evidence was logged and how many of each exist. One call for the whole
+     * org; only initiatives the caller can see are included.
+     */
+    static async getActivity(
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<Record<string, { last_log_at: string | null; claims: number; evidence: number }>> {
+        const initiatives = await this.getAll(userId, requestedOrgId);
+        const ids = initiatives.map((i: any) => i.id as string);
+        const out: Record<string, { last_log_at: string | null; claims: number; evidence: number }> = {};
+        if (ids.length === 0) return out;
+        for (const id of ids) out[id] = { last_log_at: null, claims: 0, evidence: 0 };
+
+        const [{ data: kpiRows }, { data: evidenceRows }] = await Promise.all([
+            supabase.from('kpis').select('id, initiative_id').in('initiative_id', ids),
+            supabase.from('evidence').select('initiative_id, created_at').in('initiative_id', ids),
+        ]);
+
+        const kpiToInitiative = new Map<string, string>();
+        for (const k of (kpiRows || []) as any[]) kpiToInitiative.set(k.id, k.initiative_id);
+        const kpiIds = [...kpiToInitiative.keys()];
+
+        const { data: claimRows } = kpiIds.length > 0
+            ? await supabase.from('kpi_updates').select('kpi_id, created_at').in('kpi_id', kpiIds)
+            : { data: [] as any[] };
+
+        const bump = (initiativeId: string | undefined, at: string | null, kind: 'claims' | 'evidence') => {
+            if (!initiativeId || !out[initiativeId]) return;
+            out[initiativeId][kind] += 1;
+            if (at && (!out[initiativeId].last_log_at || at > out[initiativeId].last_log_at!)) {
+                out[initiativeId].last_log_at = at;
+            }
+        };
+        for (const c of (claimRows || []) as any[]) bump(kpiToInitiative.get(c.kpi_id), c.created_at, 'claims');
+        for (const e of (evidenceRows || []) as any[]) bump(e.initiative_id, e.created_at, 'evidence');
+        return out;
+    }
+
     static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Initiative | null> {
         const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
 

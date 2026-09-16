@@ -341,6 +341,12 @@ export interface StructureSummary {
   groups_created: number;
 }
 
+export interface InitiativeActivity {
+  last_log_at: string | null;
+  claims: number;
+  evidence: number;
+}
+
 export interface ProgramReadiness {
   metrics: number;
   locations: number;
