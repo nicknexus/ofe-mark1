@@ -862,28 +862,30 @@ export class MetricTagService {
     /**
      * Tag-based gate for evidence supporting a claim.
      *
-     * Symmetric rule (introduced to fix the "removing a tag doesn't break
-     * the link" bug):
+     * Rule:
      *   - Claim has tag `T`  → evidence must include `T`.
-     *   - Claim has no tag   → evidence must also have NO tags.
+     *   - Claim has no tag   → no tag constraint; any evidence passes.
      *
-     * The previous loose rule ("untagged claim = no constraint") meant that
-     * stripping a tag from one side left the auto-linked support row in
-     * place. Owners reasonably expected the connection to die with the tag
-     * it was created from. This stricter rule makes tag state load-bearing
-     * for the link: any divergence in tag state on either side fails the
-     * gate, and the per-entity reconcilers in `EvidenceService` clean up
-     * the now-stale row.
+     * The only tag-based reason a link is refused is a real mismatch: the
+     * claim is tagged and the evidence doesn't carry that tag. Tagged
+     * evidence still supports untagged claims, so one piece of evidence
+     * pointing at two metrics (one with a tagged claim, one with an
+     * untagged claim) connects to both as long as location/date/ben-group
+     * gates pass.
      *
-     * Tag-free orgs are unaffected: both sides untagged → match.
+     * Removing the tag from EVIDENCE still breaks its links to tagged
+     * claims (they now fail `includes`). Removing the tag from a CLAIM
+     * makes it untagged, which by design keeps its existing links.
+     *
+     * Must stay in sync with the frontend mirrors in
+     * `claimEvidenceSupport.ts` and `utils/timeline.ts`.
      */
     static evidenceMatchesClaimTag(
         claimTagId: string | null | undefined,
         evidenceTagIds: string[] | null | undefined
     ): boolean {
-        const evTags = evidenceTagIds || []
-        if (!claimTagId) return evTags.length === 0
-        return evTags.includes(claimTagId)
+        if (!claimTagId) return true
+        return (evidenceTagIds || []).includes(claimTagId)
     }
 }
 

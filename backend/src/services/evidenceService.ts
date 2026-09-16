@@ -1375,21 +1375,12 @@ export class EvidenceService {
             changes.push({ kind: 'extend_dates', date_range_start: plannedDates.start, date_range_end: plannedDates.end })
         }
 
-        // Gate 4 — tag. Claim untagged + evidence tagged can only be fixed by
-        // REMOVING evidence tags (breaks its links to tagged claims) → conflict.
+        // Gate 4 — tag. Untagged claim imposes no tag constraint, so tagged
+        // evidence connects as-is. Tagged claim needs its tag on the evidence.
         let plannedTagIds = evTagIds
-        if (claimTagId) {
-            if (!evTagIds.includes(claimTagId)) {
-                plannedTagIds = [...evTagIds, claimTagId]
-                changes.push({ kind: 'add_tag', tag_id: claimTagId })
-            }
-        } else if (evTagIds.length > 0) {
-            return {
-                connected: false,
-                conflict: 'This evidence is tagged but the claim has no tag. Connections are automatic while scope matches — remove the evidence\'s tags in the evidence editor if it should support untagged claims.',
-                changes: [],
-                will_disconnect: [],
-            }
+        if (claimTagId && !evTagIds.includes(claimTagId)) {
+            plannedTagIds = [...evTagIds, claimTagId]
+            changes.push({ kind: 'add_tag', tag_id: claimTagId })
         }
 
         // Gate 5 — beneficiary groups. Claim unscoped + evidence scoped needs a

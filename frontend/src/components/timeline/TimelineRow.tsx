@@ -101,7 +101,7 @@ export default function TimelineRow({
       </div>
 
       {/* Metric */}
-      <div className={`hidden md:block ${c.metric} min-w-0`}>{metric}</div>
+      <div className={`hidden md:flex items-center ${c.metric} min-w-0`}>{metric}</div>
 
       {/* Where & When */}
       <div className={`hidden md:block ${c.where} min-w-0`}>

@@ -12,7 +12,7 @@ export default function MetricChip({ kpi, kpis }: { kpi: KPI | undefined; kpis: 
  const color = kpi ? getKPIColor(kpi.category, Math.max(index, 0)) : '#9ca3af'
 
  return (
- <span className="inline-flex items-center gap-1.5 max-w-full px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200">
+        <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200">
  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
  <span className="text-[11px] font-medium text-gray-600 truncate">{kpi?.title || 'Unknown metric'}</span>
  </span>

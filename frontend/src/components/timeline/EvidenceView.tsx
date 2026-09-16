@@ -160,7 +160,7 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
               metric={metricKpis.length === 0 ? (
                 <span className="text-sm text-gray-400">—</span>
               ) : (
-                <span className="inline-flex items-center gap-1 min-w-0">
+                <span className="flex items-center gap-1 min-w-0 max-w-full">
                   <MetricChip kpi={metricKpis[0]} kpis={kpis} />
                   {metricKpis.length > 1 && (
                     <span className="text-[11px] text-gray-400 flex-shrink-0">+{metricKpis.length - 1}</span>

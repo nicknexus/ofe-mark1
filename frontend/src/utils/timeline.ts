@@ -224,7 +224,7 @@ export function sortByMode<T extends { created_at?: string; date_represented?: s
  *  - claim's metric ∈ evidence's linked metrics
  *  - claim's location ∈ evidence's locations
  *  - activity dates overlap
- *  - tag: untagged claim needs untagged evidence; tagged claim needs its tag
+ *  - tag: untagged claim accepts any evidence; tagged claim needs its tag
  *  - ben groups: both unscoped, or both scoped with an intersection
  */
 export interface EvidenceScopePreview {
@@ -246,11 +246,7 @@ export function previewMatchingClaims(claims: TimelineClaim[], scope: EvidenceSc
  const claimEnd = claim.date_range_end || claimStart
  if (!claimStart) return false
  if (!(scope.dateStart <= claimEnd && claimStart <= dateEnd)) return false
- if (claim.tag_id) {
- if (!scope.tagIds.includes(claim.tag_id)) return false
- } else if (scope.tagIds.length > 0) {
- return false
- }
+        if (claim.tag_id && !scope.tagIds.includes(claim.tag_id)) return false
  const claimGroups = claim.beneficiary_group_ids || []
  const claimScoped = claimGroups.length > 0
  const evidenceScoped = scope.beneficiaryGroupIds.length > 0
@@ -281,12 +277,7 @@ export function previewMatchingEvidence(evidence: TimelineEvidence[], scope: Cla
  const evEnd = ev.date_range_end || evStart
  if (!evStart) return false
  if (!(evStart <= dateEnd && scope.dateStart <= evEnd)) return false
- const evTags = ev.tag_ids || []
- if (scope.tagId) {
- if (!evTags.includes(scope.tagId)) return false
- } else if (evTags.length > 0) {
- return false
- }
+        if (scope.tagId && !(ev.tag_ids || []).includes(scope.tagId)) return false
  const evGroups = ev.beneficiary_group_ids || []
  const claimScoped = scope.beneficiaryGroupIds.length > 0
  const evidenceScoped = evGroups.length > 0
