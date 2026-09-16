@@ -123,7 +123,7 @@ function SortableInitiativeCard({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className={`text-sm font-semibold leading-snug line-clamp-1 transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
+          <h3 className={`text-[15px] font-semibold leading-snug line-clamp-1 tracking-tight transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
             {initiative.title}
           </h3>
           <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
@@ -141,7 +141,7 @@ function SortableInitiativeCard({
         ) : stats ? (
           <>
             {/* Readiness: what exists, what's missing before logging works. */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <ReadinessChip icon={BarChart3} label={`${stats.metrics} metric${stats.metrics === 1 ? '' : 's'}`} ok={stats.metrics > 0} missing="Add a metric" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />
               <ReadinessChip icon={MapPin} label={`${stats.locations} location${stats.locations === 1 ? '' : 's'}`} ok={stats.locations > 0} missing="Add a location" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />
               {stats.tags > 0 && <ReadinessChip icon={TagIcon} label={`${stats.tags} tag${stats.tags === 1 ? '' : 's'}`} ok optional />}
@@ -183,9 +183,9 @@ function SortableInitiativeCard({
   return (
     <div ref={setNodeRef} style={style} className="h-full">
       <div
-        className={`group relative h-full bg-white rounded-2xl border shadow-card transition-all duration-200 ${locked
-          ? 'border-gray-200/70 hover:border-amber-300/70 hover:shadow-card-hover'
-          : 'border-gray-200/70 hover:border-primary-300/70 hover:shadow-card-hover hover:-translate-y-0.5'
+        className={`group relative h-full ${locked
+          ? 'app-tile-static transition-all duration-200 hover:border-amber-300/70 hover:shadow-card-hover'
+          : 'app-tile'
         }`}
       >
         {locked ? (
@@ -257,16 +257,17 @@ function ReadinessChip({ icon: Icon, label, ok, missing, optional, onClick }: {
   optional?: boolean
   onClick?: () => void
 }) {
-  const cls = ok
-    ? 'text-gray-500 bg-gray-50 border-gray-200'
-    : 'text-amber-700 bg-amber-50 border-amber-200'
+  // Present dimensions read like the metric card's tag hint (quiet, icon +
+  // text); a missing one becomes an amber pill you can click to fix.
   const content = (
     <>
       {ok ? <Icon className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
       {ok ? label : (missing || label)}
     </>
   )
-  const base = `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls} ${optional ? 'opacity-80' : ''}`
+  const base = ok
+    ? `inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 ${optional ? 'text-gray-400' : ''}`
+    : 'inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700'
   if (onClick && !ok) {
     return (
       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} className={`${base} hover:bg-amber-100 transition-colors`}>

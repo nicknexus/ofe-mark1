@@ -14,6 +14,7 @@ import {
   BookOpen,
   ExternalLink,
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { apiService } from '../services/api'
 import { InitiativeDashboard, LoadingState, CreateKPIForm } from '../types'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -346,68 +347,90 @@ export default function InitiativePage() {
 
   return (
     <div className="app-canvas h-screen flex flex-col">
-      {/* Header */}
-      <header className="flex-shrink-0 bg-white border-b border-gray-200">
-        <div className="px-4 sm:px-6 pt-3 pb-2 flex items-start gap-3">
-          <Link to="/tracking/programs" className="app-btn app-btn-icon app-btn-ghost text-gray-500 hover:text-gray-900 mt-0.5 flex-shrink-0" title="Back to programs" aria-label="Back to programs">
+      {/* Header: identity row + prominent section switcher */}
+      <header className="flex-shrink-0 bg-white border-b border-gray-200/80 shadow-[0_1px_0_rgba(16,24,40,0.02)]">
+        <div className="px-4 sm:px-6 pt-4 pb-3 flex items-start gap-3">
+          <Link to="/tracking/programs" className="app-btn app-btn-icon app-btn-ghost text-gray-500 hover:text-gray-900 mt-1 flex-shrink-0" title="Back to programs" aria-label="Back to programs">
             <ArrowLeft className="w-5 h-5" />
           </Link>
+          <div className="hidden sm:flex w-11 h-11 rounded-xl bg-white ring-1 ring-gray-200/80 shadow-card items-center justify-center flex-shrink-0 overflow-hidden mt-0.5">
+            <img
+              src={activeOrganization?.logo_url || '/Nexuslogo.png'}
+              alt=""
+              className="w-full h-full object-contain p-1"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
+            />
+          </div>
           <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-primary-900/70 leading-none mb-1">Program</p>
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">{dashboard.initiative.title}</h1>
+              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight truncate leading-tight">{dashboard.initiative.title}</h1>
               {publicHref && (
-                <a href={publicHref} target="_blank" rel="noreferrer" className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary-700 flex-shrink-0" title="Open public page">
-                  <ExternalLink className="w-3.5 h-3.5" /> Public
+                <a href={publicHref} target="_blank" rel="noreferrer" className="hidden sm:inline-flex items-center gap-1 rounded-full border border-impact-100 bg-impact-50 px-2 py-0.5 text-[11px] font-medium text-impact-700 hover:bg-impact-100 flex-shrink-0" title="Open public page">
+                  <ExternalLink className="w-3 h-3" /> Public
                 </a>
               )}
             </div>
             {dashboard.initiative.description && (
-              <p className="text-xs text-gray-500 truncate hidden sm:block">{dashboard.initiative.description}</p>
+              <p className="text-sm text-gray-500 truncate hidden sm:block mt-0.5 max-w-3xl">{dashboard.initiative.description}</p>
             )}
           </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
             {canLog && (
               <button
                 type="button"
                 onClick={handleAddLog}
                 disabled={!setupReady}
                 title={setupReady ? 'Log a claim or evidence' : 'Add a metric first'}
-                className="app-btn app-btn-primary app-btn-sm"
+                className="app-btn app-btn-primary"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add log</span>
               </button>
             )}
             {canEditInitiatives && (
-              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary app-btn-sm" title="Metrics, tags, locations, groups">
+              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary" title="Metrics, tags, locations, groups">
                 <Settings2 className="w-4 h-4" /> <span className="hidden sm:inline">Set up</span>
               </button>
             )}
-            <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-ghost app-btn-sm" title="Generate an AI impact report">
-              <Sparkles className="w-4 h-4" /> <span className="hidden md:inline">Report</span>
+            <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-secondary" title="Generate an AI impact report">
+              <Sparkles className="w-4 h-4 text-primary-800" /> <span className="hidden md:inline">Report</span>
             </button>
           </div>
         </div>
 
         {/* Section switcher (desktop). Mobile uses the bottom nav. */}
-        <nav className="hidden md:flex items-center gap-1 px-4 sm:px-6 pb-2" aria-label="Program sections">
-          {TABS.map(t => {
-            const Icon = t.icon
-            const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => handleTabChange(t.id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active
-                  ? 'bg-primary-50 text-primary-800'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
-                aria-current={active ? 'page' : undefined}
-              >
-                <Icon className={`w-4 h-4 ${active ? 'text-primary-700' : 'text-gray-400'}`} />
-                {t.label}
-              </button>
-            )
-          })}
+        <nav className="hidden md:flex items-center px-4 sm:px-6 pb-3" aria-label="Program sections">
+          <div className="app-segmented">
+            {TABS.map(t => {
+              const Icon = t.icon
+              const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
+              const count = t.id === 'metrics' ? dashboard.kpis.length : t.id === 'logs' ? allKPIUpdates.length : null
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleTabChange(t.id)}
+                  className="app-segmented-item"
+                  aria-current={active ? 'page' : undefined}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="programSectionPill"
+                      className="absolute inset-0 rounded-lg bg-white border border-gray-200/70 shadow-card"
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                  <Icon className={`relative z-10 w-4 h-4 ${active ? 'text-primary-800' : 'text-gray-400'}`} />
+                  <span className="relative z-10">{t.label}</span>
+                  {count !== null && count > 0 && (
+                    <span className={`relative z-10 min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-semibold tabular-nums text-center ${active ? 'bg-primary-100 text-primary-950' : 'bg-gray-200/80 text-gray-600'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </nav>
       </header>
 

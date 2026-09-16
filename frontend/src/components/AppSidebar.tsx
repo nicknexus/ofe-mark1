@@ -53,6 +53,25 @@ function SoftHome({ className }: { className?: string }) {
   )
 }
 
+/** Org mark: logo when set, otherwise a branded initial tile. */
+function OrgAvatar({ name, logoUrl, shared }: { name?: string; logoUrl?: string | null; shared?: boolean }) {
+  const initial = (name || '?').trim().charAt(0).toUpperCase()
+  if (logoUrl) {
+    return (
+      <span className="w-8 h-8 rounded-lg bg-white ring-1 ring-gray-200/80 flex items-center justify-center flex-shrink-0 overflow-hidden">
+        <img src={logoUrl} alt="" className="w-full h-full object-contain" />
+      </span>
+    )
+  }
+  return (
+    <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-[13px] font-bold ${
+      shared ? 'bg-evidence-50 text-evidence-700' : 'bg-primary-100 text-primary-950'
+    }`}>
+      {shared ? <Users className="w-4 h-4" /> : initial}
+    </span>
+  )
+}
+
 const TRACKING_ITEMS = [
   { to: '/tracking/programs', label: 'Programs', icon: LayoutDashboard },
   { to: '/metrics', label: 'Metrics', icon: BarChart3 },
@@ -101,28 +120,25 @@ function NavRow({
   return (
     <Link
       to={to}
-      className={`relative flex items-center gap-2.5 rounded-xl transition-colors ${
-        nested ? 'px-3 py-2' : 'px-3 py-2.5'
-      } ${active ? '' : 'hover:bg-gray-50'}`}
+      className={`group relative flex items-center gap-2.5 rounded-xl transition-colors ${
+        nested ? 'px-2.5 py-[7px]' : 'px-2.5 py-2'
+      } ${active ? '' : 'hover:bg-white/70'}`}
     >
       {active && (
-        <>
-          <motion.span
-            layoutId={claim ? 'appSidebarShareTab' : 'appSidebarActiveTab'}
-            className={`absolute inset-0 rounded-xl ${claim ? 'bg-claim-50' : 'bg-primary-50'}`}
-            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-          />
-          <motion.span
-            layoutId={claim ? 'appSidebarShareBar' : 'appSidebarActiveBar'}
-            className={`absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full ${claim ? 'bg-claim-500' : 'bg-primary-600'}`}
-            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-          />
-        </>
+        <motion.span
+          layoutId={claim ? 'appSidebarShareTab' : 'appSidebarActiveTab'}
+          className="absolute inset-0 rounded-xl bg-white border border-gray-200/70 shadow-card"
+          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+        />
       )}
-      <Icon className={`relative z-10 w-4 h-4 flex-shrink-0 ${
-        active ? (claim ? 'text-claim-700' : 'text-primary-800') : 'text-gray-400'
-      }`} />
-      <span className={`relative z-10 flex-1 min-w-0 text-[13px] font-medium truncate ${active ? 'text-gray-900' : 'text-gray-600'}`}>
+      <span className={`relative z-10 w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${
+        active
+          ? (claim ? 'bg-claim-50 text-claim-700' : 'bg-primary-50 text-primary-900')
+          : 'text-gray-400 group-hover:text-gray-600'
+      }`}>
+        <Icon className="w-4 h-4" />
+      </span>
+      <span className={`relative z-10 flex-1 min-w-0 text-[13px] truncate ${active ? 'font-semibold text-gray-900' : 'font-medium text-gray-600 group-hover:text-gray-900'}`}>
         {label}
       </span>
       {soon && (
@@ -132,6 +148,15 @@ function NavRow({
         <span className="relative z-10 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
       )}
     </Link>
+  )
+}
+
+function SectionLabel({ children, tone = 'gray' }: { children: React.ReactNode; tone?: 'primary' | 'claim' | 'gray' }) {
+  const color = tone === 'primary' ? 'text-primary-900' : tone === 'claim' ? 'text-claim-700' : 'text-gray-400'
+  return (
+    <p className={`px-2.5 pt-5 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.12em] ${color}`}>
+      {children}
+    </p>
   )
 }
 
@@ -221,16 +246,21 @@ export default function AppSidebar({ user }: AppSidebarProps) {
       : null
 
   return (
-    <div className="fixed left-0 top-0 w-56 h-screen bg-white border-r border-gray-200/70 flex flex-col z-30 desktop-sidebar">
-      <div className="flex-shrink-0 px-3 pt-3 pb-2 bg-white">
-        <Link to="/" className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors min-w-0">
-          <img src="/Nexuslogo.png" alt="" className="h-7 w-auto flex-shrink-0" />
-          <span className="text-[15px] font-newsreader font-extralight text-secondary-900 truncate leading-none pt-0.5">Nexus Impacts</span>
+    <div className="fixed left-0 top-0 w-56 h-screen bg-gradient-to-b from-primary-50/70 via-[#F7F8FA] to-[#F7F8FA] border-r border-gray-200/70 flex flex-col z-30 desktop-sidebar">
+      <div className="flex-shrink-0 px-3 pt-4 pb-3">
+        <Link to="/" className="flex items-center gap-2.5 px-1.5 py-1 rounded-xl hover:bg-white/70 transition-colors min-w-0">
+          <span className="w-8 h-8 rounded-xl bg-white border border-primary-200/70 shadow-card flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img src="/Nexuslogo.png" alt="" className="h-6 w-auto" />
+          </span>
+          <span className="min-w-0 leading-none">
+            <span className="block text-[15px] font-newsreader text-secondary-900 truncate">Nexus Impacts</span>
+            <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-primary-900/70 mt-1">Impact tracking</span>
+          </span>
         </Link>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 scrollbar-thin">
-      <div className="pb-3 border-b border-gray-100" ref={orgMenuRef}>
+      <div className="pb-3 border-b border-gray-200/70" ref={orgMenuRef}>
         {teamLoading ? (
           <div className="h-9 rounded-xl bg-gray-100 animate-pulse" />
         ) : hasMultipleOrgs ? (
@@ -238,13 +268,16 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             <button
               type="button"
               onClick={() => setOrgMenuOpen(v => !v)}
-              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-colors ${
-                isSharedMember ? 'bg-purple-50 hover:bg-purple-100' : 'hover:bg-gray-50'
-              }`}
+              className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-left transition-all bg-white border border-gray-200/70 shadow-card hover:border-primary-300/70 hover:shadow-card-hover"
             >
-              {isSharedMember ? <Users className="w-4 h-4 text-purple-600 flex-shrink-0" /> : <Building2 className="w-4 h-4 text-gray-500 flex-shrink-0" />}
-              <span className={`flex-1 min-w-0 text-[13px] font-semibold truncate ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
-                {activeOrganization?.name || 'Select organization'}
+              <OrgAvatar name={activeOrganization?.name} logoUrl={activeOrganization?.logo_url} shared={isSharedMember} />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-semibold text-gray-900 truncate leading-tight">
+                  {activeOrganization?.name || 'Select organization'}
+                </span>
+                <span className="block text-[10.5px] text-gray-400 truncate leading-tight mt-0.5">
+                  {isSharedMember ? 'Shared with you' : 'Your organization'}
+                </span>
               </span>
               <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -263,7 +296,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
                       org.id === activeOrganization?.id ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50 text-gray-700'
                     }`}
                   >
-                    {org.role === 'member' ? <Users className="w-3.5 h-3.5 text-purple-500" /> : <Building2 className="w-3.5 h-3.5 text-gray-400" />}
+                    {org.role === 'member' ? <Users className="w-3.5 h-3.5 text-evidence-600" /> : <Building2 className="w-3.5 h-3.5 text-gray-400" />}
                     <span className="flex-1 min-w-0 text-xs font-medium truncate">{org.name}</span>
                     {org.id === activeOrganization?.id && <Check className="w-3.5 h-3.5 text-primary-500" />}
                   </button>
@@ -272,24 +305,31 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             )}
           </div>
         ) : (
-          <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl ${isSharedMember ? 'bg-purple-50' : ''}`}>
-            {isSharedMember ? <Users className="w-4 h-4 text-purple-600 flex-shrink-0" /> : <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-            <span className={`text-[13px] font-semibold truncate ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
-              {activeOrganization?.name || 'Organization'}
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white border border-gray-200/70 shadow-card">
+            <OrgAvatar name={activeOrganization?.name} logoUrl={activeOrganization?.logo_url} shared={isSharedMember} />
+            <span className="flex-1 min-w-0">
+              <span className="block text-[13px] font-semibold text-gray-900 truncate leading-tight">
+                {activeOrganization?.name || 'Organization'}
+              </span>
+              <span className="block text-[10.5px] text-gray-400 truncate leading-tight mt-0.5">
+                {isSharedMember ? 'Shared with you' : 'Your organization'}
+              </span>
             </span>
           </div>
         )}
 
         {!teamLoading && activeOrganization && !isDemoOrg && (
-          <div className="mt-1 flex items-center gap-0.5 px-2.5">
+          <div className="mt-1.5 flex items-center gap-0.5 px-1">
             <Link
               to="/share/public"
-              className={`flex items-center gap-1.5 py-1 rounded-lg text-[11px] font-medium min-w-0 ${
-                activeOrganization.is_public ? 'text-impact-700' : 'text-amber-700'
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium min-w-0 border ${
+                activeOrganization.is_public
+                  ? 'text-impact-700 bg-impact-50 border-impact-100'
+                  : 'text-amber-700 bg-amber-50 border-amber-100'
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOrganization.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
-              <span className="truncate">{activeOrganization.is_public ? 'Public page live' : 'Public page not live'}</span>
+              <span className="truncate">{activeOrganization.is_public ? 'Public page live' : 'Not public yet'}</span>
             </Link>
             {publicHref && (
               <a
@@ -314,7 +354,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
               else localStorage.removeItem('nexus-active-org-id')
               window.location.href = '/admin/demos'
             }}
-            className="mt-1 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-purple-700 hover:bg-purple-50"
+            className="mt-1 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-evidence-700 hover:bg-evidence-50"
           >
             <FlaskConical className="w-3.5 h-3.5" />
             Back to admin
@@ -325,12 +365,8 @@ export default function AppSidebar({ user }: AppSidebarProps) {
       <div className="py-3">
         <NavRow to="/" label="Home" icon={SoftHome} active={pathname === '/'} />
 
-        <p className={`px-3 pt-5 pb-1.5 text-[13px] font-bold tracking-wide ${
-          trackingOpen ? 'text-primary-800' : 'text-primary-700'
-        }`}>
-          Tracking
-        </p>
-        <div className={`rounded-xl ${trackingOpen ? 'bg-gray-50/80' : ''}`}>
+        <SectionLabel tone="primary">Tracking</SectionLabel>
+        <div className="space-y-0.5">
           {TRACKING_ITEMS.map(item => (
             <NavRow key={item.to} to={item.to} label={item.label} icon={item.icon} active={pathActive(pathname, item.to)} nested />
           ))}
@@ -345,12 +381,8 @@ export default function AppSidebar({ user }: AppSidebarProps) {
           )}
         </div>
 
-        <p className={`px-3 pt-5 pb-1.5 text-[13px] font-bold tracking-wide ${
-          contentOpen ? 'text-claim-700' : 'text-claim-600'
-        }`}>
-          Share
-        </p>
-        <div className={`rounded-xl ${contentOpen ? 'bg-claim-50/50' : ''}`}>
+        <SectionLabel tone="claim">Share</SectionLabel>
+        <div className="space-y-0.5">
           {CONTENT_ITEMS.filter(item => item.to !== '/share/embed' || canEditShare).map(item => (
             <NavRow
               key={item.to}
@@ -366,26 +398,24 @@ export default function AppSidebar({ user }: AppSidebarProps) {
           ))}
         </div>
 
-        <p className="px-3 pt-5 pb-1.5 text-[13px] font-bold tracking-wide text-gray-400">
-          General
-        </p>
-        <div>
+        <SectionLabel>General</SectionLabel>
+        <div className="space-y-0.5">
           <NavRow to="/explore" label="Explore" icon={Compass} active={pathActive(pathname, '/explore')} nested />
           <button
             type="button"
             onClick={startOnboarding}
-            className="relative w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50"
+            className="group relative w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-xl text-[13px] font-medium text-gray-600 hover:bg-white/70 hover:text-gray-900"
           >
-            <Sparkles className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <span className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-gray-400 group-hover:text-gray-600"><Sparkles className="w-4 h-4" /></span>
             <span className="flex-1 text-left">Setup</span>
-            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary-600 text-white">Beta</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary-500 text-primary-950">Beta</span>
           </button>
           <button
             type="button"
             onClick={startTutorial}
-            className="relative w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50"
+            className="group relative w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-xl text-[13px] font-medium text-gray-600 hover:bg-white/70 hover:text-gray-900"
           >
-            <GraduationCap className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <span className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-gray-400 group-hover:text-gray-600"><GraduationCap className="w-4 h-4" /></span>
             Tutorial
           </button>
           <NavRow to="/account" label="Settings" icon={Settings} active={pathActive(pathname, '/account')} nested />
@@ -394,15 +424,15 @@ export default function AppSidebar({ user }: AppSidebarProps) {
 
       </div>
 
-      <div className="p-3 border-t border-gray-100 flex-shrink-0">
+      <div className="p-3 border-t border-gray-200/70 flex-shrink-0">
         <div className="relative" ref={settingsRef}>
           <button
             type="button"
             onClick={() => setSettingsOpen(v => !v)}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors text-left"
+            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white border border-gray-200/70 shadow-card hover:border-primary-300/70 hover:shadow-card-hover transition-all text-left"
             title={displayName}
           >
-            <div className="w-8 h-8 rounded-full bg-secondary-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-evidence-500 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0 ring-2 ring-white">
               {initials || <UserIcon className="w-4 h-4" />}
             </div>
             <div className="flex-1 min-w-0">

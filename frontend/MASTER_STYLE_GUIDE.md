@@ -58,6 +58,9 @@ import { notify } from '../lib/notify'
 | `app-card-elevated` | Higher-emphasis card (`shadow-card-lg`) |
 | `app-card-flat` | Card with border, no shadow |
 | `app-card-muted` | Subtle gray inset panel |
+| `app-tile` | Clickable grid tile: the metric-card look (`rounded-2xl`, hairline border, brand hover ring, small lift). Program cards, org metrics and program metrics all use it |
+| `app-tile-static` | Same shell without hover behaviour |
+| `app-segmented` / `app-segmented-item` | Prominent section switcher (program header). Active item gets `aria-current="page"` and a white pill |
 | `app-pad` / `app-pad-lg` | Standard internal padding |
 | `app-card-header` | Title row strip with bottom border |
 | `app-divider` | `border-t border-gray-100` |

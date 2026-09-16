@@ -191,7 +191,7 @@ export default function AllMetricsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search metrics…"
-            className="w-full h-9 pl-10 pr-3 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="app-input h-9 !pl-10 !rounded-full"
           />
         </div>
 
@@ -214,111 +214,87 @@ export default function AllMetricsPage() {
               const unused = definition.initiative_count === 0
 
               return (
-                <div key={definition.id} className="app-card p-4 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                      <h3 className="text-sm font-semibold text-gray-800 truncate" title={definition.title}>
-                        {definition.title}
-                      </h3>
-                    </div>
+                <div key={definition.id} className="app-tile p-4 flex flex-col group relative">
+                  {/* Top-right: edit on hover + open indicator */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5">
                     {canEditMetrics && (
                       <button
                         type="button"
                         onClick={() => { setEditing(definition); setShowModal(true) }}
-                        className="p-1 -m-1 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+                        className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
                         title="Edit metric"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                     )}
+                    <ChevronRight className="w-4 h-4 text-gray-200" />
                   </div>
 
-                  <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-2xl font-semibold tabular-nums" style={{ color }}>
-                      {definition.total_value.toLocaleString()}
-                      {definition.metric_type === 'percentage' ? '%' : ''}
+                  <div className="flex items-start gap-2 pr-10 mb-3">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }} />
+                    <p className="text-sm font-medium text-gray-800 leading-snug line-clamp-2" title={definition.title}>
+                      {definition.title}
+                    </p>
+                  </div>
+
+                  <div className="flex items-baseline gap-1.5 min-w-0 mb-3">
+                    <span className="text-2xl font-semibold text-gray-900 tabular-nums">
+                      {definition.metric_type === 'percentage'
+                        ? `${Math.round(definition.total_value)}%`
+                        : definition.total_value.toLocaleString()}
                     </span>
                     <span className="text-xs text-gray-400 truncate">
-                      {definition.metric_type === 'percentage'
-                        ? 'average'
-                        : definition.unit_of_measurement}
+                      {definition.metric_type === 'percentage' ? 'average' : definition.unit_of_measurement}
+                    </span>
+                    <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-gray-400 flex-shrink-0" title={`${definition.update_count} claims`}>
+                      <Layers className="w-3 h-3" />
+                      {definition.initiative_count} program{definition.initiative_count === 1 ? '' : 's'}
                     </span>
                   </div>
 
-                  {unused ? (
-                    <div className="flex items-center gap-1.5 mb-3 px-2.5 py-2 rounded-lg bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-400">
-                      <Layers className="w-3.5 h-3.5 flex-shrink-0" />
-                      Not in any program yet
-                    </div>
-                  ) : (
-                    <div className="mb-3">
-                      <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                        <Layers className="w-3 h-3" />
-                        In {definition.initiative_count} program{definition.initiative_count === 1 ? '' : 's'}
-                      </div>
-                      <div className="space-y-1.5">
-                        {definition.initiatives.map(usage => (
-                          <div
-                            key={usage.initiative_id}
-                            className="group relative bg-white rounded-xl border border-gray-200/70 shadow-card hover:border-primary-300/70 hover:shadow-card-hover transition-all"
-                          >
-                            <Link
-                              to={`/programs/${usage.initiative_id}?tab=metrics`}
-                              className="flex items-center gap-2.5 p-2 pr-8"
-                              title={usage.initiative_title}
+                  {/* Programs using this metric, as chips */}
+                  <div className="mt-auto pt-2.5 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+                    {unused ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
+                        Not in any program yet
+                      </span>
+                    ) : (
+                      definition.initiatives.map(usage => (
+                        <span
+                          key={usage.initiative_id}
+                          className="group/chip inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 pl-1 pr-1.5 py-0.5 text-[11px] font-medium text-gray-600 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-900 transition-colors max-w-full"
+                        >
+                          <Link to={`/programs/${usage.initiative_id}?tab=metrics`} className="inline-flex items-center gap-1 min-w-0" title={usage.initiative_title}>
+                            <span className="w-4 h-4 rounded bg-white ring-1 ring-gray-200/80 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                              <img
+                                src={orgLogoUrl || '/Nexuslogo.png'}
+                                alt=""
+                                className="w-full h-full object-contain"
+                                onError={(e) => { ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
+                              />
+                            </span>
+                            <span className="truncate max-w-[9rem]">{usage.initiative_title}</span>
+                          </Link>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => requestDetach(definition, usage.initiative_id, usage.initiative_title)}
+                              className="p-0.5 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/chip:opacity-100 focus:opacity-100 transition-all"
+                              title={`Remove from ${usage.initiative_title}`}
                             >
-                              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
-                                <img
-                                  src={orgLogoUrl || '/Nexuslogo.png'}
-                                  alt=""
-                                  className="w-full h-full object-contain"
-                                  onError={(e) => {
-                                    ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png'
-                                  }}
-                                />
-                              </div>
-                              <h4 className="text-xs font-semibold text-gray-900 leading-snug line-clamp-1 min-w-0">
-                                {usage.initiative_title}
-                              </h4>
-                            </Link>
-                            <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5">
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    requestDetach(
-                                      definition,
-                                      usage.initiative_id,
-                                      usage.initiative_title
-                                    )
-                                  }
-                                  className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                                  title={`Remove from ${usage.initiative_title}`}
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-auto pt-2 border-t border-gray-100">
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))
+                    )}
                     {canAddMetrics && (
                       <button
                         type="button"
                         onClick={() => setAttachTarget(definition)}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-primary-700 transition-colors"
+                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-[11px] font-medium text-gray-500 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/40 transition-colors"
                       >
-                        <Layers className="w-3.5 h-3.5" />
-                        Add to program
+                        <Plus className="w-3 h-3" /> Add to program
                       </button>
                     )}
                   </div>

@@ -201,7 +201,7 @@ function MetricCard({
 
   return (
     <div ref={setNodeRef} style={style} className={METRIC_CARD_H_CLASS}>
-      <div onClick={onOpen} className="bg-white rounded-2xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 transition-all duration-200 p-4 cursor-pointer group relative h-full flex flex-col">
+      <div onClick={onOpen} className="app-tile p-4 cursor-pointer group relative h-full flex flex-col">
         {/* Top-right: reorder handle (hover) + open indicator */}
         <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5">
           {canReorder && (
