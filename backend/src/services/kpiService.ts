@@ -505,19 +505,14 @@ export class KPIService {
                 await OrgAccessService.assertLocationInOrg(locId, organizationId, userId, requestedOrgId);
             }
 
-            // Validate any tag_ids belong to this KPI (one query for the whole group).
+            // Auto-attach any tag used by these claims to the metric. Tags are
+            // validated against the org inside ensureTagAttachedToKpi; a
+            // foreign tag still throws there.
             const wantedTagIds = [...new Set(
                 group.map((g) => (g as any).tag_id).filter(Boolean)
             )] as string[];
-            if (wantedTagIds.length > 0) {
-                const { data: kpiTags } = await supabase
-                    .from('kpi_metric_tags')
-                    .select('tag_id')
-                    .eq('kpi_id', kpiId);
-                const allowed = new Set((kpiTags || []).map((r: any) => r.tag_id));
-                for (const t of wantedTagIds) {
-                    if (!allowed.has(t)) throw new Error('Tag is not attached to the parent metric');
-                }
+            for (const t of wantedTagIds) {
+                await MetricTagService.ensureTagAttachedToKpi(kpiId, t, userId, requestedOrgId);
             }
 
             // Bulk insert all rows for this KPI. PostgREST returns RETURNING rows

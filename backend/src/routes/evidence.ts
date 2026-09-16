@@ -1,6 +1,7 @@
 import express from 'express';
 import { AuthenticatedRequest, authenticateUser } from '../middleware/auth';
 import { EvidenceService } from '../services/evidenceService';
+import { MatchService } from '../services/matchService';
 
 const router = express.Router();
 
@@ -156,6 +157,16 @@ router.get('/for-kpi-update/:updateId', authenticateUser, async (req: Authentica
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
         return;
+    }
+});
+
+// Why is / isn't this evidence connected to each candidate claim?
+router.get('/:id/match-diagnostics', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        res.json(await MatchService.diagnoseEvidence(req.params.id, req.user!.id, requestedOrgId));
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
     }
 });
 

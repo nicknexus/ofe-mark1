@@ -5,9 +5,85 @@ import { EvidenceService } from '../services/evidenceService';
 import { TimelineService } from '../services/timelineService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { EntitlementService } from '../services/entitlementService';
+import { MatchService } from '../services/matchService';
+import { ProgramStructureService, PROGRAM_TEMPLATES } from '../services/programStructureService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
+
+/** Shared program-limit gate for every create path. */
+async function assertCanCreateInitiative(req: AuthenticatedRequest, res: Response): Promise<boolean> {
+    const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+    const usage = await SubscriptionService.getInitiativesUsage(req.user!.id, requestedOrgId);
+    if (usage.canCreate) return true;
+    res.status(403).json({
+        error: `Program limit reached (${usage.current}/${usage.limit}). Upgrade your plan to create more programs.`,
+        code: 'INITIATIVE_LIMIT_REACHED',
+        usage,
+    });
+    return false;
+}
+
+// Code-defined program templates (metrics + tags + groups). Static, no auth needed
+// beyond being signed in.
+router.get('/templates', authenticateUser, async (_req: AuthenticatedRequest, res) => {
+    res.json(PROGRAM_TEMPLATES);
+});
+
+// Create a program pre-populated from a template.
+router.post('/from-template', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!(await assertCanCreateInitiative(req, res))) return;
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const { template_id, ...initiative } = req.body || {};
+        const result = await ProgramStructureService.createFromTemplate(template_id, initiative, req.user!.id, requestedOrgId);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Create a program whose metrics / locations / groups mirror an existing one.
+router.post('/:id/duplicate-structure', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!(await assertCanCreateInitiative(req, res))) return;
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const result = await ProgramStructureService.duplicateStructure(req.params.id, req.body, req.user!.id, requestedOrgId);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// What this program has / is missing before evidence can connect.
+router.get('/:id/readiness', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        res.json(await ProgramStructureService.getReadiness(req.params.id, req.user!.id, requestedOrgId));
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Server-side "what will this connect to" preview for the upload wizard.
+// Body: { kpiIds, locationIds, tagIds, beneficiaryGroupIds, dateStart, dateEnd? }
+router.post('/:id/preview-matches', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const b = req.body || {};
+        const result = await MatchService.previewMatches(req.params.id, {
+            kpiIds: Array.isArray(b.kpiIds) ? b.kpiIds : [],
+            locationIds: Array.isArray(b.locationIds) ? b.locationIds : [],
+            tagIds: Array.isArray(b.tagIds) ? b.tagIds : [],
+            beneficiaryGroupIds: Array.isArray(b.beneficiaryGroupIds) ? b.beneficiaryGroupIds : [],
+            dateStart: String(b.dateStart || ''),
+            dateEnd: b.dateEnd ? String(b.dateEnd) : null,
+        }, req.user!.id, requestedOrgId);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
 
 /**
  * Plan gate for OPENING an initiative: over-limit initiatives (beyond the

@@ -256,6 +256,55 @@ export class MetricTagService {
     }
 
     /**
+     * Make sure `tagId` is attached to the metric behind `kpiId`, appending it
+     * if it isn't. This is the "auto-attach on use" path: when a claim is
+     * saved with a tag the metric doesn't list yet, we attach instead of
+     * rejecting. The metric's tag list stays the display/ordering source for
+     * breakdown strips, but it is no longer a hard gate users have to
+     * discover before they can log.
+     *
+     * No-op if already attached, if the tag is not in the caller's org (the
+     * caller will hit a validation error later), or if tag links are locked
+     * by plan (the claim is then saved untagged, matching the existing
+     * behaviour of `setTagForUpdate`).
+     */
+    static async ensureTagAttachedToKpi(kpiId: string, tagId: string, userId: string, requestedOrgId?: string): Promise<void> {
+        const { data: existing } = await supabase
+            .from('kpi_metric_tags')
+            .select('id')
+            .eq('kpi_id', kpiId)
+            .eq('tag_id', tagId)
+            .maybeSingle()
+        if (existing) return
+
+        const orgId = await this.getOrgId(userId, requestedOrgId)
+        if (!orgId) throw new Error('No organization context')
+        if (await this.tagLinksLocked(orgId)) return
+        await this.assertTagsInOrg([tagId], orgId)
+
+        const { data: kpi } = await supabase
+            .from('kpis')
+            .select('definition_id')
+            .eq('id', kpiId)
+            .maybeSingle()
+        const definitionId = (kpi as any)?.definition_id as string | undefined
+
+        if (definitionId) {
+            const current = await this.getTagIdsForDefinition(definitionId)
+            if (current.includes(tagId)) {
+                // Definition already has it; only this instance's mirror is missing.
+                await this.applyTagsToKpi(kpiId, current, userId)
+                return
+            }
+            await this.replaceTagsForDefinition(definitionId, [...current, tagId], userId, requestedOrgId)
+            return
+        }
+
+        const current = await this.getTagIdsForKpi(kpiId)
+        await this.applyTagsToKpi(kpiId, [...current, tagId], userId)
+    }
+
+    /**
      * Set the tags on an org-global metric. Writes the source of truth, then
      * mirrors down onto every instance (archived ones included, so restoring
      * an instance doesn't resurrect a stale tag set).
@@ -521,8 +570,12 @@ export class MetricTagService {
             if (userId) {
                 const orgId = await this.getOrgId(userId)
                 if (await this.tagLinksLocked(orgId)) return
+                // Auto-attach: a tag used on a claim becomes one of the
+                // metric's tags. No more "attach it to the metric first".
+                await this.ensureTagAttachedToKpi(kpiId, tagId, userId)
             }
-            // Validate the tag is on the parent KPI.
+            // Confirm the link exists (it will unless the tag is foreign or
+            // no userId was supplied to attach with).
             const { data: link } = await supabase
                 .from('kpi_metric_tags')
                 .select('id')

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { KPIService } from '../services/kpiService';
 import { MetricTagService } from '../services/metricTagService';
+import { MatchService } from '../services/matchService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
@@ -118,6 +119,16 @@ router.post('/updates/batch', authenticateUser, async (req: AuthenticatedRequest
 });
 
 // Update a KPI update
+// Why is / isn't this claim connected to each candidate evidence row?
+router.get('/updates/:updateId/match-diagnostics', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        res.json(await MatchService.diagnoseClaim(req.params.updateId, req.user!.id, requestedOrgId));
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 router.put('/updates/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined;

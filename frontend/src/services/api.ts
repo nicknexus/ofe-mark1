@@ -23,8 +23,15 @@ import {
  MetricTag,
  MetricDefinitionWithUsage,
  CreateMetricDefinitionForm,
- TimelineResponse,
- ConnectEvidenceResult
+    TimelineResponse,
+    ConnectEvidenceResult,
+    ProgramTemplate,
+    StructureSummary,
+    ProgramReadiness,
+    MatchPreviewScope,
+    MatchPreviewResult,
+    EvidenceMatchDiagnostics,
+    ClaimMatchDiagnostics
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
@@ -414,11 +421,56 @@ class ApiService {
  })
  }
 
- async deleteInitiative(id: string): Promise<void> {
- return this.request<void>(`/initiatives/${id}`, {
- method: 'DELETE'
- })
- }
+    async deleteInitiative(id: string): Promise<void> {
+        return this.request<void>(`/initiatives/${id}`, {
+            method: 'DELETE'
+        })
+    }
+
+    // Program structure: templates, duplication, readiness, match preview
+
+    async getProgramTemplates(): Promise<ProgramTemplate[]> {
+        const result = await this.request<ProgramTemplate[]>('/initiatives/templates')
+        return result || []
+    }
+
+    async createInitiativeFromTemplate(templateId: string, data: CreateInitiativeForm): Promise<StructureSummary> {
+        return this.request<StructureSummary>('/initiatives/from-template', {
+            method: 'POST',
+            body: JSON.stringify({ template_id: templateId, ...data })
+        })
+    }
+
+    async duplicateInitiativeStructure(sourceId: string, data: CreateInitiativeForm): Promise<StructureSummary> {
+        return this.request<StructureSummary>(`/initiatives/${sourceId}/duplicate-structure`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async getInitiativeReadiness(id: string): Promise<ProgramReadiness> {
+        return this.request<ProgramReadiness>(`/initiatives/${id}/readiness`)
+    }
+
+    /**
+     * Server-side preview of what a not-yet-saved scope would connect to.
+     * Single source of truth for the matching rules; the wizard review step
+     * and coverage previews should use this rather than re-implementing gates.
+     */
+    async previewMatches(initiativeId: string, scope: MatchPreviewScope): Promise<MatchPreviewResult> {
+        return this.request<MatchPreviewResult>(`/initiatives/${initiativeId}/preview-matches`, {
+            method: 'POST',
+            body: JSON.stringify(scope)
+        })
+    }
+
+    async getEvidenceMatchDiagnostics(evidenceId: string): Promise<EvidenceMatchDiagnostics> {
+        return this.request<EvidenceMatchDiagnostics>(`/evidence/${evidenceId}/match-diagnostics`)
+    }
+
+    async getClaimMatchDiagnostics(updateId: string): Promise<ClaimMatchDiagnostics> {
+        return this.request<ClaimMatchDiagnostics>(`/kpis/updates/${updateId}/match-diagnostics`)
+    }
 
  async updateInitiativeOrder(order: Array<{ id: string; display_order: number }>): Promise<void> {
  return this.request<void>('/initiatives/update-order', {

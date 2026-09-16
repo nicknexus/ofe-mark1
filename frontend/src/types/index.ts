@@ -313,7 +313,123 @@ export interface ConnectEvidenceResult {
  conflict?: string;
  changes: ConnectPlanChange[];
  will_disconnect: Array<{ kpi_update_id: string; value: number; kpi_title: string }>;
- reconcile?: { created: number; pruned: number };
+  reconcile?: { created: number; pruned: number };
+}
+
+// Program structure (templates, duplication, readiness)
+
+export interface ProgramTemplate {
+  id: string;
+  name: string;
+  description: string;
+  metrics: Array<{
+    title: string;
+    description: string;
+    metric_type: 'number' | 'percentage';
+    unit_of_measurement: string;
+    category: 'input' | 'output' | 'impact';
+    tags?: string[];
+  }>;
+  groups?: Array<{ name: string; description?: string }>;
+}
+
+export interface StructureSummary {
+  initiative: Initiative;
+  metrics_created: number;
+  tags_attached: number;
+  locations_linked: number;
+  groups_created: number;
+}
+
+export interface ProgramReadiness {
+  metrics: number;
+  locations: number;
+  tags: number;
+  groups: number;
+  claims: number;
+  evidence: number;
+  ready: boolean;
+}
+
+// Matching (server is the single source of truth for the five gates)
+
+export type MatchReason = 'metric' | 'location' | 'date' | 'tag' | 'groups';
+
+export interface MatchVerdict {
+  ok: boolean;
+  reasons: MatchReason[];
+}
+
+export interface MatchPreviewScope {
+  kpiIds: string[];
+  locationIds: string[];
+  tagIds: string[];
+  beneficiaryGroupIds: string[];
+  dateStart: string;
+  dateEnd?: string | null;
+}
+
+export interface ClaimCandidate {
+  id: string;
+  kpi_id: string;
+  kpi_title: string;
+  value: number | null;
+  title: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  date_represented: string | null;
+  date_range_start: string | null;
+  date_range_end: string | null;
+  tag_id: string | null;
+  beneficiary_group_ids: string[];
+  linked: boolean;
+  verdict: MatchVerdict;
+}
+
+export interface EvidenceCandidate {
+  id: string;
+  title: string | null;
+  type: string | null;
+  kpi_ids: string[];
+  location_ids: string[];
+  date_represented: string | null;
+  date_range_start: string | null;
+  date_range_end: string | null;
+  tag_ids: string[];
+  beneficiary_group_ids: string[];
+  approval_status: string | null;
+  linked: boolean;
+  verdict: MatchVerdict;
+}
+
+export interface MatchPreviewResult {
+  claims: ClaimCandidate[];
+  evidence: EvidenceCandidate[];
+}
+
+export interface EvidenceMatchDiagnostics {
+  evidence: {
+    kpiIds: string[];
+    locationIds: string[];
+    dateStart: string;
+    dateEnd: string | null;
+    tagIds: string[];
+    beneficiaryGroupIds: string[];
+    approval_status: string | null;
+  };
+  candidates: ClaimCandidate[];
+}
+
+export interface ClaimMatchDiagnostics {
+  claim: {
+    kpiId: string;
+    locationId: string | null;
+    dateStart: string;
+    dateEnd: string | null;
+    tagId: string | null;
+    beneficiaryGroupIds: string[];
+  };
+  candidates: EvidenceCandidate[];
 }
 
 export interface Story {

@@ -286,7 +286,9 @@ export default function Dashboard() {
  useEffect(() => {
  if (!dashboardOrg?.id) return
  const orgId = dashboardOrg.id
- const storageKey = `evidence-backfill-done:${orgId}`
+        // v2: tag rule changed (tagged evidence now supports untagged claims),
+        // so every browser re-runs the backfill once more.
+        const storageKey = `evidence-backfill-done:v2:${orgId}`
  if (localStorage.getItem(storageKey)) return
 
  apiService.backfillEvidenceLinks()
