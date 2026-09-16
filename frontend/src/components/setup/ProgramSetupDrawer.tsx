@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, BarChart3, MapPin, Users, Plus, Pencil, Trash2, Link2, Unlink, Tag as TagIcon, CheckCircle2, AlertCircle, Settings2 } from 'lucide-react'
+import { getKPIColor } from '../metricsDashboard/metricColorPalette'
+import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
-import { BeneficiaryGroup, CreateKPIForm, KPI, Location, MetricTag, ProgramReadiness } from '../../types'
-import { SectionLoader, EmptyState, InlineAlert } from '../ui'
+import { BeneficiaryGroup, CreateKPIForm, KPI, KPIUpdate, Location, MetricTag, ProgramReadiness } from '../../types'
+import { SectionLoader } from '../ui'
 import CreateKPIModal from '../CreateKPIModal'
 import AddLocationPickerModal from '../AddLocationPickerModal'
 import LocationModal from '../LocationModal'
@@ -34,7 +36,7 @@ interface ProgramSetupDrawerProps {
  * they do elsewhere.
  */
 export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOpen, onClose, onChanged }: ProgramSetupDrawerProps) {
-  const { canAddMetrics, canEditMetrics, canDelete, canEditLocations, canAddBeneficiaries, canEditBeneficiaries, canEditTags } = useTeam()
+  const { canAddMetrics, canEditMetrics, canDelete, canEditLocations, canAddBeneficiaries, canEditBeneficiaries, canEditTags, activeOrganization } = useTeam()
 
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState<KPI[]>([])
@@ -42,6 +44,7 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
   const [groups, setGroups] = useState<BeneficiaryGroup[]>([])
   const [tags, setTags] = useState<MetricTag[]>([])
   const [readiness, setReadiness] = useState<ProgramReadiness | null>(null)
+  const [updatesByKpi, setUpdatesByKpi] = useState<Record<string, KPIUpdate[]>>({})
 
   // Modals
   const [kpiModal, setKpiModal] = useState<{ mode: 'create' } | { mode: 'edit'; kpi: KPI } | null>(null)
@@ -56,18 +59,20 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [k, l, g, t, r] = await Promise.all([
+      const [k, l, g, t, r, u] = await Promise.all([
         apiService.getKPIs(initiativeId),
         apiService.getLocations(initiativeId),
         apiService.getBeneficiaryGroups(initiativeId).catch(() => [] as BeneficiaryGroup[]),
         apiService.getMetricTags().catch(() => [] as MetricTag[]),
         apiService.getInitiativeReadiness(initiativeId).catch(() => null),
+        apiService.getKPIUpdatesForInitiative(initiativeId).catch(() => ({} as Record<string, KPIUpdate[]>)),
       ])
       setKpis((k || []).filter(x => !x.archived_at))
       setLocations(l || [])
       setGroups(g || [])
       setTags(t || [])
       setReadiness(r)
+      setUpdatesByKpi(u || {})
     } catch (e) {
       notify.error((e as Error).message || 'Could not load program setup')
     } finally {
@@ -204,48 +209,59 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
   if (!isOpen) return null
 
   const ready = readiness?.ready ?? (kpis.length > 0 && locations.length > 0)
+  const orgLogoUrl = activeOrganization?.logo_url
 
   return createPortal(
     <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Program setup">
       <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <aside className="absolute inset-y-0 right-0 w-full max-w-2xl bg-white shadow-app-modal border-l border-gray-200 flex flex-col animate-slide-in-right">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-200">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="app-icon-tile app-icon-tile-accent mt-0.5"><Settings2 className="w-5 h-5" /></div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900 truncate">Program setup</h2>
-              {initiativeTitle && <p className="text-sm text-gray-500 truncate">{initiativeTitle}</p>}
+      <aside className="absolute inset-y-0 right-0 w-full max-w-2xl app-canvas shadow-app-modal border-l border-gray-200 flex flex-col animate-slide-in-right">
+        {/* Header: branded identity + readiness at a glance */}
+        <div className="flex-shrink-0 bg-white border-b border-gray-200/80">
+          <div className="h-1 bg-gradient-to-r from-primary-500 via-primary-300 to-evidence-500" />
+          <div className="px-5 pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-xl bg-white ring-1 ring-gray-200/80 shadow-card flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img
+                  src={orgLogoUrl || '/Nexuslogo.png'}
+                  alt=""
+                  className="w-full h-full object-contain p-1"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-primary-900/70 leading-none mb-1 inline-flex items-center gap-1">
+                  <Settings2 className="w-3 h-3" /> Program setup
+                </p>
+                <h2 className="text-xl font-semibold text-gray-900 tracking-tight truncate leading-tight">{initiativeTitle || 'Program'}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Metrics, tags, locations and groups. Everything a log needs to connect.</p>
+              </div>
+              <button type="button" onClick={onClose} aria-label="Close" className="app-btn app-btn-icon app-btn-ghost text-secondary-500 hover:text-secondary-900 flex-shrink-0">
+                <X className="w-5 h-5" />
+              </button>
             </div>
+
+            {!(loading && kpis.length === 0) && (
+              <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <ReadyChip icon={BarChart3} ok={kpis.length > 0} label={`${kpis.length} metric${kpis.length === 1 ? '' : 's'}`} missing="Add a metric" />
+                <ReadyChip icon={MapPin} ok={locations.length > 0} label={`${locations.length} location${locations.length === 1 ? '' : 's'}`} missing="Add a location" />
+                <ReadyChip icon={TagIcon} ok optional label={`${new Set(kpis.flatMap(k => k.tag_ids || [])).size} tag${new Set(kpis.flatMap(k => k.tag_ids || [])).size === 1 ? '' : 's'}`} />
+                <ReadyChip icon={Users} ok optional label={`${groups.length} group${groups.length === 1 ? '' : 's'}`} />
+                <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${ready ? 'bg-impact-50 text-impact-700 border border-impact-100' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                  {ready ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                  {ready ? 'Ready to log' : 'Not ready yet'}
+                </span>
+              </div>
+            )}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="app-btn-icon rounded-lg text-secondary-500 hover:bg-gray-100 hover:text-secondary-900 transition-colors flex items-center justify-center">
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-7">
           {loading && kpis.length === 0 ? (
             <SectionLoader label="Loading setup" />
           ) : (
             <>
-              {/* Readiness */}
-              <InlineAlert tone={ready ? 'success' : 'warning'}>
-                <span className="inline-flex items-start gap-2">
-                  {ready ? <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
-                  <span>
-                    {ready
-                      ? 'Ready to log. Claims and evidence connect automatically when their metric, location and dates match.'
-                      : kpis.length === 0 && locations.length === 0
-                        ? 'Add at least one metric and one location before logging.'
-                        : kpis.length === 0
-                          ? 'Add at least one metric before logging.'
-                          : 'Add at least one location before logging. Claims need a location and evidence connects by location.'}
-                  </span>
-                </span>
-              </InlineAlert>
-
-              {/* Metrics */}
+              {/* Metrics: the same tiles as the program's Metrics page */}
               <Section
                 icon={BarChart3}
                 title="Metrics"
@@ -257,72 +273,89 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
                   </button>
                 ) : undefined}
               >
-                {kpis.length === 0 ? (
-                  <EmptyState title="No metrics yet" description="Add the first thing you want to track." />
-                ) : (
-                  <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
-                    {kpis.map(kpi => {
-                      const kpiTags = (kpi.tag_ids || []).map(id => tagById.get(id)).filter(Boolean) as MetricTag[]
-                      const editingTags = tagEditorKpi?.id === kpi.id
-                      return (
-                        <li key={kpi.id} className="px-4 py-3 bg-white">
-                          <div className="flex items-start gap-3">
-                            <div className="app-icon-tile-sm app-icon-tile-accent flex-shrink-0 mt-0.5"><BarChart3 className="w-4 h-4" /></div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-gray-900 truncate">{kpi.title}</p>
-                              <p className="text-xs text-gray-500 truncate capitalize">{kpi.category} · {kpi.unit_of_measurement}</p>
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                {kpiTags.map(t => (
-                                  <TagChip
-                                    key={t.id}
-                                    name={t.name}
-                                    size="xs"
-                                    onRemove={canEditMetrics && canEditTags ? () => handleSetKpiTags(kpi, (kpi.tag_ids || []).filter(id => id !== t.id)) : undefined}
-                                  />
-                                ))}
-                                {canEditMetrics && canEditTags && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setTagEditorKpi(editingTags ? null : kpi)}
-                                    className={`inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs font-medium transition-colors ${editingTags ? 'border-primary-400 text-primary-700 bg-primary-50' : 'border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300'}`}
-                                  >
-                                    <TagIcon className="w-3 h-3" /> {kpiTags.length === 0 ? 'Add tags' : 'Edit tags'}
-                                  </button>
-                                )}
-                              </div>
-                              {editingTags && (
-                                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
-                                  <TagPicker
-                                    mode="multi"
-                                    selectedIds={kpi.tag_ids || []}
-                                    onChange={(ids) => handleSetKpiTags(kpi, ids)}
-                                    label="Tags on this metric"
-                                    helperText="Claims on this metric can use these tags. Evidence carrying a tag supports claims with that tag and any untagged claims."
-                                  />
-                                  <div className="mt-2 text-right">
-                                    <button type="button" onClick={() => setTagEditorKpi(null)} className="app-btn app-btn-ghost app-btn-sm">Done</button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              {canEditMetrics && (
-                                <button type="button" onClick={() => setKpiModal({ mode: 'edit', kpi })} className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-gray-700" title="Edit metric">
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                              )}
-                              {canDelete && (
-                                <button type="button" onClick={() => askDeleteKpi(kpi)} className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-red-600" title="Delete metric">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {kpis.map((kpi, index) => {
+                    const kpiTags = (kpi.tag_ids || []).map(id => tagById.get(id)).filter(Boolean) as MetricTag[]
+                    const editingTags = tagEditorKpi?.id === kpi.id
+                    const color = getKPIColor(kpi.category, index)
+                    const isPct = kpi.metric_type === 'percentage'
+                    const total = aggregateKpiUpdates(updatesByKpi[kpi.id!] || [], kpi.metric_type)
+                    return (
+                      <div key={kpi.id} className={`app-tile p-4 group relative flex flex-col ${editingTags ? 'sm:col-span-2 border-primary-300/70' : ''}`}>
+                        {/* Top-right: hover actions */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5">
+                          {canEditMetrics && (
+                            <button type="button" onClick={() => setKpiModal({ mode: 'edit', kpi })} className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all" title="Edit metric">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button type="button" onClick={() => askDeleteKpi(kpi)} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all" title="Delete metric">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-start gap-2 pr-14 mb-3">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }} />
+                          <p className="text-sm font-medium text-gray-800 leading-snug line-clamp-2" title={kpi.title}>{kpi.title}</p>
+                        </div>
+                        <div className="flex items-baseline gap-1.5 min-w-0">
+                          <span className="text-2xl font-semibold text-gray-900 tabular-nums">
+                            {isPct ? `${Math.round(total)}%` : total.toLocaleString()}
+                          </span>
+                          {!isPct && kpi.unit_of_measurement && <span className="text-xs text-gray-400 truncate">{kpi.unit_of_measurement}</span>}
+                          <span className="ml-auto text-[11px] text-gray-400 capitalize flex-shrink-0">{kpi.category}</span>
+                        </div>
+
+                        {/* Tags row: the thing people couldn't find before */}
+                        <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+                          {kpiTags.map(t => (
+                            <TagChip
+                              key={t.id}
+                              name={t.name}
+                              size="xs"
+                              onRemove={canEditMetrics && canEditTags ? () => handleSetKpiTags(kpi, (kpi.tag_ids || []).filter(id => id !== t.id)) : undefined}
+                            />
+                          ))}
+                          {kpiTags.length === 0 && !(canEditMetrics && canEditTags) && (
+                            <span className="text-[11px] text-gray-400">No tags</span>
+                          )}
+                          {canEditMetrics && canEditTags && (
+                            <button
+                              type="button"
+                              onClick={() => setTagEditorKpi(editingTags ? null : kpi)}
+                              className={`inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[11px] font-medium transition-colors ${editingTags ? 'border-primary-400 text-primary-800 bg-primary-50' : 'border-gray-300 text-gray-500 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/40'}`}
+                            >
+                              <TagIcon className="w-3 h-3" /> {kpiTags.length === 0 ? 'Add tags' : 'Edit tags'}
+                            </button>
+                          )}
+                        </div>
+
+                        {editingTags && (
+                          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+                            <TagPicker
+                              mode="multi"
+                              selectedIds={kpi.tag_ids || []}
+                              onChange={(ids) => handleSetKpiTags(kpi, ids)}
+                              label="Tags on this metric"
+                              helperText="Claims on this metric can use these tags. Evidence carrying a tag supports claims with that tag and any untagged claims."
+                            />
+                            <div className="mt-2 text-right">
+                              <button type="button" onClick={() => setTagEditorKpi(null)} className="app-btn app-btn-ghost app-btn-sm">Done</button>
                             </div>
                           </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
+                        )}
+                      </div>
+                    )
+                  })}
+                  {canAddMetrics && (
+                    <AddTile onClick={() => setKpiModal({ mode: 'create' })} label={kpis.length === 0 ? 'Add your first metric' : 'New metric'} hint={kpis.length === 0 ? 'The first thing you want to track, like "Students trained".' : undefined} />
+                  )}
+                  {!canAddMetrics && kpis.length === 0 && (
+                    <p className="text-sm text-gray-500 sm:col-span-2">No metrics yet.</p>
+                  )}
+                </div>
               </Section>
 
               {/* Locations */}
@@ -342,31 +375,26 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
                   </div>
                 ) : undefined}
               >
-                {locations.length === 0 ? (
-                  <EmptyState title="No locations yet" description="Link one from your organization or create a new one." />
-                ) : (
-                  <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
-                    {locations.map(loc => (
-                      <li key={loc.id} className="px-4 py-3 bg-white flex items-center gap-3">
-                        <div className="app-icon-tile-sm app-icon-tile-accent flex-shrink-0"><MapPin className="w-4 h-4" /></div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{loc.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{loc.country || loc.description || `${loc.latitude?.toFixed?.(3)}, ${loc.longitude?.toFixed?.(3)}`}</p>
-                        </div>
-                        {canEditLocations && (
-                          <div className="flex items-center gap-0.5 flex-shrink-0">
-                            <button type="button" onClick={() => setLocationModal({ location: loc })} className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-gray-700" title="Edit location">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => askUnlinkLocation(loc)} className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-red-600" title="Remove from program">
-                              <Unlink className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {locations.map(loc => (
+                    <EntityTile
+                      key={loc.id}
+                      icon={MapPin}
+                      title={loc.name}
+                      subtitle={loc.country || loc.description || `${loc.latitude?.toFixed?.(3)}, ${loc.longitude?.toFixed?.(3)}`}
+                      onEdit={canEditLocations ? () => setLocationModal({ location: loc }) : undefined}
+                      onRemove={canEditLocations ? () => askUnlinkLocation(loc) : undefined}
+                      removeIcon={Unlink}
+                      removeTitle="Remove from program"
+                    />
+                  ))}
+                  {canEditLocations && (
+                    <AddTile onClick={() => setLocationPickerOpen(true)} label={locations.length === 0 ? 'Add a location' : 'Add location'} hint={locations.length === 0 ? 'Link one from your organization or create a new one.' : undefined} />
+                  )}
+                  {!canEditLocations && locations.length === 0 && (
+                    <p className="text-sm text-gray-500 sm:col-span-2">No locations yet.</p>
+                  )}
+                </div>
               </Section>
 
               {/* Groups */}
@@ -381,34 +409,26 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
                   </button>
                 ) : undefined}
               >
-                {groups.length === 0 ? (
-                  <p className="text-sm text-gray-500 px-1">No groups. Skip this unless you report by who benefits.</p>
+                {groups.length === 0 && !canAddBeneficiaries ? (
+                  <p className="text-sm text-gray-500">No groups. Skip this unless you report by who benefits.</p>
                 ) : (
-                  <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {groups.map(g => (
-                      <li key={g.id} className="px-4 py-3 bg-white flex items-center gap-3">
-                        <div className="app-icon-tile-sm app-icon-tile-accent flex-shrink-0"><Users className="w-4 h-4" /></div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{g.name}</p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {[g.total_number != null ? `${g.total_number} people` : null, g.age_range_start != null ? `age ${g.age_range_start}${g.age_range_end != null ? `-${g.age_range_end}` : '+'}` : null].filter(Boolean).join(' · ') || g.description || 'No details'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-0.5 flex-shrink-0">
-                          {canEditBeneficiaries && (
-                            <button type="button" onClick={() => setGroupModal({ group: g })} className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-gray-700" title="Edit group">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button type="button" onClick={() => askDeleteGroup(g)} className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-red-600" title="Delete group">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </li>
+                      <EntityTile
+                        key={g.id}
+                        icon={Users}
+                        title={g.name}
+                        subtitle={[g.total_number != null ? `${g.total_number} people` : null, g.age_range_start != null ? `age ${g.age_range_start}${g.age_range_end != null ? `-${g.age_range_end}` : '+'}` : null].filter(Boolean).join(' · ') || g.description || 'No details'}
+                        onEdit={canEditBeneficiaries ? () => setGroupModal({ group: g }) : undefined}
+                        onRemove={canDelete ? () => askDeleteGroup(g) : undefined}
+                        removeIcon={Trash2}
+                        removeTitle="Delete group"
+                      />
                     ))}
-                  </ul>
+                    {canAddBeneficiaries && (
+                      <AddTile onClick={() => setGroupModal({})} label={groups.length === 0 ? 'Add a group' : 'Add group'} hint={groups.length === 0 ? 'Optional. Skip unless you report by who benefits.' : undefined} muted />
+                    )}
+                  </div>
                 )}
               </Section>
             </>
@@ -484,18 +504,98 @@ function Section({ icon: Icon, title, count, hint, action, children }: {
 }) {
   return (
     <section>
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <Icon className="w-4 h-4 text-primary-700" />
-            {title}
-            <span className="text-xs font-medium text-gray-400">{count}</span>
-          </h3>
-          {hint && <p className="text-xs text-gray-500 mt-0.5">{hint}</p>}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <span className="app-icon-tile-sm app-icon-tile-accent flex-shrink-0"><Icon className="w-4 h-4" /></span>
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-semibold text-gray-900 tracking-tight flex items-center gap-2 leading-tight">
+              {title}
+              <span className="min-w-[1.25rem] px-1.5 py-px rounded-full bg-gray-200/80 text-[11px] font-semibold tabular-nums text-gray-600 text-center">{count}</span>
+            </h3>
+            {hint && <p className="text-xs text-gray-500 mt-0.5">{hint}</p>}
+          </div>
         </div>
         {action && <div className="flex-shrink-0">{action}</div>}
       </div>
       {children}
     </section>
+  )
+}
+
+/** Location / group tile: same shell as the metric tiles, hover-only actions. */
+function EntityTile({ icon: Icon, title, subtitle, onEdit, onRemove, removeIcon: RemoveIcon, removeTitle }: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  subtitle?: string
+  onEdit?: () => void
+  onRemove?: () => void
+  removeIcon: React.ComponentType<{ className?: string }>
+  removeTitle: string
+}) {
+  return (
+    <div className="app-tile p-4 group relative flex items-center gap-3">
+      <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5">
+        {onEdit && (
+          <button type="button" onClick={onEdit} className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all" title="Edit">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onRemove && (
+          <button type="button" onClick={onRemove} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all" title={removeTitle}>
+            <RemoveIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-900 flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4" />
+      </div>
+      <div className="min-w-0 flex-1 pr-12">
+        <p className="text-sm font-medium text-gray-800 truncate">{title}</p>
+        {subtitle && <p className="text-xs text-gray-400 truncate mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+  )
+}
+
+/** Dashed "+ add" tile that sits in the same grid as the real tiles. */
+function AddTile({ onClick, label, hint, muted }: { onClick: () => void; label: string; hint?: string; muted?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-[4.5rem] rounded-2xl border border-dashed p-4 text-left flex items-center gap-3 transition-colors ${muted
+        ? 'border-gray-200 text-gray-400 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/30'
+        : 'border-gray-300 text-gray-500 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/40'}`}
+    >
+      <span className="w-10 h-10 rounded-xl border border-dashed border-current/40 flex items-center justify-center flex-shrink-0">
+        <Plus className="w-4 h-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{label}</span>
+        {hint && <span className="block text-xs font-normal opacity-80 mt-0.5">{hint}</span>}
+      </span>
+    </button>
+  )
+}
+
+/** Header readiness chip: quiet when present, amber when required and missing. */
+function ReadyChip({ icon: Icon, ok, label, missing, optional }: {
+  icon: React.ComponentType<{ className?: string }>
+  ok: boolean
+  label: string
+  missing?: string
+  optional?: boolean
+}) {
+  if (ok) {
+    return (
+      <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${optional ? 'text-gray-400' : 'text-gray-500'}`}>
+        <Icon className="w-3 h-3" /> {label}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+      <AlertCircle className="w-3 h-3" /> {missing || label}
+    </span>
   )
 }
