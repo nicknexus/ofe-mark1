@@ -19,7 +19,7 @@ interface UploadWizardLauncherProps {
  * Mobile-only: no Advanced claim board / evidence batch paths.
  */
 export default function UploadWizardLauncher({ initiativeId, onClose, onCreated }: UploadWizardLauncherProps) {
- const { canAddImpactClaims, canAddEvidence } = useTeam()
+ const { canAddImpactClaims, canAddEvidence, canEditMetrics } = useTeam()
  const [data, setData] = useState<TimelineResponse | null>(null)
  const [locations, setLocations] = useState<Location[]>([])
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
@@ -66,6 +66,8 @@ export default function UploadWizardLauncher({ initiativeId, onClose, onCreated 
  locations={locations}
  tags={tags}
  beneficiaryGroups={beneficiaryGroups}
+ canManageStructure={canEditMetrics}
+ onStructureChanged={() => apiService.clearCache()}
  existingClaims={data.claims}
  existingEvidence={data.evidence}
  onClose={onClose}

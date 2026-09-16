@@ -42,6 +42,10 @@ import WizardClaimStep from './WizardClaimStep'
 import WizardClaimsStep from './WizardClaimsStep'
 import WizardEvidenceStep from './WizardEvidenceStep'
 import WizardReviewStep from './WizardReviewStep'
+import CreateKPIModal from '../CreateKPIModal'
+import LocationModal from '../LocationModal'
+import { getLocalDateString } from '../../utils'
+import type { CreateKPIForm } from '../../types'
 
 /**
  * Step branding: claim territory is blue, evidence territory is the brand
@@ -117,6 +121,10 @@ interface UploadWizardProps {
  locations: Location[]
  tags: MetricTag[]
  beneficiaryGroups: BeneficiaryGroup[]
+  /** Allow "+ New metric / location / tag" inside the wizard (admins/editors). */
+  canManageStructure?: boolean
+  /** Fired after anything is created inline so the parent can refresh its lists. */
+  onStructureChanged?: () => void
   existingClaims: TimelineClaim[]
   existingEvidence: TimelineEvidence[]
   /** Start on a specific kind and skip the "What would you like to add?" step. */
@@ -205,7 +213,7 @@ const STEP_META: Record<WizardStepId, { label: string | ((s: WizardState) => str
  type: {
  label: 'Type',
  title: () => 'What does this log contain?',
- subtitle: () => 'A log is one record of work — claims, evidence, or both together',
+ subtitle: () => 'A log is one record of work: claims, evidence, or both together',
  },
  mode: {
  label: 'How',
@@ -217,20 +225,20 @@ const STEP_META: Record<WizardStepId, { label: string | ((s: WizardState) => str
  title: (s) => includesClaim(s.kind) ? 'Which metric is this result for?' : 'Which metrics does this evidence support?',
  subtitle: (s) => includesClaim(s.kind)
  ? 'Pick the thing you\'re measuring'
- : 'Pick one, several, or all — broad documents like annual reports can support everything',
+ : 'Pick one, several, or all. Broad documents like annual reports can support everything',
  },
  scope: {
  label: 'Where & when',
  title: () => 'Where and when did this happen?',
  subtitle: (s) => s.kind === 'both'
- ? 'Set the scope once — every claim and all evidence in this log will share it'
- : 'This decides what gets connected automatically — matching scope means an automatic link',
+ ? 'Set the scope once. Every claim and all evidence in this log will share it'
+ : 'This decides what gets connected automatically: matching scope means an automatic link',
  },
  claim: {
  label: s => s.kind === 'both' ? 'Claims' : 'Result',
  title: (s) => s.kind === 'both' ? 'Add your impact claims' : 'Claim the result',
  subtitle: (s) => s.kind === 'both'
- ? 'Enter a result for any metric this work touched — leave the rest blank'
+ ? 'Enter a result for any metric this work touched. Leave the rest blank'
  : 'The number you achieved in that place and time',
  },
  evidence: {
@@ -263,10 +271,12 @@ export default function UploadWizard({
  canCreateEvidence,
  onAdvancedClaim,
  onAdvancedEvidence,
-  kpis,
-  locations,
-  tags,
+  kpis: kpisProp,
+  locations: locationsProp,
+  tags: tagsProp,
   beneficiaryGroups,
+  canManageStructure = false,
+  onStructureChanged,
   existingClaims,
   existingEvidence,
   initialKind,
@@ -280,6 +290,14 @@ export default function UploadWizard({
   const { queueUpload, cancelUpload, setPanelSuppressed } = useUploadManager()
   const { requiresEvidenceApproval } = useTeam()
   const isEdit = !!editClaim || !!editEvidence
+
+  // Local copies so inline creation can append without a full parent reload.
+  const [kpis, setKpis] = useState<KPI[]>(kpisProp)
+  const [locations, setLocations] = useState<Location[]>(locationsProp)
+  const [tags, setTags] = useState<MetricTag[]>(tagsProp)
+  useEffect(() => setKpis(kpisProp), [kpisProp])
+  useEffect(() => setLocations(locationsProp), [locationsProp])
+  useEffect(() => setTags(tagsProp), [tagsProp])
 
   // Add-evidence-for-a-claim implies evidence kind + the claim's metric locked.
   const startKind = initialKind ?? (evidenceForClaim ? 'evidence' : undefined)
@@ -296,9 +314,14 @@ export default function UploadWizard({
     // A caller-provided kind (Metrics dashboard) or single-capability users
     // skip the type step entirely.
     kind: startKind ?? (availableKinds.length === 1 ? availableKinds[0].kind : null),
+    // Smart defaults: today, and the only location / metric when there is
+    // exactly one. Every one of these is still editable on its step.
+    dateMode: 'single',
+    dateSingle: getLocalDateString(new Date()),
+    locationIds: locationsProp.length === 1 && locationsProp[0].id ? [locationsProp[0].id] : [],
     // Pre-scope to the metric the user added from, so we can skip the picker.
-    claimKpiId: lockedMetric ?? null,
-    evidenceKpiIds: lockedMetric ? [lockedMetric] : [],
+    claimKpiId: lockedMetric ?? (kpisProp.length === 1 ? kpisProp[0].id ?? null : null),
+    evidenceKpiIds: lockedMetric ? [lockedMetric] : kpisProp.length === 1 && kpisProp[0].id ? [kpisProp[0].id] : [],
     // Add-evidence-for-a-claim: prefill the claim's scope so it auto-connects.
     ...stateFromClaimScope(evidenceForClaim),
     // Edit mode: everything prefilled from the record being edited.
@@ -488,6 +511,66 @@ export default function UploadWizard({
  setState(prev => ({ ...prev, files: prev.files.filter(f => f.id !== fileId) }))
  }
 
+ // ── Inline structure creation ─────────────────────────────────────────
+ const [kpiModalOpen, setKpiModalOpen] = useState(false)
+ const [locationModalOpen, setLocationModalOpen] = useState(false)
+
+ const handleInlineCreateKpi = async (data: CreateKPIForm) => {
+   const created = await apiService.createKPI({ ...data, initiative_id: initiativeId } as CreateKPIForm)
+   apiService.clearCache('/kpis')
+   setKpis(prev => [...prev, created])
+   // Select it where it makes sense so the user doesn't have to hunt for it.
+   setState(prev => {
+     const next: WizardState = { ...prev }
+     if (includesEvidence(prev.kind) && prev.kind !== 'both' && created.id) {
+       next.evidenceKpiIds = [...prev.evidenceKpiIds, created.id]
+     }
+     if (prev.kind === 'claim' && created.id) next.claimKpiId = created.id
+     stateRef.current = next
+     return next
+   })
+   setKpiModalOpen(false)
+   notify.success('Metric added')
+   onStructureChanged?.()
+ }
+
+ const handleInlineCreateLocation = async (data: Partial<Location>) => {
+   try {
+     const created = await apiService.createLocation({ ...data, initiative_id: initiativeId })
+     apiService.clearCache('/locations')
+     setLocations(prev => [...prev, created])
+     if (created.id) {
+       const single = includesClaim(stateRef.current.kind)
+       update({ locationIds: single ? [created.id] : [...stateRef.current.locationIds, created.id] })
+     }
+     setLocationModalOpen(false)
+     notify.success('Location added')
+     onStructureChanged?.()
+   } catch (e: any) {
+     if (e?.code === 'LOCATION_LIMIT_REACHED') {
+       notify.error('Location limit reached on your plan.')
+       setLocationModalOpen(false)
+       return
+     }
+     throw e
+   }
+ }
+
+ const handleInlineCreateTag = async (name: string) => {
+   try {
+     const created = await apiService.createMetricTag(name)
+     apiService.clearCache('/metric-tags')
+     setTags(prev => prev.some(t => t.id === created.id) ? prev : [...prev, created])
+     const single = includesClaim(stateRef.current.kind)
+     update({ tagIds: single ? [created.id] : [...stateRef.current.tagIds, created.id] })
+     notify.success('Tag added')
+     onStructureChanged?.()
+   } catch (e) {
+     notify.error((e as Error).message || 'Could not create tag')
+     throw e
+   }
+ }
+
  const validateCurrent = (): string | null => {
  const snapshot = stateRef.current
  switch (step) {
@@ -637,7 +720,7 @@ export default function UploadWizard({
  const fileUrls = bucket.files.map(f => f.url!)
  const fileSizes = bucket.files.map(f => f.uploadedSize ?? 0)
  const evidencePayload: CreateEvidenceForm = {
- title: multi ? `${baseTitle} — ${EVIDENCE_TYPE_LABELS[bucket.type]}` : baseTitle,
+ title: multi ? `${baseTitle} - ${EVIDENCE_TYPE_LABELS[bucket.type]}` : baseTitle,
  description: state.evidenceDescription.trim() || undefined,
  type: bucket.type,
  ...dateFields,
@@ -660,9 +743,9 @@ export default function UploadWizard({
 
  notify.success(
  state.kind === 'both'
- ? `Log saved — ${createdClaimIds.length} claim${createdClaimIds.length === 1 ? '' : 's'} and ${evidenceRecordCount} evidence record${evidenceRecordCount === 1 ? '' : 's'} connected automatically`
- : state.kind === 'claim' ? 'Log saved — impact claim added'
- : `Log saved — ${evidenceRecordCount} evidence record${evidenceRecordCount === 1 ? '' : 's'} uploaded`
+ ? `Log saved. ${createdClaimIds.length} claim${createdClaimIds.length === 1 ? '' : 's'} and ${evidenceRecordCount} evidence record${evidenceRecordCount === 1 ? '' : 's'} connected automatically`
+ : state.kind === 'claim' ? 'Log saved. Impact claim added'
+ : `Log saved. ${evidenceRecordCount} evidence record${evidenceRecordCount === 1 ? '' : 's'} uploaded`
  )
  savedRef.current = true
  state.files.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
@@ -851,8 +934,8 @@ export default function UploadWizard({
  <p className="text-base font-semibold text-gray-800 mb-1.5">Advanced</p>
  <p className="text-sm text-gray-500 leading-relaxed">
  {state.kind === 'claim'
- ? 'The full claim board — add many claims across metrics at once.'
- : 'The batch organizer — sort many files into multiple evidence records.'}
+ ? 'The full claim board. Add many claims across metrics at once.'
+ : 'The batch organizer. Sort many files into multiple evidence records.'}
  </p>
  </button>
  </div>
@@ -865,6 +948,7 @@ export default function UploadWizard({
  kpis={kpis}
  kpiTotals={kpiTotals}
  onAutoAdvance={advance}
+ onCreateMetric={canManageStructure && !isEdit ? () => setKpiModalOpen(true) : undefined}
  />
  )}
 
@@ -877,6 +961,8 @@ export default function UploadWizard({
  kpis={kpis}
  beneficiaryGroups={beneficiaryGroups}
  datePickerRef={scopeDatePickerRef}
+ onCreateLocation={canManageStructure ? () => setLocationModalOpen(true) : undefined}
+ onCreateTag={canManageStructure ? handleInlineCreateTag : undefined}
  />
  )}
 
@@ -888,6 +974,7 @@ export default function UploadWizard({
  kpis={kpis}
  tags={tags}
  lockedMetricId={lockedMetricId}
+ onCreateMetric={canManageStructure ? () => setKpiModalOpen(true) : undefined}
  />
  ) : (
  <WizardClaimStep state={state} update={update} kpis={kpis} />
@@ -920,6 +1007,7 @@ export default function UploadWizard({
  )}
  <WizardReviewStep
  state={state}
+ initiativeId={initiativeId}
  kpis={kpis}
  locations={locations}
  tags={tags}
@@ -959,6 +1047,23 @@ export default function UploadWizard({
  )}
  </div>
  </div>
+
+ {kpiModalOpen && (
+ <CreateKPIModal
+ isOpen
+ onClose={() => setKpiModalOpen(false)}
+ onSubmit={handleInlineCreateKpi}
+ initiativeId={initiativeId}
+ />
+ )}
+ {locationModalOpen && (
+ <LocationModal
+ isOpen
+ onClose={() => setLocationModalOpen(false)}
+ onSubmit={handleInlineCreateLocation}
+ initiativeId={initiativeId}
+ />
+ )}
  </div>
  )
 }

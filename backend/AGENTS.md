@@ -24,6 +24,9 @@
 3. **Team / tenant security** — `OrgAccessService` enforces organization membership in **services** (not routes). `X-Organization-Id` is a routing hint only. `PermissionService` handles business roles; owners always via `organizations.owner_id`, never `role_id`. Never use content `user_id` / `created_by` as authority. Denials: log internally (`permissionDenialLog`), return 404 externally.
 4. **Errors** — Return appropriate HTTP statuses and JSON messages consistent with neighboring routes; use existing error-handling style in the file you edit.
 5. **Types** — Prefer shared types from `src/types/index.ts` for request/response shapes; extend there when adding public contracts.
+6. **Evidence/claim matching** — The five gates (metric, location, date overlap, tag, groups) live in `services/matchService.ts` (`MatchService.explain`). `previewMatches`, `diagnoseEvidence` and `diagnoseClaim` are read-only views over the same function and back the `/preview-matches` and `/match-diagnostics` routes. If you change a gate, change it there and in `evidenceService.ts`'s link/reconcile path together; don't add a third copy.
+7. **Tags attach on use** — `MetricTagService.ensureTagAttachedToKpi` adds a tag to a metric the first time a claim uses it (org-validated). Routes must not reject a claim because the tag isn't already on the metric.
+8. **Program structure** — Templates, structure duplication and readiness are in `services/programStructureService.ts` (`/initiatives/templates`, `/initiatives/from-template`, `/initiatives/:id/duplicate-structure`, `/initiatives/:id/readiness`). None of this requires migrations; it composes existing tables.
 
 ## Verification
 

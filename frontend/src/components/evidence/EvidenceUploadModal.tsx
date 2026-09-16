@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { X, ChevronLeft, ChevronRight, Upload as UploadIcon, Loader2, FileText, Layers } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Upload as UploadIcon, Loader2 } from 'lucide-react'
 import { useUploadManager } from '../../context/UploadContext'
 import { useEvidenceUploadState } from './hooks/useEvidenceUploadState'
 import { useInitiativeData } from './hooks/useInitiativeData'
@@ -11,8 +11,6 @@ import GroupEditorPopover from './kanban/GroupEditorPopover'
 import FileEditPopover from './kanban/FileEditPopover'
 import { apiService } from '../../services/api'
 import { CreateEvidenceForm, MetricTag } from '../../types'
-import { isNewEvidenceUploadEnabled } from '../../config/featureFlags'
-import AddEvidenceModal from '../AddEvidenceModal'
 import { notify } from '../../lib/notify'
 
 interface EvidenceUploadModalProps {
@@ -21,106 +19,14 @@ interface EvidenceUploadModalProps {
  onCreated?: () => void | Promise<void>
  initiativeId: string
  preSelectedKPIId?: string
- /** Skip the chooser and open straight into this mode (e.g. 'batch' from the wizard). */
- initialMode?: UploadMode
 }
 
-type UploadMode = 'choose' | 'single' | 'batch'
-
-export default function EvidenceUploadModal(props: EvidenceUploadModalProps) {
- const newFlowEnabled = isNewEvidenceUploadEnabled()
- // Reset mode every time the modal reopens so the chooser is the first thing
- // the user sees. Kill-switch keeps the legacy modal direct (no chooser).
- const defaultMode = props.initialMode ?? (newFlowEnabled ? 'choose' : 'single')
- const [mode, setMode] = useState<UploadMode>(defaultMode)
-
- useEffect(() => {
- if (props.isOpen) {
- setMode(defaultMode)
- }
- }, [props.isOpen, defaultMode])
-
- if (!props.isOpen) return null
-
- if (mode === 'choose') {
- return (
- <UploadModeChooser
- onClose={props.onClose}
- onPick={(picked) => setMode(picked)}
- />
- )
- }
-
- if (mode === 'single') {
- return <LegacyEvidenceUploadFallback {...props} />
- }
-
- return <NewEvidenceUploadModal {...props} />
-}
-
-function UploadModeChooser({
- onClose,
- onPick,
-}: {
- onClose: () => void
- onPick: (mode: 'single' | 'batch') => void
-}) {
- return (
- <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-[70]">
- <div className="app-card-elevated w-full max-w-2xl overflow-hidden">
- <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/80">
- <div>
- <h2 className="text-base font-semibold text-gray-900">How do you want to add evidence?</h2>
- <p className="text-xs text-gray-500 mt-0.5">Pick the flow that matches what you're uploading.</p>
- </div>
- <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100 transition-colors" aria-label="Close">
- <X className="w-5 h-5 text-gray-500" />
- </button>
- </div>
-
- <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
- <button
- onClick={() => onPick('single')}
- className="group text-left p-5 rounded-xl border border-gray-200 hover:border-evidence-400 hover:bg-evidence-50/30 transition-all flex flex-col gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-evidence-400"
- >
- <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center group-hover:bg-evidence-100 group-hover:border-evidence-200 transition-colors">
- <FileText className="w-5 h-5 text-gray-700 group-hover:text-evidence-700" />
- </div>
- <div>
- <div className="flex items-center gap-2">
- <h3 className="text-sm font-semibold text-gray-900">Simple</h3>
- <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">Classic</span>
- </div>
- <p className="text-xs text-gray-600 mt-1 leading-relaxed">
- For evidence that's all the same — same impact claim, date, and location. One guided form, one record.
- </p>
- </div>
- </button>
-
- <button
- onClick={() => onPick('batch')}
- className="group text-left p-5 rounded-xl border border-gray-200 hover:border-evidence-400 hover:bg-evidence-50/30 transition-all flex flex-col gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-evidence-400"
- >
- <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center group-hover:bg-evidence-100 group-hover:border-evidence-200 transition-colors">
- <Layers className="w-5 h-5 text-gray-700 group-hover:text-evidence-700" />
- </div>
- <div>
- <div className="flex items-center gap-2">
- <h3 className="text-sm font-semibold text-gray-900">Advanced</h3>
- <span className="text-xs font-medium text-evidence-700 bg-evidence-100 px-1.5 py-0.5 rounded">New</span>
- </div>
- <p className="text-xs text-gray-600 mt-1 leading-relaxed">
- For uploads that span multiple impact claims, dates, or locations. Drop everything in, then organize it into groups.
- </p>
- </div>
- </button>
- </div>
- </div>
- </div>
- )
-}
-
-function NewEvidenceUploadModal({
+/**
+ * Advanced evidence upload: drop many files, then organize them into
+ * evidence records on a board. The guided single-record path lives in
+ * `UploadWizard`; this is the bulk tool it hands off to.
+ */
+export default function EvidenceUploadModal({
  isOpen,
  onClose,
  onCreated,
@@ -207,7 +113,7 @@ function NewEvidenceUploadModal({
  // Block if any files in submittable groups failed to upload.
  const failedFiles = groupsToSubmit.flatMap(gp => gp.files.filter(f => !f.isLink && (f.status === 'error' || !f.uploadedUrl)))
  if (failedFiles.length > 0) {
- notify.error(`${failedFiles.length} file${failedFiles.length === 1 ? '' : 's'} failed to upload — remove or retry`)
+ notify.error(`${failedFiles.length} file${failedFiles.length === 1 ? '' : 's'} failed to upload. Remove or retry`)
  return
  }
 
@@ -248,11 +154,11 @@ function NewEvidenceUploadModal({
  await onCreated?.()
  onClose()
  } else if (fulfilled > 0) {
- notify.error(`Created ${fulfilled} group${fulfilled === 1 ? '' : 's'}, ${rejected} failed — check console`)
+ notify.error(`Created ${fulfilled} group${fulfilled === 1 ? '' : 's'}, ${rejected} failed. Check console`)
  results.forEach(r => r.status === 'rejected' && console.error('Evidence create failed:', r.reason))
  await onCreated?.()
  } else {
- notify.error('All evidence groups failed — check console')
+ notify.error('All evidence groups failed. Check console')
  results.forEach(r => r.status === 'rejected' && console.error('Evidence create failed:', r.reason))
  }
  }, [state.groups, state.files, initiativeId, onCreated, onClose])
@@ -283,7 +189,7 @@ function NewEvidenceUploadModal({
  <div>
  <h2 className="text-base font-semibold text-gray-900 leading-tight">Upload Evidence</h2>
  <p className="text-xs text-gray-500 mt-0.5">
- {state.step === 'upload' ? 'Step 1 — Add your files' : 'Step 2 — Organize into evidence groups'}
+ {state.step === 'upload' ? 'Step 1: Add your files' : 'Step 2: Organize into evidence groups'}
  </p>
  </div>
  </div>
@@ -451,36 +357,5 @@ function NewEvidenceUploadModal({
  )
  })()}
  </div>
- )
-}
-
-/**
- * Rollback path for the Kanban evidence upload flow. Pulls the initiative's KPIs
- * (the only piece of state the legacy modal can't load itself) and mounts the
- * legacy AddEvidenceModal with an adapted submit handler that mirrors the
- * server contract the new flow uses.
- */
-function LegacyEvidenceUploadFallback({
- isOpen,
- onClose,
- onCreated,
- initiativeId,
- preSelectedKPIId,
-}: EvidenceUploadModalProps) {
- const { kpis } = useInitiativeData(initiativeId, isOpen)
- const handleSubmit = useCallback(async (data: CreateEvidenceForm) => {
- await apiService.createEvidence(data)
- await onCreated?.()
- }, [onCreated])
-
- return (
- <AddEvidenceModal
- isOpen={isOpen}
- onClose={onClose}
- onSubmit={handleSubmit}
- availableKPIs={kpis}
- initiativeId={initiativeId}
- preSelectedKPIId={preSelectedKPIId}
- />
  )
 }

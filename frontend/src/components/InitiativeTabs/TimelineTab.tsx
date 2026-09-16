@@ -69,7 +69,7 @@ interface TimelineTabProps {
  * browser controls (?tab=logs&view=...&metric=...).
  */
 export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal }: TimelineTabProps) {
- const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canDelete, canManageTeam } = useTeam()
+ const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canDelete, canManageTeam, canEditMetrics } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
  const [data, setData] = useState<TimelineResponse | null>(null)
@@ -438,6 +438,8 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  locations={locations}
  tags={tags}
  beneficiaryGroups={beneficiaryGroups}
+ canManageStructure={canEditMetrics}
+ onStructureChanged={refresh}
  existingClaims={data.claims}
  existingEvidence={data.evidence}
  onClose={() => setIsWizardOpen(false)}
@@ -449,9 +451,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  {advancedUpload === 'claim' && data && (
  <ImpactClaimUploadModal
  isOpen
- initialMode="advanced"
  initiativeId={initiativeId}
- availableKPIs={data.kpis}
  onClose={() => setAdvancedUpload(null)}
  onCreated={() => refresh()}
  />
@@ -461,7 +461,6 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  {advancedUpload === 'evidence' && (
  <EvidenceUploadModal
  isOpen
- initialMode="batch"
  initiativeId={initiativeId}
  onClose={() => setAdvancedUpload(null)}
  onCreated={() => refresh()}
@@ -523,6 +522,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  onDelete={canDelete || (canManageTeam && selectedEvidence.approval_status === 'pending')
  ? () => setDeleteEvidence(selectedEvidence)
  : undefined}
+ onConnect={canEditEvidence ? () => { setSelectedEvidence(null); setConnectTarget({ evidence: selectedEvidence }) } : undefined}
  />
  )}
 

@@ -14,6 +14,8 @@ import {
 } from '../../types'
 import { formatDate } from '../../utils'
 import { previewMatchingClaims } from '../../utils/timeline'
+import { apiService } from '../../services/api'
+import MatchDiagnosticsPanel from './MatchDiagnosticsPanel'
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
 const isImageFile = (f: { file_url?: string; file_name?: string; file_type?: string }) => {
@@ -45,6 +47,8 @@ interface EvidenceDetailModalProps {
  onOpenClaim: (claim: TimelineClaim) => void
  onEdit?: () => void
  onDelete?: () => void
+ /** Manual connect (re-scope + link) for unconnected evidence. */
+ onConnect?: () => void
 }
 
 /**
@@ -67,6 +71,7 @@ export default function EvidenceDetailModal({
  onOpenClaim,
  onEdit,
  onDelete,
+ onConnect,
 }: EvidenceDetailModalProps) {
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
  const isPending = evidence.approval_status === 'pending'
@@ -262,9 +267,22 @@ export default function EvidenceDetailModal({
  Supports {connectedClaims.length} claim{connectedClaims.length === 1 ? '' : 's'}
  </p>
  {connectedClaims.length === 0 ? (
- <p className="text-xs text-gray-400">
- Not connected to any claim yet — connect it from the Logs tab's Connections view.
- </p>
+ <MatchDiagnosticsPanel
+ subject="evidence"
+ onFix={onEdit}
+ onConnect={onConnect}
+ load={async () => {
+ const d = await apiService.getEvidenceMatchDiagnostics(evidence.id!)
+ return d.candidates.map(c => ({
+ id: c.id,
+ title: `${c.value ?? ''} ${c.kpi_title}`.trim(),
+ subtitle: c.location_name || undefined,
+ date: c.date_represented,
+ reasons: c.verdict.reasons,
+ linked: c.linked,
+ }))
+ }}
+ />
  ) : (
  <div className="space-y-1.5">
  {connectedClaims.map(claim => {

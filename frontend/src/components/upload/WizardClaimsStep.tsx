@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Tag as TagIcon, TrendingUp } from 'lucide-react'
+import { BarChart3, Plus, Tag as TagIcon, TrendingUp } from 'lucide-react'
 import { KPI, MetricTag } from '../../types'
 import { ClaimEntry, WizardState, filledClaimEntries, kpiHasTags } from './wizardTypes'
 import { getKPIColor } from '../metricsDashboard/metricColorPalette'
@@ -12,19 +12,21 @@ interface WizardClaimsStepProps {
   tags?: MetricTag[]
   /** Restrict the list to one metric (per-metric entry points). */
   lockedMetricId?: string
+  /** Inline "new metric" affordance; omitted when the user can't add metrics. */
+  onCreateMetric?: () => void
 }
 
 /**
  * "Both" flow claims step — metrics shown as the same cards as the Metrics
- * tab, each with an optional result input inside the card.
- * If scope already picked tags, only metrics that carry those tags are shown.
+ * tab, each with an optional result input inside the card. A tag picked in
+ * scope applies to every claim entered here; the server attaches it to any
+ * metric that doesn't list it yet, so nothing is hidden.
  */
-export default function WizardClaimsStep({ state, update, kpis, tags = [], lockedMetricId }: WizardClaimsStepProps) {
-  const list = useMemo(() => {
-    const base = lockedMetricId ? kpis.filter(k => k.id === lockedMetricId) : kpis
-    if (state.tagIds.length === 0) return base
-    return base.filter(k => kpiHasTags(k, state.tagIds))
-  }, [kpis, lockedMetricId, state.tagIds])
+export default function WizardClaimsStep({ state, update, kpis, tags = [], lockedMetricId, onCreateMetric }: WizardClaimsStepProps) {
+  const list = useMemo(
+    () => (lockedMetricId ? kpis.filter(k => k.id === lockedMetricId) : kpis),
+    [kpis, lockedMetricId],
+  )
 
   const filledCount = filledClaimEntries(state, list).length
 
@@ -36,6 +38,9 @@ export default function WizardClaimsStep({ state, update, kpis, tags = [], locke
   const tagNames = state.tagIds
     .map(id => tags.find(t => t.id === id)?.name)
     .filter(Boolean) as string[]
+  const newlyTagged = state.tagIds.length > 0
+    ? list.filter(k => !kpiHasTags(k, state.tagIds)).length
+    : 0
 
   const setEntry = (kpiId: string, patch: Partial<ClaimEntry>) => {
     const existing = state.claimEntries[kpiId] || { value: '', label: '', note: '' }
@@ -46,24 +51,26 @@ export default function WizardClaimsStep({ state, update, kpis, tags = [], locke
     return (
       <div className="app-card p-8 text-center max-w-md mx-auto">
         <div className="app-icon-tile mx-auto mb-4">
-          <TagIcon className="w-5 h-5 text-primary-800" />
+          <BarChart3 className="w-5 h-5 text-primary-800" />
         </div>
-        <p className="text-sm font-medium text-gray-700 mb-1">No metrics match your tags</p>
-        <p className="text-xs text-gray-500">
-          {tagNames.length > 0
-            ? `None of this program’s metrics have ${tagNames.map(n => `“${n}”`).join(', ')}. Go back and clear the tag, or add it to a metric first.`
-            : 'Go back and adjust your scope, or add tags to a metric first.'}
-        </p>
+        <p className="text-sm font-medium text-gray-700 mb-1">No metrics yet</p>
+        <p className="text-xs text-gray-500 mb-4">Metrics are what you measure, like "Students trained". Add one to log a result against it.</p>
+        {onCreateMetric && (
+          <button type="button" onClick={onCreateMetric} className="app-btn app-btn-primary app-btn-sm">
+            <Plus className="w-4 h-4" /> New metric
+          </button>
+        )}
       </div>
     )
   }
 
   return (
     <div className="space-y-3 w-full">
-      {state.tagIds.length > 0 && (
-        <p className="text-xs text-gray-500">
-          Showing metrics tagged {tagNames.map(n => `“${n}”`).join(', ') || 'with your selection'}
-          {list.length < kpis.length ? ` · ${list.length} of ${kpis.length}` : ''}
+      {tagNames.length > 0 && (
+        <p className="text-xs text-gray-500 inline-flex items-center gap-1.5">
+          <TagIcon className="w-3.5 h-3.5 text-gray-400" />
+          Every claim here is tagged {tagNames.map(n => `"${n}"`).join(', ')}.
+          {newlyTagged > 0 && <span className="text-gray-400">The tag is added to {newlyTagged === 1 ? 'one metric' : `${newlyTagged} metrics`} that didn't have it.</span>}
         </p>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -83,13 +90,23 @@ export default function WizardClaimsStep({ state, update, kpis, tags = [], locke
             />
           )
         })}
+        {onCreateMetric && !lockedMetricId && (
+          <button
+            type="button"
+            onClick={onCreateMetric}
+            className="min-h-[7rem] flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New metric
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-2 pt-1">
         <TrendingUp className="w-4 h-4 text-claim-600 flex-shrink-0" />
         <p className="text-sm text-gray-600">
           {filledCount === 0
-            ? 'Enter a result for at least one metric — the rest can stay blank'
+            ? 'Enter a result for at least one metric. The rest can stay blank.'
             : `${filledCount} claim${filledCount === 1 ? '' : 's'} will be added`}
         </p>
       </div>

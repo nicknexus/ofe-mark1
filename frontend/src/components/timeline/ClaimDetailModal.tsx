@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink, Pencil, Trash2, X } from 'lucide-react'
+import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Pencil, Trash2, X } from 'lucide-react'
 import ModalFrame, { ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
 import { Badge } from '../ui'
 import { getStatusStyle } from './statusStyles'
@@ -14,6 +14,8 @@ import {
 } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import { getEvidenceImageUrl } from '../../utils/timeline'
+import { apiService } from '../../services/api'
+import MatchDiagnosticsPanel from './MatchDiagnosticsPanel'
 import { EVIDENCE_TYPE_ORDER, EvidenceTypeKey, countEvidenceTypes, EVIDENCE_TYPE_STYLE } from './EvidenceTypeCounts'
 
 const TYPE_ICONS = {
@@ -178,10 +180,22 @@ export default function ClaimDetailModal({
  </div>
 
  {evidence.length === 0 ? (
- <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-4 py-3">
- <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
- <p className="text-xs text-red-600">No evidence connected to this claim yet.</p>
- </div>
+ <MatchDiagnosticsPanel
+ subject="claim"
+ onFix={onEdit}
+ onConnect={onConnectExisting}
+ load={async () => {
+ const d = await apiService.getClaimMatchDiagnostics(claim.id!)
+ return d.candidates.map(e => ({
+ id: e.id,
+ title: e.title || 'Untitled evidence',
+ subtitle: e.approval_status === 'pending' ? 'awaiting approval' : undefined,
+ date: e.date_represented,
+ reasons: e.verdict.reasons,
+ linked: e.linked,
+ }))
+ }}
+ />
  ) : (
  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
  {visibleEvidence.map(ev => {

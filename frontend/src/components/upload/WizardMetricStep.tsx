@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Plus } from 'lucide-react'
 import { KPI } from '../../types'
 import { getKPIColor } from '../metricsDashboard/metricColorPalette'
 import { WizardState, includesClaim } from './wizardTypes'
@@ -12,6 +12,8 @@ interface WizardMetricStepProps {
   kpiTotals?: Record<string, number>
   /** Single-select (claim / both) auto-advances to the next step. */
   onAutoAdvance: () => void
+  /** Inline "new metric" affordance; omitted when the user can't add metrics. */
+  onCreateMetric?: () => void
 }
 
 /**
@@ -19,7 +21,7 @@ interface WizardMetricStepProps {
  * involved it's a single choice that advances on click; evidence-only can
  * select several (or all).
  */
-export default function WizardMetricStep({ state, update, kpis, kpiTotals = {}, onAutoAdvance }: WizardMetricStepProps) {
+export default function WizardMetricStep({ state, update, kpis, kpiTotals = {}, onAutoAdvance, onCreateMetric }: WizardMetricStepProps) {
   const single = includesClaim(state.kind)
   const selected = single
     ? (state.claimKpiId ? [state.claimKpiId] : [])
@@ -51,10 +53,14 @@ export default function WizardMetricStep({ state, update, kpis, kpiTotals = {}, 
           <BarChart3 className="w-5 h-5 text-primary-800" />
         </div>
         <p className="text-sm font-medium text-gray-700 mb-1">No metrics yet</p>
-        <p className="text-xs text-gray-500">
-          Metrics are what you measure — like &quot;Students trained&quot;. Create your first one
-          from the Metrics tab, then come back here.
+        <p className="text-xs text-gray-500 mb-4">
+          Metrics are what you measure, like &quot;Students trained&quot;. Add your first one here.
         </p>
+        {onCreateMetric && (
+          <button type="button" onClick={onCreateMetric} className="app-btn app-btn-primary app-btn-sm">
+            <Plus className="w-4 h-4" /> New metric
+          </button>
+        )}
       </div>
     )
   }
@@ -89,6 +95,16 @@ export default function WizardMetricStep({ state, update, kpis, kpiTotals = {}, 
             titlesOnlyOnMobile
           />
         ))}
+        {onCreateMetric && (
+          <button
+            type="button"
+            onClick={onCreateMetric}
+            className="min-h-[5.5rem] flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New metric
+          </button>
+        )}
       </div>
     </div>
   )

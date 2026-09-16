@@ -1,13 +1,16 @@
-import React, { useMemo } from 'react'
-import { Link2, Unlink, TrendingUp, FileText, MapPin, CalendarRange, Tag as TagIcon, Users } from 'lucide-react'
-import { BeneficiaryGroup, KPI, Location, MetricTag, TimelineClaim, TimelineEvidence } from '../../types'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Link2, Unlink, TrendingUp, FileText, MapPin, CalendarRange, Tag as TagIcon, Users, Loader2 } from 'lucide-react'
+import { BeneficiaryGroup, KPI, Location, MatchPreviewResult, MetricTag, TimelineClaim, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
+import { apiService } from '../../services/api'
 import { previewMatchingClaims, previewMatchingEvidence } from '../../utils/timeline'
 import { WizardState, filledClaimEntries, includesClaim, includesEvidence, wizardDates, evidenceBuckets, EVIDENCE_TYPE_LABELS } from './wizardTypes'
 import { EVIDENCE_TYPE_STYLE } from '../timeline/EvidenceTypeCounts'
 
 interface WizardReviewStepProps {
  state: WizardState
+ /** Enables the server-side preview (the same gates the auto-matcher runs). */
+ initiativeId?: string
  kpis: KPI[]
  locations: Location[]
  tags: MetricTag[]
@@ -17,13 +20,14 @@ interface WizardReviewStepProps {
 }
 
 /**
- * Step 4 — review before saving, with a live preview of what the
- * auto-matcher will connect. The preview mirrors the server's gates
- * client-side, so a broad upload shows its blast radius ("connects to 23
- * claims") and a mis-scoped one shows zero *before* anything is saved.
+ * Review before saving, with a live preview of what the auto-matcher will
+ * connect. The client mirror of the gates renders instantly; the server's
+ * verdict (the same code path that links on save) replaces it as soon as it
+ * arrives, so what you see here is what you get after Save.
  */
 export default function WizardReviewStep({
  state,
+ initiativeId,
  kpis,
  locations,
  tags,
@@ -54,8 +58,8 @@ export default function WizardReviewStep({
  .map(id => beneficiaryGroups.find(g => g.id === id)?.name)
  .filter(Boolean) as string[]
 
- // What will the auto-matcher connect?
- const matchedClaims = useMemo(() => {
+ // What will the auto-matcher connect? Client mirror first (instant) …
+ const localClaims = useMemo(() => {
  if (!evidence) return []
  const kpiIds = state.kind === 'both'
  ? filledClaimEntries(state, kpis).map(([kpiId]) => kpiId)
@@ -70,7 +74,7 @@ export default function WizardReviewStep({
  })
  }, [evidence, state, existingClaims, start, end])
 
- const matchedEvidence = useMemo(() => {
+ const localEvidence = useMemo(() => {
  if (state.kind !== 'claim' || !state.claimKpiId || state.locationIds.length === 0) return []
  return previewMatchingEvidence(existingEvidence, {
  kpiId: state.claimKpiId,
@@ -81,6 +85,46 @@ export default function WizardReviewStep({
  dateEnd: end,
  })
  }, [state, existingEvidence, start, end])
+
+ // … then the server's answer, which is authoritative.
+ const previewKpiIds = state.kind === 'both'
+ ? newClaims.map(c => c.kpiId)
+ : state.kind === 'claim' && state.claimKpiId ? [state.claimKpiId] : state.evidenceKpiIds
+ const previewKey = JSON.stringify([previewKpiIds, state.locationIds, state.tagIds, state.beneficiaryGroupIds, start, end])
+ const [server, setServer] = useState<{ key: string; result: MatchPreviewResult } | null>(null)
+ const [previewing, setPreviewing] = useState(false)
+ useEffect(() => {
+ if (!initiativeId || state.editing || previewKpiIds.length === 0 || !start) return
+ let cancelled = false
+ setPreviewing(true)
+ const t = window.setTimeout(async () => {
+ try {
+ const result = await apiService.previewMatches(initiativeId, {
+ kpiIds: previewKpiIds,
+ locationIds: state.locationIds,
+ tagIds: state.tagIds,
+ beneficiaryGroupIds: state.beneficiaryGroupIds,
+ dateStart: start,
+ dateEnd: end !== start ? end : null,
+ })
+ if (!cancelled) setServer({ key: previewKey, result })
+ } catch {
+ // Fall back to the client mirror silently.
+ } finally {
+ if (!cancelled) setPreviewing(false)
+ }
+ }, 250)
+ return () => { cancelled = true; window.clearTimeout(t) }
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [initiativeId, previewKey, state.editing])
+
+ const serverFresh = server?.key === previewKey
+ const matchedClaims = serverFresh
+ ? server!.result.claims.map(c => ({ id: c.id, kpi_id: c.kpi_id, value: c.value, date_represented: c.date_represented || '' }))
+ : localClaims.map(c => ({ id: c.id, kpi_id: c.kpi_id, value: c.value, date_represented: c.date_represented }))
+ const matchedEvidence = serverFresh
+ ? server!.result.evidence.map(e => ({ id: e.id, title: e.title, date_represented: e.date_represented || '' }))
+ : localEvidence.map(e => ({ id: e.id, title: e.title, date_represented: e.date_represented }))
 
  const scopeRow = (icon: typeof MapPin, text: string) => {
  const Icon = icon
@@ -143,7 +187,7 @@ export default function WizardReviewStep({
  </div>
  <div className="min-w-0">
  <p className="text-sm font-medium text-gray-800 truncate">
- {multi ? `${state.evidenceTitle} — ${EVIDENCE_TYPE_LABELS[bucket.type]}` : state.evidenceTitle}
+ {multi ? `${state.evidenceTitle} - ${EVIDENCE_TYPE_LABELS[bucket.type]}` : state.evidenceTitle}
  </p>
  <p className="text-xs text-gray-500">
  {EVIDENCE_TYPE_LABELS[bucket.type]} · {bucket.files.length} file{bucket.files.length === 1 ? '' : 's'}
@@ -170,7 +214,9 @@ export default function WizardReviewStep({
  : 'border-amber-200 bg-amber-50/50'
  }`}>
  <div className="flex items-center gap-2 mb-1">
- {connectionCount > 0
+ {previewing && !serverFresh
+ ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+ : connectionCount > 0
  ? <Link2 className="w-4 h-4 text-impact-500" />
  : <Unlink className="w-4 h-4 text-amber-600" />}
  <p className="text-sm font-semibold text-gray-800">
@@ -194,7 +240,7 @@ export default function WizardReviewStep({
 
  {state.kind === 'evidence' && matchedClaims.length === 0 && (
  <p className="text-xs text-amber-700">
- It will appear as unconnected evidence in your Logs — you can connect it manually there, or it
+ It will appear as unconnected evidence in your Logs. You can connect it manually there, or it
  will link automatically when a matching claim is added.
  </p>
  )}
