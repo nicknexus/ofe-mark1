@@ -2,15 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Plus,
-  MapPin,
   Edit,
   Trash2,
-  BarChart3,
   GripVertical,
   Settings2,
   Copy,
-  AlertCircle,
   MoreHorizontal,
+  ChevronRight,
   Clock,
 } from 'lucide-react'
 import {
@@ -36,7 +34,6 @@ import { readSWR, writeSWR } from '../utils/swrCache'
 import { notify } from '../lib/notify'
 import CreateInitiativeModal, { type CreateInitiativeSource } from '../components/CreateInitiativeModal'
 import ProgramSetupDrawer from '../components/setup/ProgramSetupDrawer'
-import UploadWizardLauncher from '../components/upload/UploadWizardLauncher'
 import { createProgramFromSource } from '../components/setup/createProgram'
 import ModalFrame from '../components/ModalFrame'
 import UpgradeModal from '../components/UpgradeModal'
@@ -70,11 +67,9 @@ function SortableInitiativeCard({
   activity,
   canEditInitiatives,
   canDeleteInitiatives,
-  canLog,
   openEditModal,
   openDeleteConfirm,
   openSetup,
-  openAddLog,
   openDuplicate,
   locked = false,
   onLockedClick,
@@ -88,11 +83,9 @@ function SortableInitiativeCard({
   activity?: InitiativeActivity | null
   canEditInitiatives: boolean
   canDeleteInitiatives: boolean
-  canLog: boolean
   openEditModal: (i: Initiative) => void
   openDeleteConfirm: (i: Initiative) => void
   openSetup: (i: Initiative) => void
-  openAddLog: (i: Initiative) => void
   openDuplicate: (i: Initiative) => void
   locked?: boolean
   onLockedClick?: () => void
@@ -146,8 +139,20 @@ function SortableInitiativeCard({
     return { text: `Last log ${activity.last_log_at ? formatRelativeTime(activity.last_log_at) : ''}`.trim(), detail: parts, quiet: false }
   })()
 
+  // Four numbers that describe the program at a glance. Structure counts come
+  // from the org-wide lists, log counts from /initiatives/activity. Missing
+  // structure reads amber so "what's not set up" is visible without a chip.
+  const statTiles: Array<{ label: string; value: number | null; warn: boolean }> = [
+    { label: 'Metrics', value: stats ? stats.metrics : null, warn: !!stats && stats.metrics === 0 },
+    { label: 'Locations', value: stats ? stats.locations : null, warn: !!stats && stats.locations === 0 },
+    { label: 'Claims', value: activity === undefined ? null : (activity?.claims ?? 0), warn: false },
+    { label: 'Evidence', value: activity === undefined ? null : (activity?.evidence ?? 0), warn: false },
+  ]
+
   const inner = (
-    <div className={`${large ? 'p-5 gap-3.5' : 'p-4 gap-3'} h-full flex flex-col`}>
+    <div className={`${large ? 'p-5 gap-4' : 'p-4 gap-3.5'} h-full flex flex-col`}>
+      {/* Identity row. The chevron is the "this opens" affordance: always
+          visible, slides right on hover. */}
       <div className={`flex items-start gap-3 ${hasMenu ? 'pr-8' : ''}`}>
         {locked ? (
           <div className={`${large ? 'w-12 h-12' : 'w-10 h-10'} rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100`}>
@@ -164,81 +169,72 @@ function SortableInitiativeCard({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className={`${large ? 'text-base' : 'text-[15px]'} font-semibold leading-snug line-clamp-1 tracking-tight transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
-            {initiative.title}
-          </h3>
-          <p className={`text-xs text-gray-500 mt-0.5 leading-relaxed ${large ? 'line-clamp-3' : 'line-clamp-2'}`}>
-            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, large ? 180 : 110)}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className={`${large ? 'text-base' : 'text-[15px]'} font-semibold leading-snug line-clamp-1 tracking-tight transition-colors ${locked ? 'text-gray-500' : 'text-gray-900 group-hover:text-primary-800'}`} title={initiative.title}>
+              {initiative.title}
+            </h3>
+            {!locked && (
+              <ChevronRight className="w-4 h-4 flex-shrink-0 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" aria-hidden />
+            )}
+          </div>
+          <p className={`text-xs text-gray-500 mt-0.5 leading-relaxed ${large ? 'line-clamp-2' : 'line-clamp-2'}`}>
+            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, large ? 150 : 110)}
           </p>
         </div>
       </div>
 
-      <div className="mt-auto pt-3 border-t border-gray-100 space-y-2.5">
+      {/* Stats grid */}
+      {!locked && (
+        <div className="grid grid-cols-4 gap-1.5">
+          {statTiles.map(t => (
+            <div
+              key={t.label}
+              className={`rounded-lg px-2 py-1.5 ring-1 ${t.warn ? 'bg-amber-50 ring-amber-100' : 'bg-gray-50/80 ring-gray-100'}`}
+            >
+              {t.value === null ? (
+                <span className="block h-5 w-8 rounded bg-gray-200/70 animate-pulse" />
+              ) : (
+                <span className={`block ${large ? 'text-lg' : 'text-base'} font-semibold tabular-nums leading-none ${t.warn ? 'text-amber-700' : 'text-gray-900'}`}>
+                  {t.value}
+                </span>
+              )}
+              <span className={`block text-[10px] font-medium uppercase tracking-wide mt-1 ${t.warn ? 'text-amber-600' : 'text-gray-400'}`}>
+                {t.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer: last activity (left), Set up (right). */}
+      <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between gap-3 min-w-0">
         {locked ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
             <Lock className="w-3.5 h-3.5" />
             Locked
           </span>
-        ) : stats ? (
+        ) : (
           <>
-            {/* Ready: one quiet structure line + last activity. Not ready: what to fix. */}
-            {ready ? (
-              <div className="flex items-center justify-between gap-3 min-w-0">
-                <span className="text-[11px] text-gray-400 truncate">
-                  {[
-                    `${stats.metrics} metric${stats.metrics === 1 ? '' : 's'}`,
-                    `${stats.locations} location${stats.locations === 1 ? '' : 's'}`,
-                    stats.tags > 0 ? `${stats.tags} tag${stats.tags === 1 ? '' : 's'}` : null,
-                    stats.groups > 0 ? `${stats.groups} group${stats.groups === 1 ? '' : 's'}` : null,
-                  ].filter(Boolean).join(' · ')}
-                </span>
-                {activityLine && (
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-medium flex-shrink-0 ${activityLine.quiet ? 'text-gray-400' : 'text-gray-600'}`} title={activityLine.detail}>
-                    <Clock className="w-3 h-3" /> {activityLine.text}
-                  </span>
-                )}
-              </div>
+            {activityLine ? (
+              <span className={`inline-flex items-center gap-1 text-[11px] font-medium min-w-0 truncate ${activityLine.quiet ? 'text-gray-400' : 'text-gray-600'}`} title={activityLine.detail}>
+                <Clock className="w-3 h-3 flex-shrink-0" /> {activityLine.text}
+              </span>
             ) : (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {stats.metrics === 0 && <FixChip icon={BarChart3} label="Add a metric" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />}
-                {stats.locations === 0 && <FixChip icon={MapPin} label="Add a location" onClick={canEditInitiatives ? () => openSetup(initiative) : undefined} />}
-                {activityLine && !activityLine.quiet && (
-                  <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-gray-500"><Clock className="w-3 h-3" /> {activityLine.text}</span>
-                )}
-              </div>
+              <span className="block h-3.5 w-24 rounded bg-gray-100 animate-pulse" />
             )}
-
-            {/* Add log leads; Set up sits beside it, smaller but always visible. */}
-            {(canLog || canEditInitiatives) && (
-              <div className="flex items-center gap-2">
-                {canLog && (
-                  <button
-                    type="button"
-                    onClick={(e) => { stop(e); openAddLog(initiative) }}
-                    disabled={!ready}
-                    title={ready ? 'Log a claim or evidence' : 'Add a metric and a location first'}
-                    className="app-btn app-btn-primary app-btn-sm flex-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add log
-                  </button>
-                )}
-                {canEditInitiatives && (
-                  <button
-                    type="button"
-                    onClick={(e) => { stop(e); openSetup(initiative) }}
-                    title="Metrics, tags, locations, groups"
-                    className={`app-btn app-btn-sm flex-shrink-0 ${ready
-                      ? 'app-btn-secondary'
-                      : 'app-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'} ${canLog ? '' : 'flex-1'}`}
-                  >
-                    <Settings2 className="w-3.5 h-3.5" /> Set up
-                  </button>
-                )}
-              </div>
+            {canEditInitiatives && (
+              <button
+                type="button"
+                onClick={(e) => { stop(e); openSetup(initiative) }}
+                title={ready ? 'Metrics, tags, locations, groups' : 'Finish setting up this program'}
+                className={`app-btn app-btn-sm flex-shrink-0 ${ready
+                  ? 'app-btn-secondary'
+                  : 'app-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'}`}
+              >
+                <Settings2 className="w-3.5 h-3.5" /> Set up
+              </button>
             )}
           </>
-        ) : (
-          <span className="block h-4 w-28 rounded bg-gray-100 animate-pulse" />
         )}
       </div>
     </div>
@@ -354,22 +350,6 @@ function MenuItem({ icon: Icon, label, onClick, tone = 'default' }: {
 }
 
 /** Amber "fix this" chip shown only while something required is missing. */
-function FixChip({ icon: Icon, label, onClick }: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  onClick?: () => void
-}) {
-  const cls = 'inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700'
-  if (onClick) {
-    return (
-      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} className={`${cls} hover:bg-amber-100 transition-colors`}>
-        <Icon className="w-3 h-3" /> {label}
-      </button>
-    )
-  }
-  return <span className={cls}><AlertCircle className="w-3 h-3" /> {label}</span>
-}
-
 export default function Dashboard() {
  const [searchParams, setSearchParams] = useSearchParams()
  const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
@@ -382,8 +362,6 @@ export default function Dashboard() {
  canCreateInitiatives,
     canEditInitiatives,
     canDelete,
-    canAddImpactClaims,
-    canAddEvidence,
   } = useTeam()
  // Team members see the full dashboard. Widgets read from activeOrganization
  // so a team member sees the org they're scoped into, not a missing
@@ -406,7 +384,6 @@ export default function Dashboard() {
  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
   const [setupInitiative, setSetupInitiative] = useState<Initiative | null>(null)
-  const [addLogInitiative, setAddLogInitiative] = useState<Initiative | null>(null)
   const [createSource, setCreateSource] = useState<CreateInitiativeSource | undefined>(undefined)
   const [allGroups, setAllGroups] = useState<Array<{ initiative_id?: string }>>([])
   const [activity, setActivity] = useState<Record<string, InitiativeActivity> | null>(null)
@@ -854,11 +831,9 @@ export default function Dashboard() {
  stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0, tags: 0, groups: 0 }}
                       canEditInitiatives={canEditInitiatives}
                       canDeleteInitiatives={canDelete}
-                      canLog={canAddImpactClaims || canAddEvidence}
                       openEditModal={openEditModal}
                       openDeleteConfirm={openDeleteConfirm}
                       openSetup={(i) => setSetupInitiative(i)}
-                      openAddLog={(i) => setAddLogInitiative(i)}
                       openDuplicate={(i) => { setCreateSource({ kind: 'duplicate', sourceInitiativeId: i.id! }); setShowCreateModal(true) }}
  locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
  onLockedClick={() => setShowUpgradeModal(true)}
@@ -899,14 +874,6 @@ export default function Dashboard() {
           isOpen
           onClose={() => setSetupInitiative(null)}
           onChanged={() => refreshKPIsAndEvidence()}
-        />
-      )}
-
-      {addLogInitiative?.id && (
-        <UploadWizardLauncher
-          initiativeId={addLogInitiative.id}
-          onClose={() => setAddLogInitiative(null)}
-          onCreated={() => { apiService.clearCache(); refreshKPIsAndEvidence() }}
         />
       )}
 
