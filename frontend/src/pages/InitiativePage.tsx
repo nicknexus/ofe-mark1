@@ -13,7 +13,6 @@ import {
   Users,
   BookOpen,
   ExternalLink,
-  Info,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { apiService } from '../services/api'
@@ -383,74 +382,43 @@ export default function InitiativePage() {
 
   return (
     <div className="app-canvas h-screen flex flex-col">
-      {/* Header: one 56px row. Back + title | section switcher | actions. */}
+      {/* Header: two rows (~104px). Identity + actions on top, underline
+          section tabs beneath so nothing competes for the same horizontal
+          space. */}
       <header className="flex-shrink-0 bg-white border-b border-gray-200/80 shadow-[0_1px_0_rgba(16,24,40,0.02)]">
-        <div className="px-3 sm:px-5 h-14 flex items-center gap-2 sm:gap-3">
+        {/* Row 1: back · title + description · actions */}
+        <div className="px-3 sm:px-5 pt-3 pb-2 md:pt-3.5 md:pb-2.5 flex items-center gap-2 sm:gap-3">
           <Link to="/tracking/programs" className="app-btn app-btn-icon app-btn-ghost text-gray-500 hover:text-gray-900 flex-shrink-0 -ml-1" title="Back to programs" aria-label="Back to programs">
             <ArrowLeft className="w-5 h-5" />
           </Link>
 
-          <div className="min-w-0 flex items-center gap-1.5 md:max-w-[14rem] lg:max-w-[18rem] xl:max-w-[24rem]">
-            <h1
-              className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight truncate leading-tight"
-              title={initiative.description ? `${initiative.title}\n\n${initiative.description}` : initiative.title}
-            >
-              {initiative.title}
-            </h1>
-            {initiative.description && (
-              <span className="hidden sm:inline-flex text-gray-300 hover:text-gray-500 flex-shrink-0" title={initiative.description} aria-label="Program description">
-                <Info className="w-3.5 h-3.5" />
-              </span>
-            )}
-            {publicHref && (
-              <a href={publicHref} target="_blank" rel="noreferrer" className="hidden lg:inline-flex items-center gap-1 rounded-full border border-impact-100 bg-impact-50 px-2 py-0.5 text-[11px] font-medium text-impact-700 hover:bg-impact-100 flex-shrink-0" title="Open public page">
-                <ExternalLink className="w-3 h-3" /> Public
-              </a>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 tracking-tight truncate leading-tight" title={initiative.title}>
+                {initiative.title}
+              </h1>
+              {publicHref && (
+                <a href={publicHref} target="_blank" rel="noreferrer" className="hidden md:inline-flex items-center gap-1 rounded-full border border-impact-100 bg-impact-50 px-2 py-0.5 text-[11px] font-medium text-impact-700 hover:bg-impact-100 flex-shrink-0" title="Open public page">
+                  <ExternalLink className="w-3 h-3" /> Public
+                </a>
+              )}
+            </div>
+            {initiative.description ? (
+              <p className="text-[13px] text-gray-500 truncate mt-0.5 hidden sm:block max-w-3xl" title={initiative.description}>
+                {initiative.description}
+              </p>
+            ) : (
+              <p className="text-[13px] text-gray-400 mt-0.5 hidden sm:block">Program workspace</p>
             )}
           </div>
 
-          {/* Section switcher (desktop). Mobile uses the bottom nav. */}
-          <nav className="hidden md:flex flex-1 justify-center min-w-0" aria-label="Program sections">
-            <div className="app-segmented">
-              {TABS.map(t => {
-                const Icon = t.icon
-                const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
-                const count = t.id === 'metrics' ? (dashboard?.kpis.length ?? 0) : t.id === 'logs' ? allKPIUpdates.length : null
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => handleTabChange(t.id)}
-                    className="app-segmented-item !py-1.5 !px-3"
-                    aria-current={active ? 'page' : undefined}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="programSectionPill"
-                        className="absolute inset-0 rounded-lg bg-white border border-gray-200/70 shadow-card"
-                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                      />
-                    )}
-                    <Icon className={`relative z-10 w-4 h-4 ${active ? 'text-primary-800' : 'text-gray-400'}`} />
-                    <span className="relative z-10 hidden lg:inline">{t.label}</span>
-                    {count !== null && count > 0 && (
-                      <span className={`relative z-10 min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-semibold tabular-nums text-center ${active ? 'bg-primary-100 text-primary-950' : 'bg-gray-200/80 text-gray-600'}`}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </nav>
-
-          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-            <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-sm app-btn-ghost text-gray-600" title="Generate an AI impact report">
-              <Sparkles className="w-4 h-4 text-primary-800" /> <span className="hidden xl:inline">Report</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-ghost text-gray-600" title="Generate an AI impact report">
+              <Sparkles className="w-4 h-4 text-primary-800" /> <span className="hidden lg:inline">Report</span>
             </button>
             {canEditInitiatives && (
-              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-sm app-btn-secondary" title="Metrics, tags, locations, groups">
-                <Settings2 className="w-4 h-4" /> <span className="hidden xl:inline">Set up</span>
+              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary" title="Metrics, tags, locations, groups">
+                <Settings2 className="w-4 h-4" /> <span className="hidden md:inline">Set up</span>
               </button>
             )}
             {canLog && (
@@ -459,13 +427,52 @@ export default function InitiativePage() {
                 onClick={handleAddLog}
                 disabled={!setupReady}
                 title={setupReady ? 'Log a claim or evidence' : 'Add a metric first'}
-                className="app-btn app-btn-sm app-btn-primary"
+                className="app-btn app-btn-primary"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add log</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Row 2: underline tabs (desktop). Mobile uses the bottom nav. */}
+        <nav className="hidden md:block px-3 sm:px-5" aria-label="Program sections">
+          <div className="flex items-end gap-1 pl-10 overflow-x-auto scrollbar-hide">
+            {TABS.map(t => {
+              const Icon = t.icon
+              const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
+              const count = t.id === 'metrics' ? (dashboard?.kpis.length ?? 0) : t.id === 'logs' ? allKPIUpdates.length : null
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleTabChange(t.id)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`group relative inline-flex items-center gap-2 h-11 px-3 text-sm font-medium whitespace-nowrap rounded-t-lg transition-colors ${
+                    active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 transition-colors ${active ? 'text-primary-700' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <span>{t.label}</span>
+                  {count !== null && count > 0 && (
+                    <span className={`min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-semibold tabular-nums text-center transition-colors ${
+                      active ? 'bg-primary-100 text-primary-900' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200/80'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                  {active && (
+                    <motion.span
+                      layoutId="programSectionUnderline"
+                      className="absolute left-2 right-2 -bottom-px h-[2px] rounded-full bg-primary-600"
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </nav>
       </header>
 
       {/* Body: each section owns its own scroll. */}
