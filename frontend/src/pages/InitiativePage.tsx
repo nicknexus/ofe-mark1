@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   Plus,
@@ -13,11 +13,13 @@ import {
   Users,
   BookOpen,
   ExternalLink,
+  Info,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { apiService } from '../services/api'
-import { InitiativeDashboard, LoadingState, CreateKPIForm } from '../types'
+import { Initiative, InitiativeDashboard, LoadingState, CreateKPIForm } from '../types'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
+import { readSWR, writeSWR } from '../utils/swrCache'
 import CreateKPIModal from '../components/CreateKPIModal'
 import MetricsDashboardTab from '../components/metricsDashboard/MetricsDashboardTab'
 import MetricDetailTab from '../components/InitiativeTabs/MetricDetailTab'
@@ -32,38 +34,55 @@ import ModalFrame, { ModalHeader } from '../components/ModalFrame'
 import ProgramSetupDrawer from '../components/setup/ProgramSetupDrawer'
 import UploadWizardLauncher from '../components/upload/UploadWizardLauncher'
 import { notify } from '../lib/notify'
-import { Button, PageLoader, InlineAlert } from '../components/ui'
+import { Button, PageLoader, SectionLoader, InlineAlert } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
 
 type ProgramTab = 'metrics' | 'logs' | 'location' | 'beneficiaries' | 'stories'
 
 const TABS: { id: ProgramTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
   { id: 'logs', label: 'Logs', icon: Activity },
+  { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
   { id: 'location', label: 'Locations', icon: MapPin },
   { id: 'beneficiaries', label: 'People', icon: Users },
   { id: 'stories', label: 'Stories', icon: BookOpen },
 ]
 
 /**
- * Program workspace. One header (title, section switcher, Add log / Set up /
- * Report), one body. The org sidebar stays visible so users never lose the
- * rest of the app. Structural setup (metrics, tags, locations, groups) lives
- * in the Set up drawer; logging lives in the Add log wizard; the AI report
- * opens in a modal. Sections are still deep-linkable via ?tab=.
+ * Program workspace. One compact header row (back, title, section switcher,
+ * Report / Set up / Add log), one body. Logs is the default section: the
+ * page is a logging workspace first, metrics management lives one tab over.
+ *
+ * Perceived speed: the header paints immediately from the initiative passed
+ * via router state (dashboard card click) or the sessionStorage SWR cache
+ * (refresh / deep link), then the dashboard payload and KPI totals stream in
+ * behind it. The org sidebar stays visible so users never lose the rest of
+ * the app. Sections are deep-linkable via ?tab=.
  */
 export default function InitiativePage() {
   const { canAddImpactClaims, canAddEvidence, canAddMetrics, canEditMetrics, canDelete, canEditInitiatives, activeOrganization } = useTeam()
   const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  // Seed the identity row so the page never blocks on the network for a title.
+  const [initiative, setInitiative] = useState<Initiative | null>(() => {
+    const fromState = (location.state as { initiative?: Initiative } | null)?.initiative
+    if (fromState && fromState.id === id) return fromState
+    return id ? readSWR<Initiative>(`initiative:${id}`) : null
+  })
   const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
   const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
   const [kpiTotals, setKpiTotals] = useState<Record<string, number>>({})
   const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
 
-  const [activeTab, setActiveTab] = useState<ProgramTab>('metrics')
+  const [activeTab, setActiveTab] = useState<ProgramTab>(() => {
+    const tab = searchParams.get('tab')
+    if (tab && (TABS as { id: string }[]).some(t => t.id === tab)) return tab as ProgramTab
+    if (kpiId || tab === 'home') return 'metrics'
+    if (tab === 'timeline' || tab === 'evidence') return 'logs'
+    return 'logs'
+  })
   const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
 
   // Header-driven overlays
@@ -102,6 +121,14 @@ export default function InitiativePage() {
   useEffect(() => {
     if (kpiId && dashboard) setActiveTab('metrics')
   }, [kpiId, dashboard])
+
+  // A program with no metrics yet has nothing to log against: land on the
+  // Metrics section's setup call-to-action instead of an empty Logs list.
+  // Only on the implicit default (no ?tab=), so deep links still win.
+  useEffect(() => {
+    if (dashboard && dashboard.kpis.length === 0 && !searchParams.get('tab') && !kpiId) setActiveTab('metrics')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboard])
 
   const loadKPITotals = async (kpis: any[], clearFirst = true) => {
     if (!id || kpis.length === 0) {
@@ -142,8 +169,13 @@ export default function InitiativePage() {
       if (!dashboard) setLoadingState({ isLoading: true })
       const data = await apiService.getInitiativeDashboard(id)
       setDashboard(data)
-      if (data?.kpis) await loadKPITotals(data.kpis)
+      if (data?.initiative) {
+        setInitiative(data.initiative)
+        writeSWR(`initiative:${id}`, data.initiative)
+      }
       setLoadingState({ isLoading: false })
+      // Totals are only needed by the Metrics section; never block the page on them.
+      if (data?.kpis) void loadKPITotals(data.kpis)
     } catch (error: any) {
       if (error?.code === 'INITIATIVE_LOCKED') {
         notify.error('This program is locked on your current plan. Upgrade to unlock it.')
@@ -240,17 +272,19 @@ export default function InitiativePage() {
 
   const publicHref = useMemo(() => {
     const orgSlug = activeOrganization?.slug
-    const initSlug = dashboard?.initiative?.slug
+    const initSlug = initiative?.slug
     if (!orgSlug || !initSlug) return null
     return `${activeOrganization?.is_demo ? '/demo' : '/org'}/${orgSlug}/${initSlug}`
-  }, [activeOrganization?.slug, activeOrganization?.is_demo, dashboard?.initiative?.slug])
+  }, [activeOrganization?.slug, activeOrganization?.is_demo, initiative?.slug])
 
-  const setupReady = !!dashboard && dashboard.kpis.length > 0
+  // Optimistic while the dashboard payload is still in flight so the primary
+  // action is never greyed out during the first paint.
+  const setupReady = !dashboard || dashboard.kpis.length > 0
 
   // ── Body ───────────────────────────────────────────────────────────────
 
   const renderMetricsContent = () => {
-    if (!dashboard) return null
+    if (!dashboard) return <SectionLoader className="h-64" />
     const { kpis } = dashboard
     if (kpis.length === 0) {
       return (
@@ -301,7 +335,7 @@ export default function InitiativePage() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'logs':
-        return <TimelineTab initiativeId={id!} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} />
+        return <TimelineTab initiativeId={id!} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} hideHeader />
       case 'location':
         return <LocationTab onStoryClick={openStory} onMetricClick={handleMetricCardClick} />
       case 'beneficiaries':
@@ -311,6 +345,7 @@ export default function InitiativePage() {
       case 'metrics':
       default: {
         const detailKpi = kpiId ? (dashboard?.kpis || []).find(k => k.id === kpiId) : null
+        if (kpiId && !dashboard) return <SectionLoader className="h-64" />
         if (detailKpi) {
           return (
             <MetricDetailTab
@@ -331,9 +366,10 @@ export default function InitiativePage() {
     }
   }
 
-  if (loadingState.isLoading) return <PageLoader />
+  // Only block on the network when we have nothing at all to paint.
+  if (!initiative && loadingState.isLoading) return <PageLoader />
 
-  if (loadingState.error || !dashboard) {
+  if (!initiative || (loadingState.error && !dashboard)) {
     return (
       <div className="text-center py-12 px-4 app-canvas min-h-screen">
         <InlineAlert tone="error" className="mb-4 max-w-md mx-auto text-left">{loadingState.error || 'Program not found'}</InlineAlert>
@@ -347,91 +383,89 @@ export default function InitiativePage() {
 
   return (
     <div className="app-canvas h-screen flex flex-col">
-      {/* Header: identity row + prominent section switcher */}
+      {/* Header: one 56px row. Back + title | section switcher | actions. */}
       <header className="flex-shrink-0 bg-white border-b border-gray-200/80 shadow-[0_1px_0_rgba(16,24,40,0.02)]">
-        <div className="px-4 sm:px-6 pt-4 pb-3 flex items-start gap-3">
-          <Link to="/tracking/programs" className="app-btn app-btn-icon app-btn-ghost text-gray-500 hover:text-gray-900 mt-1 flex-shrink-0" title="Back to programs" aria-label="Back to programs">
+        <div className="px-3 sm:px-5 h-14 flex items-center gap-2 sm:gap-3">
+          <Link to="/tracking/programs" className="app-btn app-btn-icon app-btn-ghost text-gray-500 hover:text-gray-900 flex-shrink-0 -ml-1" title="Back to programs" aria-label="Back to programs">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div className="hidden sm:flex w-11 h-11 rounded-xl bg-white ring-1 ring-gray-200/80 shadow-card items-center justify-center flex-shrink-0 overflow-hidden mt-0.5">
-            <img
-              src={activeOrganization?.logo_url || '/Nexuslogo.png'}
-              alt=""
-              className="w-full h-full object-contain p-1"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-primary-900/70 leading-none mb-1">Program</p>
-            <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight truncate leading-tight">{dashboard.initiative.title}</h1>
-              {publicHref && (
-                <a href={publicHref} target="_blank" rel="noreferrer" className="hidden sm:inline-flex items-center gap-1 rounded-full border border-impact-100 bg-impact-50 px-2 py-0.5 text-[11px] font-medium text-impact-700 hover:bg-impact-100 flex-shrink-0" title="Open public page">
-                  <ExternalLink className="w-3 h-3" /> Public
-                </a>
-              )}
-            </div>
-            {dashboard.initiative.description && (
-              <p className="text-sm text-gray-500 truncate hidden sm:block mt-0.5 max-w-3xl">{dashboard.initiative.description}</p>
+
+          <div className="min-w-0 flex items-center gap-1.5 md:max-w-[14rem] lg:max-w-[18rem] xl:max-w-[24rem]">
+            <h1
+              className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight truncate leading-tight"
+              title={initiative.description ? `${initiative.title}\n\n${initiative.description}` : initiative.title}
+            >
+              {initiative.title}
+            </h1>
+            {initiative.description && (
+              <span className="hidden sm:inline-flex text-gray-300 hover:text-gray-500 flex-shrink-0" title={initiative.description} aria-label="Program description">
+                <Info className="w-3.5 h-3.5" />
+              </span>
+            )}
+            {publicHref && (
+              <a href={publicHref} target="_blank" rel="noreferrer" className="hidden lg:inline-flex items-center gap-1 rounded-full border border-impact-100 bg-impact-50 px-2 py-0.5 text-[11px] font-medium text-impact-700 hover:bg-impact-100 flex-shrink-0" title="Open public page">
+                <ExternalLink className="w-3 h-3" /> Public
+              </a>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+
+          {/* Section switcher (desktop). Mobile uses the bottom nav. */}
+          <nav className="hidden md:flex flex-1 justify-center min-w-0" aria-label="Program sections">
+            <div className="app-segmented">
+              {TABS.map(t => {
+                const Icon = t.icon
+                const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
+                const count = t.id === 'metrics' ? (dashboard?.kpis.length ?? 0) : t.id === 'logs' ? allKPIUpdates.length : null
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleTabChange(t.id)}
+                    className="app-segmented-item !py-1.5 !px-3"
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="programSectionPill"
+                        className="absolute inset-0 rounded-lg bg-white border border-gray-200/70 shadow-card"
+                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                      />
+                    )}
+                    <Icon className={`relative z-10 w-4 h-4 ${active ? 'text-primary-800' : 'text-gray-400'}`} />
+                    <span className="relative z-10 hidden lg:inline">{t.label}</span>
+                    {count !== null && count > 0 && (
+                      <span className={`relative z-10 min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-semibold tabular-nums text-center ${active ? 'bg-primary-100 text-primary-950' : 'bg-gray-200/80 text-gray-600'}`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </nav>
+
+          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+            <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-sm app-btn-ghost text-gray-600" title="Generate an AI impact report">
+              <Sparkles className="w-4 h-4 text-primary-800" /> <span className="hidden xl:inline">Report</span>
+            </button>
+            {canEditInitiatives && (
+              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-sm app-btn-secondary" title="Metrics, tags, locations, groups">
+                <Settings2 className="w-4 h-4" /> <span className="hidden xl:inline">Set up</span>
+              </button>
+            )}
             {canLog && (
               <button
                 type="button"
                 onClick={handleAddLog}
                 disabled={!setupReady}
                 title={setupReady ? 'Log a claim or evidence' : 'Add a metric first'}
-                className="app-btn app-btn-primary"
+                className="app-btn app-btn-sm app-btn-primary"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add log</span>
               </button>
             )}
-            {canEditInitiatives && (
-              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary" title="Metrics, tags, locations, groups">
-                <Settings2 className="w-4 h-4" /> <span className="hidden sm:inline">Set up</span>
-              </button>
-            )}
-            <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-secondary" title="Generate an AI impact report">
-              <Sparkles className="w-4 h-4 text-primary-800" /> <span className="hidden md:inline">Report</span>
-            </button>
           </div>
         </div>
-
-        {/* Section switcher (desktop). Mobile uses the bottom nav. */}
-        <nav className="hidden md:flex items-center px-4 sm:px-6 pb-3" aria-label="Program sections">
-          <div className="app-segmented">
-            {TABS.map(t => {
-              const Icon = t.icon
-              const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
-              const count = t.id === 'metrics' ? dashboard.kpis.length : t.id === 'logs' ? allKPIUpdates.length : null
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => handleTabChange(t.id)}
-                  className="app-segmented-item"
-                  aria-current={active ? 'page' : undefined}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="programSectionPill"
-                      className="absolute inset-0 rounded-lg bg-white border border-gray-200/70 shadow-card"
-                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                    />
-                  )}
-                  <Icon className={`relative z-10 w-4 h-4 ${active ? 'text-primary-800' : 'text-gray-400'}`} />
-                  <span className="relative z-10">{t.label}</span>
-                  {count !== null && count > 0 && (
-                    <span className={`relative z-10 min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-semibold tabular-nums text-center ${active ? 'bg-primary-100 text-primary-950' : 'bg-gray-200/80 text-gray-600'}`}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </nav>
       </header>
 
       {/* Body: each section owns its own scroll. */}
@@ -445,7 +479,7 @@ export default function InitiativePage() {
       {setupOpen && (
         <ProgramSetupDrawer
           initiativeId={id!}
-          initiativeTitle={dashboard.initiative.title}
+          initiativeTitle={initiative.title}
           isOpen
           onClose={() => setSetupOpen(false)}
           onChanged={refreshAfterChange}
@@ -464,7 +498,7 @@ export default function InitiativePage() {
         <ModalFrame size="full" zIndexClass="z-[70]" onClose={() => setReportOpen(false)} paddingClassName="p-0 md:p-4">
           <ModalHeader title="AI impact report" subtitle="Generate a shareable summary from this program's claims, evidence and stories." icon={Sparkles} onClose={() => setReportOpen(false)} />
           <div className="flex-1 min-h-0 h-[80vh]">
-            <ReportTab initiativeId={id!} dashboard={dashboard} />
+            {dashboard ? <ReportTab initiativeId={id!} dashboard={dashboard} /> : <SectionLoader className="h-64" />}
           </div>
         </ModalFrame>
       )}

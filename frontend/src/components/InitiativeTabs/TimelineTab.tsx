@@ -15,14 +15,15 @@ import {
 } from '../../types'
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
-import { SectionLoader, EmptyState } from '../ui'
-import { AlertCircle, Plus, Search } from 'lucide-react'
+import { EmptyState, Skeleton } from '../ui'
+import { AlertCircle, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import {
  TimelineFilters,
  TimelineView,
  applyFiltersToParams,
  filtersFromParams,
 } from '../../utils/timeline'
+import { readSWR, writeSWR } from '../../utils/swrCache'
 import { viewSwap } from '../timeline/motion'
 import TimelineStatCards from '../timeline/TimelineStatCards'
 import TimelineFilterBar from '../timeline/TimelineFilterBar'
@@ -57,9 +58,43 @@ interface TimelineTabProps {
  /** Renders inside another page (metric detail) rather than as a full-screen tab:
   * drops the fixed height + big title so the parent page owns scrolling. */
  embedded?: boolean
- /** Bump this counter to open the Add Log wizard from a parent (e.g. the
+  /** Bump this counter to open the Add Log wizard from a parent (e.g. the
   * metric detail header button). */
  openAddLogSignal?: number
+ /** The parent header already owns the "Logs" title and Add log button
+  * (program page): drop our title row so the list gets the height. */
+ hideHeader?: boolean
+}
+
+/** Dimension filters that live behind the Filters toggle (search + status
+ * have their own always-visible controls). */
+function countDimensionFilters(f: TimelineFilters): number {
+ return (
+ (f.metrics.length ? 1 : 0) +
+ (f.locations.length ? 1 : 0) +
+ (f.beneficiaryGroups.length ? 1 : 0) +
+ (f.tags.length ? 1 : 0) +
+ (f.contributors.length ? 1 : 0) +
+ (f.evidenceTypes.length ? 1 : 0) +
+ (f.dateFrom || f.dateTo ? 1 : 0)
+ )
+}
+
+function LogsSkeleton() {
+ return (
+ <div className="space-y-2.5" aria-hidden>
+ {Array.from({ length: 6 }).map((_, i) => (
+ <div key={i} className="app-card p-3.5 flex items-center gap-3">
+ <Skeleton className="w-9 h-9 rounded-lg flex-shrink-0" />
+ <div className="flex-1 min-w-0 space-y-2">
+ <Skeleton className="h-3.5 w-2/5" />
+ <Skeleton className="h-3 w-3/5" />
+ </div>
+ <Skeleton className="h-5 w-16 rounded-full" />
+ </div>
+ ))}
+ </div>
+ )
 }
 
 /**
@@ -68,12 +103,16 @@ interface TimelineTabProps {
  * params so filtered views can be deep-linked, refreshed, and navigated with
  * browser controls (?tab=logs&view=...&metric=...).
  */
-export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal }: TimelineTabProps) {
+export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal, hideHeader }: TimelineTabProps) {
  const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canDelete, canManageTeam, canEditMetrics } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
- const [data, setData] = useState<TimelineResponse | null>(null)
- const [loading, setLoading] = useState(true)
+ // Stale-while-revalidate: paint the last payload for this program instantly
+ // (revisit / refresh), then the fresh fetch below overwrites it.
+ const swrKey = `timeline:${initiativeId}`
+ const [data, setData] = useState<TimelineResponse | null>(() => readSWR<TimelineResponse>(swrKey))
+ const [loading, setLoading] = useState(() => !readSWR<TimelineResponse>(swrKey))
+ const [filtersOpen, setFiltersOpen] = useState(false)
  const [locations, setLocations] = useState<Location[]>([])
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
  const [tags, setTags] = useState<MetricTag[]>([])
@@ -121,14 +160,16 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  // Normalise defensively: a backend older than this frontend (or a
  // cached/partial payload) may omit arrays, and every view assumes
  // they exist. Missing pieces degrade to empty instead of crashing.
- setData({
+ const normalised: TimelineResponse = {
  kpis: timeline?.kpis || [],
  claims: timeline?.claims || [],
  evidence: timeline?.evidence || [],
  connections: timeline?.connections || [],
  contributors: timeline?.contributors || {},
  stats: timeline?.stats || { total: 0, connected: 0, not_connected: 0, claims_total: 0, evidence_total: 0 },
- })
+ }
+ setData(normalised)
+ writeSWR(`timeline:${initiativeId}`, normalised)
  } catch (error) {
  console.error('Error loading timeline:', error)
  notify.error('Failed to load timeline')
@@ -139,9 +180,18 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }, [initiativeId])
 
  useEffect(() => {
- setLoading(true)
+ // Only show the skeleton when there is nothing cached to paint.
+ if (!readSWR<TimelineResponse>(`timeline:${initiativeId}`)) setLoading(true)
  load()
- }, [load])
+ }, [load, initiativeId])
+
+ // Dimension filters arriving via deep link should be visible, not hidden
+ // behind a collapsed toggle.
+ const dimensionFilterCount = countDimensionFilters(filters)
+ useEffect(() => {
+ if (dimensionFilterCount > 0) setFiltersOpen(true)
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [])
 
  // Parent-triggered "Add Log" (e.g. metric detail header). Ignore the initial 0.
  useEffect(() => {
@@ -262,68 +312,81 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }
  }
 
- return (
+  const showTitleRow = !hideHeader
+  const showAddButton = (canAddImpactClaims || canAddEvidence) && !hideHeader
+
+  return (
     <div className={embedded ? 'flex flex-col' : 'h-full overflow-hidden flex flex-col'}>
-      {/* Header + toolbar (kept compact so the list below is the focus) */}
-      <div className={`px-4 sm:px-6 pt-3 sm:pt-5 pb-2.5 sm:pb-3 border-b border-gray-100 space-y-2 md:space-y-3 flex-shrink-0 ${embedded ? 'bg-gray-50' : 'bg-white'}`}>
-        {/* Title row — Add is hidden on phone (center FAB owns that action) */}
-        <div className="flex items-center justify-between gap-3">
-          {embedded ? (
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-gray-800 leading-tight">Logs</h3>
-              <p className="text-xs text-gray-500 hidden sm:block">Claims, evidence, and connections for this metric</p>
-            </div>
-          ) : (
-            <div className="min-w-0">
-              <h2 className="text-xl md:text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Logs</h2>
-              <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-                Every logged claim, piece of evidence, and connection for this program
-              </p>
-            </div>
-          )}
-          {(canAddImpactClaims || canAddEvidence) && (
-            <button
-              onClick={() => setIsWizardOpen(true)}
-              className={`app-btn app-btn-primary shadow-sm flex-shrink-0 ${
-                embedded
-                  ? 'app-btn-sm'
-                  : 'app-btn-sm max-md:hidden md:h-12 md:px-6 md:text-base lg:h-14 lg:px-8 lg:text-[17px]'
-              }`}
-            >
-              <Plus className={embedded ? 'w-4 h-4' : 'w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6'} />
-              <span className={embedded ? undefined : 'hidden sm:inline'}>Add Log</span>
-              {!embedded && <span className="sm:hidden">Add</span>}
-            </button>
-          )}
-        </div>
+      {/* Toolbar: one row (view · search · status · filters toggle), plus an
+          optional second row of dimension filters. The list gets the rest. */}
+      <div className={`px-4 sm:px-6 pt-2.5 pb-2 border-b border-gray-100 space-y-2 flex-shrink-0 ${embedded ? 'bg-gray-50' : 'bg-white'}`}>
+        {showTitleRow && (
+          <div className="flex items-center justify-between gap-3">
+            {embedded ? (
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-gray-800 leading-tight">Logs</h3>
+                <p className="text-xs text-gray-500 hidden sm:block">Claims, evidence, and connections for this metric</p>
+              </div>
+            ) : (
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-gray-900 leading-tight tracking-tight">Logs</h2>
+              </div>
+            )}
+            {showAddButton && (
+              <button
+                onClick={() => setIsWizardOpen(true)}
+                className={`app-btn app-btn-sm app-btn-primary shadow-sm flex-shrink-0 ${embedded ? '' : 'max-md:hidden'}`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Log</span>
+              </button>
+            )}
+          </div>
+        )}
 
-        {/* Main filters */}
-        <TimelineFilterBar
-          view={view}
-          filters={filters}
-          onFiltersChange={setFilters}
-          kpis={data?.kpis || []}
-          hideMetric={!!lockedMetricId}
-          locations={locations}
-          beneficiaryGroups={beneficiaryGroups}
-          tags={tags}
-          contributors={data?.contributors || {}}
-        />
+        <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
+          {/* View switcher */}
+          <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/90 p-0.5 flex-shrink-0" role="tablist" aria-label="Log view">
+            {VIEWS.map(v => {
+              const isActive = view === v.id
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setView(v.id)}
+                  className={`inline-flex items-center justify-center h-8 px-3 rounded-md border text-xs md:text-sm font-semibold transition-colors ${isActive ? `${v.activeClass} shadow-card` : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-white/70'}`}
+                >
+                  {v.label}
+                </button>
+              )
+            })}
+          </div>
 
-        {/* Search (left) · status filters + evidence view mode (right) */}
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 justify-between">
-          <div className="relative flex-1 min-w-[160px] md:min-w-[200px] max-w-md">
-            <Search className="absolute left-3 md:left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" />
+          {/* Search */}
+          <div className="relative flex-1 min-w-[140px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"
               value={filters.q}
               onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-              placeholder="Search claims and evidence…"
-              className="w-full h-8 md:h-9 pl-9 md:pl-10 pr-3 bg-white border border-gray-200 rounded-full text-xs md:text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="Search logs"
+              className="w-full h-8 pl-9 pr-8 bg-white border border-gray-200 rounded-full text-xs md:text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
+            {filters.q && (
+              <button
+                type="button"
+                onClick={() => setFilters({ ...filters, q: '' })}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
             {data && displayStats && (
               <TimelineStatCards
                 stats={displayStats}
@@ -341,33 +404,58 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
             {view === 'evidence' && (
               <EvidenceViewModeToggle mode={evidenceMode} onChange={setEvidenceMode} />
             )}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(o => !o)}
+              aria-expanded={filtersOpen}
+              className={`app-btn app-btn-sm ${filtersOpen || dimensionFilterCount > 0 ? 'app-btn-secondary border-primary-200 bg-primary-50 text-primary-900' : 'app-btn-ghost text-gray-600'}`}
+              title="Filter by metric, location, group, tag, contributor, type, or date"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {dimensionFilterCount > 0 && (
+                <span className="min-w-[1.1rem] px-1 py-px rounded-full bg-primary-600 text-white text-[10px] font-bold tabular-nums text-center">
+                  {dimensionFilterCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* View switcher — full-width, equal, squared buttons above the rows */}
-      <div className="px-4 sm:px-6 pt-2.5 md:pt-4 pb-1 bg-gray-50 flex-shrink-0">
-        <div className="grid grid-cols-3 gap-1.5 md:gap-2">
-          {VIEWS.map(v => {
-            const isActive = view === v.id
-            return (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => setView(v.id)}
-                className={`inline-flex items-center justify-center h-8 md:h-10 rounded-lg border text-xs md:text-sm font-medium transition-colors ${isActive ? v.activeClass : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-              >
-                {v.label}
-              </button>
-            )
-          })}
-        </div>
+        {/* Dimension filters: collapsed by default, auto-open when a deep
+            link carries one. */}
+        <AnimatePresence initial={false}>
+          {filtersOpen && (
+            <motion.div
+              key="filters"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+              <div className="pt-1">
+                <TimelineFilterBar
+                  view={view}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  kpis={data?.kpis || []}
+                  hideMetric={!!lockedMetricId}
+                  locations={locations}
+                  beneficiaryGroups={beneficiaryGroups}
+                  tags={tags}
+                  contributors={data?.contributors || {}}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Active view — fills remaining height down to the phone nav / desktop chrome */}
-      <div className={`px-4 sm:px-6 pb-2 md:pb-6 pt-2 bg-gray-50 min-h-0 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
+      <div className={`px-4 sm:px-6 pb-2 md:pb-6 pt-2.5 bg-gray-50 min-h-0 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
         {loading ? (
-          <SectionLoader className="h-64" />
+          <LogsSkeleton />
         ) : !data ? (
           <div className="app-card md:p-8">
             <EmptyState

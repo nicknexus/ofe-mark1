@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../services/api'
 import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, InitiativeActivity } from '../types'
 import { truncateText, formatRelativeTime } from '../utils'
+import { readSWR, writeSWR } from '../utils/swrCache'
 import { notify } from '../lib/notify'
 import CreateInitiativeModal, { type CreateInitiativeSource } from '../components/CreateInitiativeModal'
 import ProgramSetupDrawer from '../components/setup/ProgramSetupDrawer'
@@ -48,6 +49,15 @@ import { Button, PageLoader, InlineAlert, EmptyState, PageHeader } from '../comp
 import { InitiativesHelp } from '../components/tracking/TrackingHelp'
 import { easeOut, dropdownPop } from '../components/timeline/motion'
 import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
+
+// Warm the program page's two payloads on hover so the click lands on an
+// in-memory cache hit. apiService dedupes in-flight requests and caches GETs
+// for 60s, so repeated hovers are free (and invalidation still works).
+function prefetchProgram(id: string | undefined) {
+  if (!id) return
+  apiService.getInitiativeDashboard(id).catch(() => {})
+  apiService.getInitiativeTimeline(id).catch(() => {})
+}
 
 // ============ Sortable initiative card ============
 // Owner/team can drag-reorder initiatives on the dashboard. Order is persisted
@@ -247,7 +257,13 @@ function SortableInitiativeCard({
             {inner}
           </button>
         ) : (
-          <Link to={`/programs/${initiative.id}`} className="block h-full">
+          <Link
+            to={`/programs/${initiative.id}`}
+            state={{ initiative }}
+            className="block h-full"
+            onMouseEnter={() => prefetchProgram(initiative.id)}
+            onFocus={() => prefetchProgram(initiative.id)}
+          >
             {inner}
           </Link>
         )}
@@ -418,8 +434,11 @@ export default function Dashboard() {
  useEffect(() => {
  if (!dashboardOrg?.id) return
  // Reset stale lists immediately so the UI doesn't show the previous
- // org's data while the new fetch is in flight.
- setInitiatives([])
+ // org's data while the new fetch is in flight. If we have this org's
+ // last list in the SWR cache, paint it now instead of a full-page loader.
+ const cached = readSWR<Initiative[]>(`initiatives:${dashboardOrg.id}`)
+ setInitiatives(cached || [])
+ if (cached && cached.length) setLoadingState({ isLoading: false })
  setAllKPIs([])
  setAllLocations([])
  setIsLoadingStats(true)
@@ -428,6 +447,13 @@ export default function Dashboard() {
  loadingPromise.current = null
  loadingPromise.current = loadAllData()
  }, [dashboardOrg?.id])
+
+ // Mirror the list into the SWR cache after every change (load, create,
+ // delete, reorder) so the next visit paints the same thing instantly.
+ useEffect(() => {
+ if (!dashboardOrg?.id || loadingState.isLoading) return
+ writeSWR(`initiatives:${dashboardOrg.id}`, initiatives)
+ }, [initiatives, dashboardOrg?.id, loadingState.isLoading])
 
  // One-time backfill of evidence ↔ claim links per browser per org.
  // Catches up historical data created before the tag-gate rule (or other
@@ -530,7 +556,9 @@ export default function Dashboard() {
  }
 
  setIsLoadingData(true)
- setLoadingState({ isLoading: true })
+ // Only block the page when there is nothing cached to paint.
+ const swrKey = dashboardOrg?.id ? `initiatives:${dashboardOrg.id}` : null
+ if (!(swrKey && readSWR<Initiative[]>(swrKey)?.length)) setLoadingState({ isLoading: true })
 
  try {
  // Load initiatives - organization comes from TeamContext now

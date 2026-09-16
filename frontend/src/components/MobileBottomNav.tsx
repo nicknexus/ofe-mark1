@@ -16,8 +16,8 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps) {
   const tabs = [
-    { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
     { id: 'logs', label: 'Logs', icon: Activity },
+    { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
     { id: 'location', label: 'Locations', icon: MapPin },
  { id: 'beneficiaries', label: 'People', icon: Users },
  { id: 'stories', label: 'Stories', icon: BookOpen },
