@@ -400,13 +400,13 @@ export default function OverviewPage() {
                 <div className="flex-1 flex flex-col justify-center py-6">
                   <p className="text-sm font-medium text-secondary-800">You are set</p>
                   <p className="text-xs text-secondary-500 mt-1 mb-4">Tracking and sharing look complete.</p>
-                  <Link to="/tracking/programs" className="app-btn app-btn-primary app-btn-sm w-fit">Open tracking</Link>
+                  <Link to="/tracking/programs" className="app-btn app-btn-primary app-btn-sm w-fit">Open programs</Link>
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
                   {proveNext.length > 0 && (
                     <div>
-                      <p className="px-2 mb-1 text-[11px] font-bold uppercase tracking-wide text-primary-800">Tracking</p>
+                      <p className="px-2 mb-1 text-[11px] font-bold uppercase tracking-wide text-primary-800">Programs</p>
                       <NextStepList items={proveNext} tone="tracking" />
                     </div>
                   )}
@@ -425,7 +425,7 @@ export default function OverviewPage() {
                 <div className="flex items-center gap-2.5 mb-2">
                   <ProgressRing pct={provePct} stroke="#789a59" />
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-primary-800">Tracking</p>
+                    <p className="text-xs font-bold text-primary-800">Programs</p>
                     <p className="text-[11px] tabular-nums text-secondary-400">{proveChecks.filter(c => c.done).length}/{proveChecks.length}</p>
                   </div>
                 </div>

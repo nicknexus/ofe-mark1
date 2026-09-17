@@ -24,6 +24,7 @@ import {
  filtersFromParams,
 } from '../../utils/timeline'
 import { readSWR, writeSWR } from '../../utils/swrCache'
+import { tagsOnProgramMetrics } from '../../utils/programTags'
 import { viewSwap } from '../timeline/motion'
 import TimelineStatCards from '../timeline/TimelineStatCards'
 import TimelineFilterBar from '../timeline/TimelineFilterBar'
@@ -250,6 +251,11 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  return { total, connected, not_connected: total - connected, claims_total: mClaims.length, evidence_total: mEvidence.length }
  }, [data, lockedMetricId])
 
+ const programTags = useMemo(
+   () => tagsOnProgramMetrics(tags, data?.kpis || []),
+   [tags, data?.kpis]
+ )
+
 
  const handleAddEvidenceToClaim = canAddEvidence
  ? (claim: TimelineClaim, kpi: KPI | undefined) => setAddEvidenceTarget({ claim, kpi })
@@ -443,7 +449,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                   hideMetric={!!lockedMetricId}
                   locations={locations}
                   beneficiaryGroups={beneficiaryGroups}
-                  tags={tags}
+                  tags={programTags}
                   contributors={data?.contributors || {}}
                 />
               </div>

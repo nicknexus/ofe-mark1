@@ -97,19 +97,25 @@ export default function LayoutIntro() {
             </h2>
             <p className="text-base sm:text-lg text-secondary-600 leading-relaxed">
               Everything is easier to find.{' '}
-              <span className="font-semibold text-primary-800 bg-primary-50 px-1.5 py-0.5 rounded-md">Tracking</span>
-              {' '}is where you prove the work.{' '}
+              <span className="font-semibold text-primary-800 bg-primary-50 px-1.5 py-0.5 rounded-md">Programs</span>
+              {' '}is where you work.{' '}
               <span className="font-semibold text-claim-700 bg-claim-50 px-1.5 py-0.5 rounded-md">Share</span>
               {' '}is where you publish it.
             </p>
             <div className="rounded-xl border border-gray-200/80 bg-gray-50 p-3 hidden sm:block max-w-[11rem]" aria-hidden>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-primary-50">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary-600" />
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
                 <span className="text-[11px] font-semibold text-secondary-900">Home</span>
               </div>
-              <p className="px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-primary-800">Tracking</p>
-              <p className="px-2 py-0.5 text-[11px] text-secondary-600">Programs</p>
-              <p className="px-2 py-0.5 text-[11px] text-secondary-600">Metrics</p>
+              <p className="px-2 pt-2 pb-1 text-[10px] font-bold tracking-wide text-primary-700">Tracking</p>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-primary-50">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-600" />
+                <span className="text-[11px] font-semibold text-secondary-900">Programs</span>
+              </div>
+              <div className="ml-5 mt-0.5 rounded-md bg-primary-50/50 py-0.5">
+                <p className="px-2 py-0.5 text-[11px] text-secondary-600">Metrics</p>
+                <p className="px-2 py-0.5 text-[11px] text-secondary-600">Locations</p>
+                <p className="px-2 py-0.5 text-[11px] text-secondary-600">Tags</p>
+              </div>
               <p className="px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-claim-700">Share</p>
               <p className="px-2 py-0.5 text-[11px] text-secondary-600">Public page</p>
               <p className="px-2 py-0.5 text-[11px] text-secondary-600">Organization</p>

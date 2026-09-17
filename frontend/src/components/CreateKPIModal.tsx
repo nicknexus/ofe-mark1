@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { BarChart3, Trash2, Search, Globe2, Plus } from 'lucide-react'
+import { BarChart3, Trash2, Search, Globe2, Plus, Check } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { CreateKPIForm, MetricDefinitionWithUsage } from '../types'
 import TagPicker from './MetricTags/TagPicker'
 import { apiService } from '../services/api'
 import { notify } from '../lib/notify'
 import { useTeam } from '../context/TeamContext'
+import { EmptyState, SectionLoader } from './ui'
+import { getKPIColor } from './metricsDashboard/metricColorPalette'
 
 interface CreateKPIModalProps {
   isOpen: boolean
@@ -42,7 +44,9 @@ export default function CreateKPIModal({
   const [definitions, setDefinitions] = useState<MetricDefinitionWithUsage[]>([])
   const [definitionsLoading, setDefinitionsLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [attaching, setAttaching] = useState<string | null>(null)
+  const [attaching, setAttaching] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [addedIds, setAddedIds] = useState<string[]>([])
   const [formData, setFormData] = useState<CreateKPIForm>({
     title: editData?.title || '',
     description: editData?.description || '',
@@ -65,6 +69,9 @@ export default function CreateKPIModal({
     if (!isOpen) {
       setMode('new')
       setSearch('')
+      setSelectedIds([])
+      setAddedIds([])
+      setAttaching(false)
     }
   }, [isOpen])
 
@@ -83,27 +90,44 @@ export default function CreateKPIModal({
   // that were archived here before, which come back with their claims intact.
   const availableDefinitions = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const added = new Set(addedIds)
     return definitions
-      .filter(d => !d.initiatives.some(u => u.initiative_id === initiativeId))
+      .filter(d => !added.has(d.id) && !d.initiatives.some(u => u.initiative_id === initiativeId))
       .filter(d => !q || d.title.toLowerCase().includes(q) || (d.description || '').toLowerCase().includes(q))
-  }, [definitions, initiativeId, search])
+  }, [definitions, initiativeId, search, addedIds])
 
-  const attachExisting = async (definition: MetricDefinitionWithUsage) => {
-    setAttaching(definition.id)
-    try {
-      await apiService.addMetricToInitiative(definition.id, initiativeId)
-      notify.success(`"${definition.title}" added to this program`)
-      onAttached?.()
-      onClose()
-    } catch (err) {
-      notify.error((err as Error).message || 'Failed to add metric')
-    } finally {
-      setAttaching(null)
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const finish = () => {
+    if (addedIds.length > 0) onAttached?.()
+    onClose()
+  }
+
+  const attachSelected = async () => {
+    if (selectedIds.length === 0 || attaching) return
+    setAttaching(true)
+    const picked = definitions.filter(d => selectedIds.includes(d.id))
+    const results = await Promise.allSettled(
+      picked.map(definition => apiService.addMetricToInitiative(definition.id, initiativeId))
+    )
+    const ok = picked.filter((_, i) => results[i].status === 'fulfilled').map(d => d.id)
+    const failed = results.filter(r => r.status === 'rejected').length
+    if (ok.length > 0) {
+      setAddedIds(prev => [...prev, ...ok])
+      setSelectedIds(prev => prev.filter(id => !ok.includes(id)))
+      notify.success(ok.length === 1
+        ? `"${picked.find(d => d.id === ok[0])?.title || 'Metric'}" added to this program`
+        : `${ok.length} metrics added to this program`)
     }
+    if (failed > 0) notify.error(failed === 1 ? 'Could not add 1 metric' : `Could not add ${failed} metrics`)
+    setAttaching(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (mode === 'existing' && !editData) return
     setLoading(true)
 
     try {
@@ -140,7 +164,9 @@ export default function CreateKPIModal({
       zIndexClass="z-[60]"
       size="md"
       paddingClassName="p-0 md:p-4"
-      panelClassName="bg-white w-full h-full max-h-[100dvh] overflow-hidden flex flex-col rounded-none border-0 shadow-none md:rounded-xl md:border md:border-gray-200 md:shadow-app-modal md:h-auto md:max-h-[90vh] md:max-w-2xl"
+      panelClassName={`bg-white w-full h-full max-h-[100dvh] overflow-hidden flex flex-col rounded-none border-0 shadow-none md:rounded-xl md:border md:border-gray-200 md:shadow-app-modal md:h-auto md:max-h-[90vh] ${
+        mode === 'existing' && !editData ? 'md:max-w-4xl' : 'md:max-w-2xl'
+      }`}
     >
       <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
         <ModalHeader
@@ -151,7 +177,7 @@ export default function CreateKPIModal({
               ? 'Changes apply everywhere this metric is used'
               : 'Create a new metric, or reuse one your organization already tracks'
           }
-          onClose={onClose}
+          onClose={mode === 'existing' && !editData ? finish : onClose}
         />
 
         {!editData && (
@@ -185,62 +211,123 @@ export default function CreateKPIModal({
 
         {mode === 'existing' && !editData ? (
           <>
-            <ModalBody rail>
-              <div className="relative mb-3">
+            <ModalBody>
+              <div className="relative max-w-sm mb-4">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search your organization's metrics…"
-                  className="w-full h-9 pl-10 pr-3 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Search metrics…"
+                  className="app-input h-9 !pl-10 !rounded-full"
                 />
               </div>
 
               {definitionsLoading ? (
-                <p className="text-sm text-gray-400 py-8 text-center">Loading metrics…</p>
+                <SectionLoader label="Loading metrics" />
               ) : availableDefinitions.length === 0 ? (
-                <p className="text-sm text-gray-400 py-8 text-center">
-                  {definitions.length === 0
-                    ? 'Your organization has no other metrics yet.'
-                    : search.trim()
-                      ? `No metrics match "${search}".`
-                      : 'Every metric your organization tracks is already on this program.'}
-                </p>
+                <EmptyState
+                  icon={BarChart3}
+                  title={
+                    definitions.length === 0
+                      ? 'No other metrics yet'
+                      : search.trim()
+                        ? `No metrics match "${search}"`
+                        : 'Every metric is already on this program'
+                  }
+                  description={
+                    definitions.length === 0
+                      ? 'Create a new one instead, or add metrics from the org library.'
+                      : undefined
+                  }
+                />
               ) : (
-                <div className="space-y-1.5">
-                  {availableDefinitions.map(definition => (
-                    <button
-                      key={definition.id}
-                      type="button"
-                      onClick={() => attachExisting(definition)}
-                      disabled={attaching !== null}
-                      className="group w-full flex items-center gap-2.5 p-2 bg-white rounded-xl border border-gray-200/70 shadow-card hover:border-primary-300/70 hover:shadow-card-hover transition-all text-left disabled:opacity-50"
-                    >
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
-                        <img
-                          src={orgLogoUrl || '/Nexuslogo.png'}
-                          alt=""
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png'
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-gray-900 leading-snug line-clamp-1 min-w-0 flex-1">
-                        {definition.title}
-                      </span>
-                      <span className="text-xs font-medium text-primary-600 flex-shrink-0">
-                        {attaching === definition.id ? 'Adding…' : 'Add'}
-                      </span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {availableDefinitions.map((definition, index) => {
+                    const color = getKPIColor(definition.category, index)
+                    const isPct = definition.metric_type === 'percentage'
+                    const selected = selectedIds.includes(definition.id)
+                    const unused = definition.initiative_count === 0
+                    return (
+                      <button
+                        key={definition.id}
+                        type="button"
+                        onClick={() => toggleSelected(definition.id)}
+                        disabled={attaching}
+                        className={`app-tile p-4 text-left flex flex-col group relative disabled:opacity-50 ${
+                          selected ? 'border-primary-400 ring-2 ring-primary-200' : ''
+                        }`}
+                      >
+                        <span className={`absolute top-2.5 right-2.5 w-5 h-5 rounded-md border flex items-center justify-center ${
+                          selected ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 bg-white text-transparent'
+                        }`}>
+                          <Check className="w-3 h-3" />
+                        </span>
+                        <div className="flex items-start gap-2 pr-10 mb-3">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }} />
+                          <p className="text-sm font-medium text-gray-800 leading-snug line-clamp-2" title={definition.title}>
+                            {definition.title}
+                          </p>
+                        </div>
+                        <div className="flex items-baseline gap-1.5 min-w-0 mb-3">
+                          <span className="text-2xl font-semibold text-gray-900 tabular-nums">
+                            {isPct ? `${Math.round(definition.total_value)}%` : definition.total_value.toLocaleString()}
+                          </span>
+                          <span className="text-xs text-gray-400 truncate">
+                            {isPct ? 'average' : definition.unit_of_measurement}
+                          </span>
+                          <span className="ml-auto text-[11px] text-gray-400 capitalize flex-shrink-0">
+                            {definition.category}
+                          </span>
+                        </div>
+                        <div className="mt-auto pt-2.5 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+                          {unused ? (
+                            <span className="inline-flex items-center rounded-full border border-dashed border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
+                              Not in any program yet
+                            </span>
+                          ) : (
+                            definition.initiatives.slice(0, 2).map(usage => (
+                              <span
+                                key={usage.initiative_id}
+                                className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 pl-1 pr-1.5 py-0.5 text-[11px] font-medium text-gray-600 max-w-full"
+                              >
+                                <span className="w-4 h-4 rounded bg-white ring-1 ring-gray-200/80 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                  <img
+                                    src={orgLogoUrl || '/Nexuslogo.png'}
+                                    alt=""
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
+                                  />
+                                </span>
+                                <span className="truncate max-w-[8rem]">{usage.initiative_title}</span>
+                              </span>
+                            ))
+                          )}
+                          {definition.initiatives.length > 2 && (
+                            <span className="text-[11px] text-gray-400">+{definition.initiatives.length - 2}</span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </ModalBody>
             <ModalFooter>
-              <button type="button" onClick={onClose} className="app-btn app-btn-ghost">
-                Cancel
+              <button type="button" onClick={finish} className="app-btn app-btn-secondary">
+                {addedIds.length > 0 ? 'Done' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={attachSelected}
+                disabled={selectedIds.length === 0 || attaching}
+                className="app-btn app-btn-primary"
+              >
+                {attaching
+                  ? 'Adding…'
+                  : selectedIds.length === 0
+                    ? 'Add metrics'
+                    : `Add ${selectedIds.length} metric${selectedIds.length === 1 ? '' : 's'}`}
               </button>
             </ModalFooter>
           </>

@@ -796,7 +796,8 @@ function App() {
  <Route path="/*" element={
  <Layout user={user}>
  <Routes>
- <Route index element={<OverviewPage />} />
+ <Route index element={<RedirectKeepSearch to="/tracking/programs" />} />
+ <Route path="home" element={<OverviewPage />} />
  <Route path="tracking" element={<RedirectKeepSearch to="/tracking/programs" />} />
  <Route path="tracking/programs" element={<Dashboard />} />
  <Route path="tracking/initiatives" element={<RedirectKeepSearch to="/tracking/programs" />} />

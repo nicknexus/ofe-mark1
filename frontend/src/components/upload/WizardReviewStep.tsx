@@ -17,6 +17,8 @@ interface WizardReviewStepProps {
  beneficiaryGroups: BeneficiaryGroup[]
  existingClaims: TimelineClaim[]
  existingEvidence: TimelineEvidence[]
+ /** Opened from a specific claim (Connections "Add evidence"). Always treat as connected. */
+ pinClaim?: TimelineClaim
 }
 
 /**
@@ -34,6 +36,7 @@ export default function WizardReviewStep({
  beneficiaryGroups,
  existingClaims,
  existingEvidence,
+ pinClaim,
 }: WizardReviewStepProps) {
  const claim = includesClaim(state.kind)
  const evidence = includesEvidence(state.kind)
@@ -119,9 +122,20 @@ export default function WizardReviewStep({
  }, [initiativeId, previewKey, state.editing])
 
  const serverFresh = server?.key === previewKey
- const matchedClaims = serverFresh
+ const matchedClaimsRaw = serverFresh
  ? server!.result.claims.map(c => ({ id: c.id, kpi_id: c.kpi_id, value: c.value, date_represented: c.date_represented || '' }))
  : localClaims.map(c => ({ id: c.id, kpi_id: c.kpi_id, value: c.value, date_represented: c.date_represented }))
+ const pinRow = pinClaim?.id
+   ? {
+     id: pinClaim.id,
+     kpi_id: pinClaim.kpi_id,
+     value: pinClaim.value,
+     date_represented: pinClaim.date_represented || '',
+   }
+   : null
+ const matchedClaims = pinRow && !matchedClaimsRaw.some(c => c.id === pinRow.id)
+   ? [pinRow, ...matchedClaimsRaw]
+   : matchedClaimsRaw
  const matchedEvidence = serverFresh
  ? server!.result.evidence.map(e => ({ id: e.id, title: e.title, date_represented: e.date_represented || '' }))
  : localEvidence.map(e => ({ id: e.id, title: e.title, date_represented: e.date_represented }))
@@ -226,7 +240,9 @@ export default function WizardReviewStep({
  : `${newClaims.length} claim${newClaims.length === 1 ? '' : 's'} and the evidence will be connected to each other`
  )}
  {state.kind === 'evidence' && (
- matchedClaims.length > 0
+ pinClaim
+ ? `Will connect to this claim${matchedClaims.length > 1 ? ` and ${matchedClaims.length - 1} other matching claim${matchedClaims.length === 2 ? '' : 's'}` : ''}`
+ : matchedClaims.length > 0
  ? `Will connect to ${matchedClaims.length} existing claim${matchedClaims.length === 1 ? '' : 's'}`
  : 'No existing claims match this scope'
  )}
@@ -238,7 +254,7 @@ export default function WizardReviewStep({
  </p>
  </div>
 
- {state.kind === 'evidence' && matchedClaims.length === 0 && (
+ {state.kind === 'evidence' && matchedClaims.length === 0 && !pinClaim && (
  <p className="text-xs text-amber-700">
  It will appear as unconnected evidence in your Logs. You can connect it manually there, or it
  will link automatically when a matching claim is added.

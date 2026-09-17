@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Search, X, MapPin, Users, Tag as TagIcon } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../../services/api'
-import { Story, Location, BeneficiaryGroup, MetricTag } from '../../types'
+import { Story, Location, BeneficiaryGroup, MetricTag, KPI } from '../../types'
+import { tagsOnProgramMetrics } from '../../utils/programTags'
 import StoryCard from '../StoryCard'
 import AddStoryModal from '../AddStoryModal'
 import StoryDetailModal from '../StoryDetailModal'
 import DateRangePicker from '../DateRangePicker'
 import ConfirmDialog from '../ConfirmDialog'
 import FilterPill from '../shared/FilterPill'
+import FiltersToggle from '../shared/FiltersToggle'
 import { useTeam } from '../../context/TeamContext'
 import { notify } from '../../lib/notify'
 import { SectionLoader, EmptyState } from '../ui'
@@ -29,6 +32,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
  const [selectedStory, setSelectedStory] = useState<Story | null>(null)
  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
  const [searchQuery, setSearchQuery] = useState('')
+ const [filtersOpen, setFiltersOpen] = useState(false)
  const [deleteStoryId, setDeleteStoryId] = useState<string | null>(null)
 
  // Master filter state
@@ -41,29 +45,31 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
  const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
  const [selectedTags, setSelectedTags] = useState<string[]>([])
  const [allTags, setAllTags] = useState<MetricTag[]>([])
+ const [programKpis, setProgramKpis] = useState<KPI[]>([])
 
  // Load locations and beneficiary groups
  useEffect(() => {
  if (initiativeId) {
  Promise.all([
  apiService.getLocations(initiativeId),
- apiService.getBeneficiaryGroups(initiativeId)
- ]).then(([locs, groups]) => {
+ apiService.getBeneficiaryGroups(initiativeId),
+ apiService.getMetricTags().catch(() => [] as MetricTag[]),
+ apiService.getKPIs(initiativeId).catch(() => [] as KPI[]),
+ ]).then(([locs, groups, tags, kpis]) => {
  setLocations(locs || [])
  setBeneficiaryGroups(groups || [])
+ setAllTags(tags || [])
+ setProgramKpis(kpis || [])
  }).catch(() => {
  setLocations([])
  setBeneficiaryGroups([])
+ setAllTags([])
+ setProgramKpis([])
  })
  }
  }, [initiativeId])
 
- // Load org-wide metric tags for the tag filter.
- useEffect(() => {
- apiService.getMetricTags()
- .then((tags) => setAllTags(tags || []))
- .catch(() => setAllTags([]))
- }, [])
+ const programTags = tagsOnProgramMetrics(allTags, programKpis)
 
  // Load stories with filters
  useEffect(() => {
@@ -169,6 +175,12 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
    selectedTags.length > 0 ||
    datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
 
+ const filterCount =
+   (selectedLocations.length ? 1 : 0) +
+   (selectedBeneficiaryGroups.length ? 1 : 0) +
+   (selectedTags.length ? 1 : 0) +
+   (datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate) ? 1 : 0)
+
  const clearFilters = () => {
    setSelectedLocations([])
    setSelectedBeneficiaryGroups([])
@@ -179,81 +191,108 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
  return (
    <div className="h-full overflow-hidden flex flex-col mobile-content-padding">
      {/* Header + filters */}
-     <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white space-y-3 flex-shrink-0">
-       <div className="flex items-center justify-between gap-3">
-         <div className="min-w-0">
-           <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Stories</h2>
-           <p className="text-sm text-gray-500 mt-1 hidden sm:block">Showcase your impact with photos and stories</p>
-         </div>
-         {canAddStories && (
-           <button type="button" onClick={handleAddStory} className="app-btn app-btn-primary app-btn-lg shadow-sm flex-shrink-0">
-             <Plus className="w-5 h-5" />
-             <span>Add Story</span>
-           </button>
-         )}
-       </div>
-
-       <div className="relative max-w-sm">
-         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-         <input
-           type="text"
-           placeholder="Search stories by title or description…"
-           value={searchQuery}
-           onChange={(e) => setSearchQuery(e.target.value)}
-           className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-         />
-       </div>
-
-       <div className="flex flex-wrap items-center gap-2">
-         <DateRangePicker
-           value={datePickerValue}
-           onChange={setDatePickerValue}
-           placeholder="Date"
-           variant="pill"
-         />
-         <FilterPill
-           icon={MapPin}
-           label="Location"
-           pluralLabel="locations"
-           options={locations.map(l => ({ id: l.id!, name: l.name }))}
-           selected={selectedLocations}
-           onChange={setSelectedLocations}
-           emptyText="No locations available"
-         />
-         {allTags.length > 0 && (
-           <FilterPill
-             icon={TagIcon}
-             label="Tag"
-             pluralLabel="tags"
-             options={allTags.map(t => ({ id: t.id, name: t.name }))}
-             selected={selectedTags}
-             onChange={setSelectedTags}
-             emptyText="No tags available"
+     <div className="px-4 sm:px-6 pt-2.5 pb-2 border-b border-gray-100 bg-white space-y-2 flex-shrink-0">
+       <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
+         <div className="relative flex-1 min-w-[140px] max-w-sm">
+           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+           <input
+             type="text"
+             placeholder="Search stories"
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+             className="w-full h-8 pl-9 pr-8 bg-white border border-gray-200 rounded-full text-xs md:text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
            />
-         )}
-         <FilterPill
-           icon={Users}
-           label="Group"
-           pluralLabel="groups"
-           options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))}
-           selected={selectedBeneficiaryGroups}
-           onChange={setSelectedBeneficiaryGroups}
-           emptyText="No beneficiary groups available"
-         />
-         {hasActiveFilters && (
-           <button
-             onClick={clearFilters}
-             className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-           >
-             <X className="w-3.5 h-3.5" />
-             Clear all
-           </button>
-         )}
+           {searchQuery && (
+             <button
+               type="button"
+               onClick={() => setSearchQuery('')}
+               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+               aria-label="Clear search"
+             >
+               <X className="w-3.5 h-3.5" />
+             </button>
+           )}
+         </div>
+         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+           <FiltersToggle
+             open={filtersOpen}
+             count={filterCount}
+             onClick={() => setFiltersOpen(o => !o)}
+             title="Filter by date, location, tag, or group"
+           />
+           {canAddStories && (
+             <button type="button" onClick={handleAddStory} className="app-btn app-btn-sm app-btn-primary shadow-sm">
+               <Plus className="w-4 h-4" />
+               <span className="hidden sm:inline">Add story</span>
+               <span className="sm:hidden">Add</span>
+             </button>
+           )}
+         </div>
        </div>
+
+       <AnimatePresence initial={false}>
+         {filtersOpen && (
+           <motion.div
+             key="filters"
+             initial={{ height: 0, opacity: 0 }}
+             animate={{ height: 'auto', opacity: 1 }}
+             exit={{ height: 0, opacity: 0 }}
+             transition={{ duration: 0.18, ease: 'easeOut' }}
+             className="overflow-hidden"
+           >
+             <div className="flex flex-wrap items-center gap-2 pt-1">
+               <DateRangePicker
+                 value={datePickerValue}
+                 onChange={setDatePickerValue}
+                 placeholder="Date"
+                 variant="pill"
+               />
+               <FilterPill
+                 icon={MapPin}
+                 label="Location"
+                 pluralLabel="locations"
+                 options={locations.map(l => ({ id: l.id!, name: l.name }))}
+                 selected={selectedLocations}
+                 onChange={setSelectedLocations}
+                 emptyText="No locations available"
+               />
+               {programTags.length > 0 && (
+                 <FilterPill
+                   icon={TagIcon}
+                   label="Tag"
+                   pluralLabel="tags"
+                   options={programTags.map(t => ({ id: t.id, name: t.name }))}
+                   selected={selectedTags}
+                   onChange={setSelectedTags}
+                   emptyText="No tags on this program's metrics"
+                 />
+               )}
+               <FilterPill
+                 icon={Users}
+                 label="Group"
+                 pluralLabel="groups"
+                 options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))}
+                 selected={selectedBeneficiaryGroups}
+                 onChange={setSelectedBeneficiaryGroups}
+                 emptyText="No beneficiary groups available"
+               />
+               {hasActiveFilters && (
+                 <button
+                   onClick={clearFilters}
+                   className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                 >
+                   <X className="w-3.5 h-3.5" />
+                   Clear
+                 </button>
+               )}
+             </div>
+           </motion.div>
+         )}
+       </AnimatePresence>
      </div>
 
      {/* Stories grid */}
-     <div className="flex-1 bg-gray-50 px-4 sm:px-6 py-4 overflow-y-auto min-h-0">
+     <div className="flex-1 bg-gray-50 px-4 sm:px-6 pt-2.5 pb-4 overflow-y-auto min-h-0">
        {loading ? (
          <SectionLoader className="h-64" />
        ) : stories.length === 0 ? (

@@ -8,6 +8,7 @@ import FilterPill from '../shared/FilterPill'
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
 import { narrativeBudget } from '../../utils/reportLayout'
+import { tagsOnProgramMetrics } from '../../utils/programTags'
 import { getKPIColor } from '../metricsDashboard/metricColorPalette'
 
 // @react-pdf/renderer is heavy; keep it out of the main bundle until a user
@@ -243,7 +244,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setKPIs(kpisData || [])
  setLocations(locationsData || [])
  setBeneficiaryGroups(groupsData || [])
- setMetricTags(tagsData || [])
+ setMetricTags(tagsOnProgramMetrics(tagsData || [], kpisData || []))
  }).catch(() => {
  notify.error('Failed to load filter options')
  })

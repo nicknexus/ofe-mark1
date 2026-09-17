@@ -20,12 +20,13 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { Plus, GripVertical, ChevronDown, ChevronRight, Check, MapPin, Users, Tag as TagIcon, Filter, X, LayoutGrid, LineChart, BarChart3, TrendingUp, Link2, Unlink, FileText } from 'lucide-react'
+import { Plus, GripVertical, ChevronDown, ChevronRight, Check, MapPin, Users, Tag as TagIcon, Filter, X, LineChart, BarChart3, TrendingUp, Link2, Unlink, FileText } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
 import { BeneficiaryGroup, Location, MetricTag, TimelineStats } from '../../types'
 import { getLocalDateString } from '../../utils'
+import { tagsOnProgramMetrics } from '../../utils/programTags'
 import { getKPIColor } from './metricColorPalette'
 import { generateMetricsDashboardChartData } from './generateMetricsDashboardChartData'
 import { filterDashboardKpiUpdates, computeFilteredTotals } from './filterDashboardKpiUpdates'
@@ -33,6 +34,7 @@ import { type TimeFrameKey } from '../expandableKpiCard/generateKpiChartData'
 import { fadeUp, dropdownPop, staggerContainer, viewSwap } from '../timeline/motion'
 import LocationMap from '../LocationMap'
 import DateRangePicker from '../DateRangePicker'
+import FiltersToggle from '../shared/FiltersToggle'
 
 const TIMEFRAMES: Array<{ key: TimeFrameKey; label: string }> = [
   { key: 'all', label: 'All' },
@@ -264,6 +266,7 @@ export default function MetricsDashboardTab({
   const navigate = useNavigate()
   const { canEditMetrics } = useTeam()
   const [subView, setSubView] = useState<'metrics' | 'overview'>('metrics')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [timelineStats, setTimelineStats] = useState<TimelineStats | null>(null)
   const [isCumulative, setIsCumulative] = useState(true)
   const [timeFrame, setTimeFrame] = useState<TimeFrameKey>('all')
@@ -283,6 +286,7 @@ export default function MetricsDashboardTab({
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const tagNameById = useMemo(() => new Map(allTags.map(t => [t.id, t.name])), [allTags])
+  const programTags = useMemo(() => tagsOnProgramMetrics(allTags, kpis), [allTags, kpis])
   const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
 
   const sensors = useSensors(
@@ -382,6 +386,13 @@ export default function MetricsDashboardTab({
     !!(datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate) ||
     selectedLocations.length > 0 || selectedTags.length > 0 || selectedBeneficiaryGroups.length > 0 ||
     visibleKPIs.length < kpis.length
+
+  const filterCount =
+    (datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate ? 1 : 0) +
+    (visibleKPIs.length < kpis.length ? 1 : 0) +
+    (selectedLocations.length ? 1 : 0) +
+    (selectedTags.length ? 1 : 0) +
+    (selectedBeneficiaryGroups.length ? 1 : 0)
 
   const clearAll = () => {
     setDatePickerValue({})
@@ -578,110 +589,126 @@ export default function MetricsDashboardTab({
   )
 
   return (
-    <div className="h-full overflow-hidden bg-gray-50">
-      <motion.div
-        className="h-full flex flex-col gap-4 px-4 sm:px-6 lg:px-8 xl:px-10 py-5 max-w-[1800px] mx-auto w-full"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Header — this page is where metrics get added and tracked */}
-        <motion.div variants={fadeUp} className="flex-shrink-0 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Metrics</h2>
-            <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-              Add and track what this program measures
-            </p>
-          </div>
-          {onAddKPI && (
-            <button
-              onClick={onAddKPI}
-              className="app-btn app-btn-primary shadow-sm flex-shrink-0 app-btn-sm md:h-12 md:px-6 md:text-base lg:h-14 lg:px-8 lg:text-[17px]"
-            >
-              <Plus className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
-              <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add metric</span>
-            </button>
-          )}
-        </motion.div>
-
-        {/* Master filter bar */}
-        <motion.div variants={fadeUp} className="flex-shrink-0 flex flex-wrap items-center gap-2">
-          <DateRangePicker
-            value={datePickerValue}
-            onChange={setDatePickerValue}
-            maxDate={getLocalDateString(new Date())}
-            placeholder="Date"
-            variant="pill"
-          />
-          <FilterPill
-            icon={Filter}
-            label="Metrics"
-            options={metricOptions}
-            selected={visibleKPIs}
-            onChange={setVisibleKPIs}
-            emptyText="No metrics available"
-            total={kpis.length}
-          />
-          <FilterPill
-            icon={MapPin}
-            label="Location"
-            options={locations.map(l => ({ id: l.id!, name: l.name }))}
-            selected={selectedLocations}
-            onChange={setSelectedLocations}
-            emptyText="No locations available"
-          />
-          {allTags.length > 0 && (
-            <FilterPill
-              icon={TagIcon}
-              label="Tag"
-              options={allTags}
-              selected={selectedTags}
-              onChange={setSelectedTags}
-              emptyText="No tags available"
-            />
-          )}
-          {beneficiaryGroups.length > 0 && (
-            <FilterPill
-              icon={Users}
-              label="Groups"
-              options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))}
-              selected={selectedBeneficiaryGroups}
-              onChange={setSelectedBeneficiaryGroups}
-              emptyText="No beneficiary groups available"
-            />
-          )}
-          {anyFilterActive && (
-            <button
-              onClick={clearAll}
-              className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-              Clear all
-            </button>
-          )}
-
-          {/* Metrics ↔ Overview toggle */}
-          <div className="ml-auto inline-flex items-center h-9 p-0.5 rounded-full bg-gray-100 border border-gray-200">
+    <div className="h-full overflow-hidden flex flex-col bg-gray-50">
+      <div className="px-4 sm:px-6 pt-2.5 pb-2 border-b border-gray-100 bg-white space-y-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
+          <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/90 p-0.5 flex-shrink-0" role="tablist" aria-label="Metrics view">
             {([
-              { id: 'metrics', label: 'Metrics', icon: LayoutGrid },
-              { id: 'overview', label: 'Overview', icon: LineChart },
+              { id: 'metrics', label: 'Metrics' },
+              { id: 'overview', label: 'Overview' },
             ] as const).map(v => {
               const active = subView === v.id
               return (
                 <button
                   key={v.id}
                   type="button"
+                  role="tab"
+                  aria-selected={active}
                   onClick={() => setSubView(v.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-sm font-medium transition-colors ${active ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`inline-flex items-center justify-center h-8 px-3 rounded-md border text-xs md:text-sm font-semibold transition-colors ${
+                    active ? 'border-gray-200 bg-white text-gray-900 shadow-card' : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-white/70'
+                  }`}
                 >
-                  <v.icon className="w-4 h-4" />
                   {v.label}
                 </button>
               )
             })}
           </div>
-        </motion.div>
+
+          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            <FiltersToggle
+              open={filtersOpen}
+              count={filterCount}
+              onClick={() => setFiltersOpen(o => !o)}
+              title="Filter by date, metric, location, tag, or group"
+            />
+            {onAddKPI && (
+              <button onClick={onAddKPI} className="app-btn app-btn-sm app-btn-primary shadow-sm">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Add metric</span>
+                <span className="sm:hidden">Add</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {filtersOpen && (
+            <motion.div
+              key="filters"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <DateRangePicker
+                  value={datePickerValue}
+                  onChange={setDatePickerValue}
+                  maxDate={getLocalDateString(new Date())}
+                  placeholder="Date"
+                  variant="pill"
+                />
+                <FilterPill
+                  icon={Filter}
+                  label="Metrics"
+                  options={metricOptions}
+                  selected={visibleKPIs}
+                  onChange={setVisibleKPIs}
+                  emptyText="No metrics available"
+                  total={kpis.length}
+                />
+                <FilterPill
+                  icon={MapPin}
+                  label="Location"
+                  options={locations.map(l => ({ id: l.id!, name: l.name }))}
+                  selected={selectedLocations}
+                  onChange={setSelectedLocations}
+                  emptyText="No locations available"
+                />
+                {programTags.length > 0 && (
+                  <FilterPill
+                    icon={TagIcon}
+                    label="Tag"
+                    options={programTags}
+                    selected={selectedTags}
+                    onChange={setSelectedTags}
+                    emptyText="No tags on this program's metrics"
+                  />
+                )}
+                {beneficiaryGroups.length > 0 && (
+                  <FilterPill
+                    icon={Users}
+                    label="Groups"
+                    options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))}
+                    selected={selectedBeneficiaryGroups}
+                    onChange={setSelectedBeneficiaryGroups}
+                    emptyText="No beneficiary groups available"
+                  />
+                )}
+                {anyFilterActive && (
+                  <button
+                    onClick={clearAll}
+                    className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex-1 min-h-0 px-4 sm:px-6 pt-2.5 pb-4 overflow-hidden">
+      <motion.div
+        className="h-full flex flex-col max-w-[1800px] mx-auto w-full"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
 
         <AnimatePresence mode="wait">
         {subView === 'metrics' ? (
@@ -797,7 +824,7 @@ export default function MetricsDashboardTab({
         )}
         </AnimatePresence>
       </motion.div>
-
+      </div>
     </div>
   )
 }

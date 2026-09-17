@@ -280,14 +280,7 @@ export default function AllTagsPage() {
  }
  }
 
- return (
- <div className="min-h-screen app-canvas pt-8 pb-12 px-4 sm:px-6">
- <div className="max-w-5xl mx-auto">
- <PageHeader
- title="Tags"
- subtitle={`${tags.length} tag${tags.length !== 1 ? 's' : ''} · drag the handles to reorder`}
- help={<TagsHelp />}
- actions={canAddTags ? (
+ const addButton = canAddTags ? (
  <button
  type="button"
  onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)}
@@ -296,7 +289,16 @@ export default function AllTagsPage() {
  <Plus className="w-4 h-4" />
  New tag
  </button>
- ) : undefined}
+ ) : undefined
+
+ return (
+ <div className="min-h-screen app-canvas pt-8 pb-12 px-4 sm:px-6">
+ <div className="max-w-5xl mx-auto">
+ <PageHeader
+ title="Tags"
+ subtitle={`${tags.length} tag${tags.length !== 1 ? 's' : ''}. Shared across programs. Create them here or from any program's Set up.`}
+ help={<TagsHelp />}
+ actions={addButton}
  />
 
  {/* Free-plan lock banner: tags are preserved but read-only until upgrade */}
@@ -350,7 +352,7 @@ export default function AllTagsPage() {
  <EmptyState
  icon={TagIcon}
  title={tags.length === 0 ? 'No tags yet' : `No tags match "${search}"`}
- description={tags.length === 0 ? 'Create tags to break metrics into sub-groups' : undefined}
+ description={tags.length === 0 ? 'Tags are shared across programs. Create them here or attach them from a program\'s Set up.' : undefined}
  />
  ) : (
  <DndContext

@@ -53,8 +53,7 @@ function SoftHome({ className }: { className?: string }) {
   )
 }
 
-const TRACKING_ITEMS = [
-  { to: '/tracking/programs', label: 'Programs', icon: LayoutDashboard },
+const LIBRARY_ITEMS = [
   { to: '/metrics', label: 'Metrics', icon: BarChart3 },
   { to: '/locations', label: 'Locations', icon: MapPin },
   { to: '/tags', label: 'Tags', icon: Tag },
@@ -73,8 +72,11 @@ function pathActive(pathname: string, to: string) {
   if (to === '/tags') return pathname === '/tags' || pathname.startsWith('/tags/')
   if (to === '/account') return pathname === '/account' || pathname.startsWith('/account')
   if (to === '/share/org') return pathname === '/share/org' || pathname === '/share/brand'
-  // A program workspace belongs to Programs.
-  if (to === '/tracking/programs') return pathname === to || pathname.startsWith(`${to}/`) || pathname.startsWith('/programs/') || pathname.startsWith('/initiatives/')
+  if (to === '/home') return pathname === '/home'
+  // A program workspace belongs to Programs. `/` redirects there.
+  if (to === '/tracking/programs') {
+    return pathname === '/' || pathname === to || pathname.startsWith(`${to}/`) || pathname.startsWith('/programs/') || pathname.startsWith('/initiatives/')
+  }
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
@@ -84,6 +86,7 @@ function NavRow({
   icon: Icon,
   active,
   nested,
+  compact,
   soon,
   nudge,
   accent = 'primary',
@@ -93,6 +96,7 @@ function NavRow({
   icon: React.ComponentType<{ className?: string }>
   active: boolean
   nested?: boolean
+  compact?: boolean
   soon?: boolean
   nudge?: boolean
   accent?: 'primary' | 'claim'
@@ -101,28 +105,26 @@ function NavRow({
   return (
     <Link
       to={to}
-      className={`relative flex items-center gap-2.5 rounded-xl transition-colors ${
-        nested ? 'px-3 py-2' : 'px-3 py-2.5'
+      className={`relative flex items-center rounded-lg transition-colors ${
+        compact ? 'gap-2 px-2.5 py-1.5' : nested ? 'gap-2.5 px-3 py-2' : 'gap-2.5 px-3 py-2.5'
       } ${active ? '' : 'hover:bg-gray-50'}`}
     >
       {active && (
         <>
-          <motion.span
-            layoutId={claim ? 'appSidebarShareTab' : 'appSidebarActiveTab'}
-            className={`absolute inset-0 rounded-xl ${claim ? 'bg-claim-50' : 'bg-primary-50'}`}
-            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-          />
-          <motion.span
-            layoutId={claim ? 'appSidebarShareBar' : 'appSidebarActiveBar'}
-            className={`absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full ${claim ? 'bg-claim-500' : 'bg-primary-600'}`}
-            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-          />
+          <span className={`absolute inset-0 rounded-lg ${
+            claim ? 'bg-claim-50' : compact ? 'bg-white shadow-sm' : 'bg-primary-50'
+          }`} />
+          {!compact && (
+            <span className={`absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full ${claim ? 'bg-claim-500' : 'bg-primary-600'}`} />
+          )}
         </>
       )}
-      <Icon className={`relative z-10 w-4 h-4 flex-shrink-0 ${
+      <Icon className={`relative z-10 flex-shrink-0 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${
         active ? (claim ? 'text-claim-700' : 'text-primary-800') : 'text-gray-400'
       }`} />
-      <span className={`relative z-10 flex-1 min-w-0 text-[13px] font-medium truncate ${active ? 'text-gray-900' : 'text-gray-600'}`}>
+      <span className={`relative z-10 flex-1 min-w-0 font-medium truncate ${
+        compact ? 'text-[12px]' : 'text-[13px]'
+      } ${active ? 'text-gray-900' : compact ? 'text-gray-500' : 'text-gray-600'}`}>
         {label}
       </span>
       {soon && (
@@ -136,7 +138,7 @@ function NavRow({
 }
 
 /**
- * Org-level sidebar for Home / Tracking / Share.
+ * Org-level sidebar: Home, Tracking (Programs + shared library), Share.
  * Hidden on mobile via `.desktop-sidebar` (the program page shows it too).
  */
 export default function AppSidebar({ user }: AppSidebarProps) {
@@ -164,16 +166,13 @@ export default function AppSidebar({ user }: AppSidebarProps) {
   const canEditShare = isOwner || isAdmin
   const needsPublicNudge = canEditShare && !!activeOrganization && !activeOrganization.is_public && !isDemoOrg
 
-  const trackingOpen =
-    pathname === '/tracking' ||
-    pathname.startsWith('/tracking/') ||
-    pathname.startsWith('/programs/') ||
-    pathname.startsWith('/initiatives/') ||
+  const programsOpen = pathActive(pathname, '/tracking/programs')
+  const libraryOpen =
     pathname.startsWith('/metrics') ||
     pathname === '/locations' ||
     pathname === '/tags' ||
-    pathname.startsWith('/tags/') ||
-    pathname.startsWith('/share/team')
+    pathname.startsWith('/tags/')
+  const trackingOpen = programsOpen || libraryOpen
   const contentOpen =
     !pathname.startsWith('/share/team') && (
       pathname === '/share' ||
@@ -231,6 +230,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 scrollbar-thin">
       <div className="pb-3 border-b border-gray-100" ref={orgMenuRef}>
+        <div className="h-9">
         {teamLoading ? (
           <div className="h-9 rounded-xl bg-gray-100 animate-pulse" />
         ) : hasMultipleOrgs ? (
@@ -279,69 +279,91 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             </span>
           </div>
         )}
+        </div>
 
-        {!teamLoading && activeOrganization && !isDemoOrg && (
-          <div className="mt-1 flex items-center gap-0.5 px-2.5">
-            <Link
-              to="/share/public"
-              className={`flex items-center gap-1.5 py-1 rounded-lg text-[11px] font-medium min-w-0 ${
-                activeOrganization.is_public ? 'text-impact-700' : 'text-amber-700'
-              }`}
+        <div className="mt-1 h-6 flex items-center gap-0.5 px-2.5">
+          {isDemoOrg && user.is_admin ? (
+            <button
+              type="button"
+              onClick={() => {
+                const realOrg = switcherOrganizations.find(o => o.role === 'owner') || switcherOrganizations[0]
+                if (realOrg) localStorage.setItem('nexus-active-org-id', realOrg.id)
+                else localStorage.removeItem('nexus-active-org-id')
+                window.location.href = '/admin/demos'
+              }}
+              className="flex items-center gap-1.5 text-[11px] font-medium text-purple-700"
             >
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOrganization.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
-              <span className="truncate">{activeOrganization.is_public ? 'Public page live' : 'Public page not live'}</span>
-            </Link>
-            {publicHref && (
-              <a
-                href={publicHref}
-                target="_blank"
-                rel="noreferrer"
-                title="Open public page"
-                className="p-1 rounded-md text-impact-600 hover:bg-impact-50 flex-shrink-0"
+              <FlaskConical className="w-3.5 h-3.5" />
+              Back to admin
+            </button>
+          ) : !teamLoading && activeOrganization && !isDemoOrg ? (
+            <>
+              <Link
+                to="/share/public"
+                className={`flex items-center gap-1.5 min-w-0 ${
+                  activeOrganization.is_public ? 'text-impact-700' : 'text-amber-700'
+                } text-[11px] font-medium`}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
-          </div>
-        )}
-
-        {isDemoOrg && user.is_admin && (
-          <button
-            type="button"
-            onClick={() => {
-              const realOrg = switcherOrganizations.find(o => o.role === 'owner') || switcherOrganizations[0]
-              if (realOrg) localStorage.setItem('nexus-active-org-id', realOrg.id)
-              else localStorage.removeItem('nexus-active-org-id')
-              window.location.href = '/admin/demos'
-            }}
-            className="mt-1 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-purple-700 hover:bg-purple-50"
-          >
-            <FlaskConical className="w-3.5 h-3.5" />
-            Back to admin
-          </button>
-        )}
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOrganization.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
+                <span className="truncate">{activeOrganization.is_public ? 'Public page live' : 'Public page not live'}</span>
+              </Link>
+              {publicHref && (
+                <a
+                  href={publicHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open public page"
+                  className="p-1 rounded-md text-impact-600 hover:bg-impact-50 flex-shrink-0"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="py-3">
-        <NavRow to="/" label="Home" icon={SoftHome} active={pathname === '/'} />
+        <NavRow to="/home" label="Home" icon={SoftHome} active={pathActive(pathname, '/home')} />
 
         <p className={`px-3 pt-5 pb-1.5 text-[13px] font-bold tracking-wide ${
           trackingOpen ? 'text-primary-800' : 'text-primary-700'
         }`}>
           Tracking
         </p>
-        <div className={`rounded-xl ${trackingOpen ? 'bg-gray-50/80' : ''}`}>
-          {TRACKING_ITEMS.map(item => (
-            <NavRow key={item.to} to={item.to} label={item.label} icon={item.icon} active={pathActive(pathname, item.to)} nested />
-          ))}
-          {canEditShare && (
-            <NavRow
-              to="/share/team"
-              label="Teams"
-              icon={Users}
-              active={pathActive(pathname, '/share/team')}
-              nested
-            />
+        <div>
+          <Link
+            to="/tracking/programs"
+            className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors ${programsOpen ? '' : 'hover:bg-gray-50'}`}
+          >
+            {programsOpen && (
+              <>
+                <span className="absolute inset-0 rounded-lg bg-primary-50" />
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-primary-600" />
+              </>
+            )}
+            <LayoutDashboard className={`relative z-10 w-4 h-4 flex-shrink-0 ${programsOpen ? 'text-primary-800' : 'text-gray-400'}`} />
+            <span className={`relative z-10 flex-1 min-w-0 text-[13px] font-medium truncate ${programsOpen ? 'text-gray-900' : 'text-gray-600'}`}>
+              Programs
+            </span>
+            <ChevronDown className={`relative z-10 w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+              trackingOpen ? 'text-gray-500 rotate-180' : 'text-gray-300'
+            }`} />
+          </Link>
+          {trackingOpen && (
+            <div className="mt-1.5 ml-8 mr-1.5 mb-1 rounded-xl bg-primary-50/50 p-1 space-y-0.5">
+              {LIBRARY_ITEMS.map(item => (
+                <NavRow
+                  key={item.to}
+                  to={item.to}
+                  label={item.label}
+                  icon={item.icon}
+                  active={pathActive(pathname, item.to)}
+                  nested
+                  compact
+                />
+              ))}
+            </div>
           )}
         </div>
 
@@ -351,7 +373,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
           Share
         </p>
         <div className={`rounded-xl ${contentOpen ? 'bg-claim-50/50' : ''}`}>
-          {CONTENT_ITEMS.filter(item => item.to !== '/share/embed' || canEditShare).map(item => (
+          {CONTENT_ITEMS.filter(item => item.to !== '/share/embed' || canEditShare || teamLoading).map(item => (
             <NavRow
               key={item.to}
               to={item.to}
@@ -388,6 +410,9 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             <GraduationCap className="w-4 h-4 text-gray-400 flex-shrink-0" />
             Tutorial
           </button>
+          {(canEditShare || teamLoading) && (
+            <NavRow to="/share/team" label="Teams" icon={Users} active={pathActive(pathname, '/share/team')} nested />
+          )}
           <NavRow to="/account" label="Settings" icon={Settings} active={pathActive(pathname, '/account')} nested />
         </div>
       </div>

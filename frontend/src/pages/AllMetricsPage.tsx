@@ -165,23 +165,25 @@ export default function AllMetricsPage() {
     }
   }
 
+  const addButton = canAddMetrics ? (
+    <button
+      type="button"
+      onClick={() => { setEditing(undefined); setShowModal(true) }}
+      className="app-btn app-btn-primary app-btn-sm"
+    >
+      <Plus className="w-4 h-4" />
+      New metric
+    </button>
+  ) : undefined
+
   return (
     <div className="min-h-screen app-canvas pt-8 pb-12 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
         <PageHeader
           title="Metrics"
-          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''} · shared across every program`}
+          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''}. Shared across programs. Create them here or from any program's Set up.`}
           help={<MetricsHelp />}
-          actions={canAddMetrics ? (
-            <button
-              type="button"
-              onClick={() => { setEditing(undefined); setShowModal(true) }}
-              className="app-btn app-btn-primary app-btn-sm"
-            >
-              <Plus className="w-4 h-4" />
-              New metric
-            </button>
-          ) : undefined}
+          actions={addButton}
         />
 
         <div className="relative max-w-sm mb-5">
@@ -203,7 +205,7 @@ export default function AllMetricsPage() {
             title={definitions.length === 0 ? 'No metrics yet' : `No metrics match "${search}"`}
             description={
               definitions.length === 0
-                ? 'Create a metric here and it becomes available to every program in your organization.'
+                ? 'Metrics are shared across programs. Create one here or attach it from a program\'s Set up.'
                 : undefined
             }
           />

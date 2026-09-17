@@ -130,6 +130,9 @@ interface BeneficiaryManagerProps {
  onRefresh?: () => void
  onStoryClick?: (storyId: string) => void
  onMetricClick?: (kpiId: string) => void
+ searchQuery?: string
+ addSignal?: number
+ hideHeader?: boolean
 }
 
 interface CreateGroupModalProps {
@@ -294,7 +297,7 @@ export function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiati
  )
 }
 
-export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiaryManagerProps) {
+export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryClick, onMetricClick, searchQuery = '', addSignal = 0, hideHeader }: BeneficiaryManagerProps) {
  const { canAddBeneficiaries, canEditBeneficiaries } = useTeam()
  const [groups, setGroups] = useState<BeneficiaryGroup[]>([])
  const [orderedGroups, setOrderedGroups] = useState<BeneficiaryGroup[]>([])
@@ -317,6 +320,12 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  .then(f => setGroupsLocked(!f.beneficiaryGroups))
  .catch(() => { /* fail open */ })
  }, [])
+
+ useEffect(() => {
+ if (!addSignal) return
+ if (groupsLocked) setShowUpgrade(true)
+ else setIsCreateModalOpen(true)
+ }, [addSignal, groupsLocked])
 
  // Initialize ordered groups from state, sorted by display_order
  useEffect(() => {
@@ -345,6 +354,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  const { active, over } = event
 
  if (!over || active.id === over.id) return
+ if (searchQuery.trim()) return
 
  const oldIndex = orderedGroups.findIndex((group) => group.id === active.id)
  const newIndex = orderedGroups.findIndex((group) => group.id === over.id)
@@ -486,6 +496,13 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  setIsDetailsModalOpen(true)
  }
 
+ const q = searchQuery.trim().toLowerCase()
+ const visibleGroups = q
+  ? orderedGroups.filter(g =>
+      g.name.toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q)
+    )
+  : orderedGroups
+
  if (loading) {
  return (
  <div className="app-card p-6">
@@ -499,7 +516,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
 
  return (
  <div className="h-full flex flex-col overflow-hidden space-y-4">
- {/* Header */}
+ {!hideHeader && (
  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
  Beneficiary groups ({orderedGroups.length})
@@ -514,6 +531,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  </button>
  )}
  </div>
+ )}
 
  {/* Free-plan lock banner: groups are preserved but read-only until upgrade */}
  {groupsLocked && groups.length > 0 && (
@@ -544,6 +562,10 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  )}
  </div>
  </div>
+ ) : visibleGroups.length === 0 ? (
+ <div className="flex-1 flex items-center justify-center">
+ <p className="text-gray-500 text-sm">No groups match that search</p>
+ </div>
  ) : (
  <DndContext
  sensors={sensors}
@@ -551,11 +573,11 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  onDragEnd={handleDragEnd}
  >
  <SortableContext
- items={orderedGroups.map(group => group.id!)}
+ items={visibleGroups.map(group => group.id!)}
  strategy={verticalListSortingStrategy}
  >
  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 flex-1 overflow-y-auto pr-1 min-w-0 content-start">
- {orderedGroups.map(group => {
+ {visibleGroups.map(group => {
  const locIds = derivedLocationIds[group.id!] || []
  const locationNames = locIds
  .map(id => locationsMap[id]?.name)

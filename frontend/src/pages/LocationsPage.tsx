@@ -84,6 +84,13 @@ export default function LocationsPage() {
 
   if (loading && locations.length === 0) return <PageLoader />
 
+  const addButton = canEditLocations ? (
+    <button type="button" onClick={() => setIsCreateOpen(true)} className="app-btn app-btn-primary app-btn-sm">
+      <Plus className="w-4 h-4" />
+      Add location
+    </button>
+  ) : undefined
+
   return (
     <motion.div
       className="min-h-screen lg:h-screen lg:overflow-hidden pt-6 pb-6 px-4 sm:px-6 lg:px-8 flex flex-col"
@@ -95,14 +102,9 @@ export default function LocationsPage() {
         <PageHeader
           className="mb-4 flex-shrink-0"
           title="Locations"
-          subtitle="Where the work happens, across every program."
+          subtitle="Shared across programs. Create them here or from any program's Set up."
           help={<LocationsHelp />}
-          actions={canEditLocations ? (
-            <button type="button" onClick={() => setIsCreateOpen(true)} className="app-btn app-btn-primary app-btn-sm">
-              <Plus className="w-4 h-4" />
-              Add location
-            </button>
-          ) : undefined}
+          actions={addButton}
         />
 
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -134,7 +136,7 @@ export default function LocationsPage() {
               ) : filtered.length === 0 ? (
                 <EmptyState
                   title={locations.length === 0 ? 'No locations yet' : 'No matches'}
-                  description={locations.length === 0 ? 'Add a place so metrics and evidence can sit on the map.' : undefined}
+                  description={locations.length === 0 ? 'Locations are shared across programs. Add one here or from a program\'s Set up.' : undefined}
                   action={locations.length === 0 && canEditLocations ? (
                     <button type="button" onClick={() => setIsCreateOpen(true)} className="app-btn app-btn-primary app-btn-sm">
                       Add location

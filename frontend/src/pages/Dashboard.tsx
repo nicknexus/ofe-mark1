@@ -9,7 +9,6 @@ import {
   Copy,
   MoreHorizontal,
   ChevronRight,
-  Clock,
 } from 'lucide-react'
 import {
  DndContext,
@@ -28,7 +27,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, InitiativeActivity } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, MetricTag, InitiativeActivity } from '../types'
 import { truncateText, formatRelativeTime } from '../utils'
 import { readSWR, writeSWR } from '../utils/swrCache'
 import { notify } from '../lib/notify'
@@ -42,7 +41,7 @@ import { Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
-import { Button, PageLoader, InlineAlert, EmptyState, PageHeader } from '../components/ui'
+import { Button, PageLoader, InlineAlert, PageHelpTip } from '../components/ui'
 import { InitiativesHelp } from '../components/tracking/TrackingHelp'
 import { easeOut, dropdownPop } from '../components/timeline/motion'
 import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
@@ -54,6 +53,27 @@ function prefetchProgram(id: string | undefined) {
   if (!id) return
   apiService.getInitiativeDashboard(id).catch(() => {})
   apiService.getInitiativeTimeline(id).catch(() => {})
+}
+
+function StatCount({
+  value,
+  label,
+  loading,
+}: {
+  value?: number
+  label: string
+  loading: boolean
+}) {
+  return (
+    <div className="flex-1 min-w-0 px-3 py-2.5">
+      {loading ? (
+        <span className="block h-7 w-8 rounded bg-gray-100 animate-pulse" />
+      ) : (
+        <p className="text-[1.65rem] font-semibold tabular-nums text-secondary-900 leading-none tracking-tight">{value ?? 0}</p>
+      )}
+      <p className="mt-1.5 text-[11px] font-medium text-secondary-400">{label}</p>
+    </div>
+  )
 }
 
 // ============ Sortable initiative card ============
@@ -74,7 +94,6 @@ function SortableInitiativeCard({
   locked = false,
   onLockedClick,
   orgLogoUrl,
-  size = 'compact',
 }: {
   initiative: Initiative
   /** Per-initiative counts; null while background stats are still loading. */
@@ -89,10 +108,7 @@ function SortableInitiativeCard({
   openDuplicate: (i: Initiative) => void
   locked?: boolean
   onLockedClick?: () => void
-  /** Organization logo; falls back to the Nexus mark when absent. */
   orgLogoUrl?: string | null
-  /** 'large' when the org has only a few programs (2-col grid). */
-  size?: 'compact' | 'large'
 }) {
   const {
     attributes,
@@ -125,10 +141,8 @@ function SortableInitiativeCard({
 
   const ready = !!stats && stats.metrics > 0 && stats.locations > 0
   const hasMenu = !locked && (canEditInitiatives || canDeleteInitiatives)
-  const large = size === 'large'
   const stop = (e: React.SyntheticEvent) => { e.preventDefault(); e.stopPropagation() }
 
-  // One line that says whether this program is alive.
   const activityLine = (() => {
     if (activity === undefined) return null
     if (!activity || (activity.claims === 0 && activity.evidence === 0)) return { text: 'No logs yet', quiet: true }
@@ -138,104 +152,84 @@ function SortableInitiativeCard({
     ].filter(Boolean).join(', ')
     return { text: `Last log ${activity.last_log_at ? formatRelativeTime(activity.last_log_at) : ''}`.trim(), detail: parts, quiet: false }
   })()
-
-  // Four numbers that describe the program at a glance. Structure counts come
-  // from the org-wide lists, log counts from /initiatives/activity. Missing
-  // structure reads amber so "what's not set up" is visible without a chip.
-  const statTiles: Array<{ label: string; value: number | null; warn: boolean }> = [
-    { label: 'Metrics', value: stats ? stats.metrics : null, warn: !!stats && stats.metrics === 0 },
-    { label: 'Locations', value: stats ? stats.locations : null, warn: !!stats && stats.locations === 0 },
-    { label: 'Claims', value: activity === undefined ? null : (activity?.claims ?? 0), warn: false },
-    { label: 'Evidence', value: activity === undefined ? null : (activity?.evidence ?? 0), warn: false },
-  ]
+  const statsLoading = stats === null
 
   const inner = (
-    <div className={`${large ? 'p-5 gap-4' : 'p-4 gap-3.5'} h-full flex flex-col`}>
-      {/* Identity row. The chevron is the "this opens" affordance: always
-          visible, slides right on hover. */}
-      <div className={`flex items-start gap-3 ${hasMenu ? 'pr-8' : ''}`}>
-        {locked ? (
-          <div className={`${large ? 'w-12 h-12' : 'w-10 h-10'} rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100`}>
+    <div className={`h-full min-h-[17.5rem] px-5 pt-5 pb-4 flex flex-col ${hasMenu ? 'pr-11' : ''}`}>
+      <div className="flex items-start gap-3.5 min-w-0">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${
+          locked
+            ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+            : 'bg-white ring-1 ring-gray-200/80 shadow-card'
+        }`}>
+          {locked ? (
             <Lock className="w-4 h-4" />
-          </div>
-        ) : (
-          <div className={`${large ? 'w-12 h-12' : 'w-10 h-10'} rounded-xl flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-200/80 shadow-card overflow-hidden`}>
+          ) : (
             <img
               src={orgLogoUrl || '/Nexuslogo.png'}
               alt=""
               className="w-full h-full object-contain p-1"
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
             />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <h3 className={`${large ? 'text-base' : 'text-[15px]'} font-semibold leading-snug line-clamp-1 tracking-tight transition-colors ${locked ? 'text-gray-500' : 'text-gray-900 group-hover:text-primary-800'}`} title={initiative.title}>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1 min-w-0">
+            <h3
+              className={`text-[17px] font-semibold leading-snug line-clamp-2 tracking-tight ${
+                locked ? 'text-secondary-400' : 'text-secondary-900 group-hover:text-primary-800'
+              }`}
+              title={initiative.title}
+            >
               {initiative.title}
             </h3>
             {!locked && (
-              <ChevronRight className="w-4 h-4 flex-shrink-0 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" aria-hidden />
+              <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" aria-hidden />
             )}
           </div>
-          <p className={`text-xs text-gray-500 mt-0.5 leading-relaxed ${large ? 'line-clamp-2' : 'line-clamp-2'}`}>
-            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, large ? 150 : 110)}
+          <p className="text-[13px] text-secondary-500 mt-1.5 leading-relaxed line-clamp-2">
+            {locked ? 'Locked. Upgrade to unlock this program.' : truncateText(initiative.description, 140)}
           </p>
         </div>
       </div>
 
-      {/* Stats grid */}
-      {!locked && (
-        <div className="grid grid-cols-4 gap-1.5">
-          {statTiles.map(t => (
-            <div
-              key={t.label}
-              className={`rounded-lg px-2 py-1.5 ring-1 ${t.warn ? 'bg-amber-50 ring-amber-100' : 'bg-gray-50/80 ring-gray-100'}`}
-            >
-              {t.value === null ? (
-                <span className="block h-5 w-8 rounded bg-gray-200/70 animate-pulse" />
-              ) : (
-                <span className={`block ${large ? 'text-lg' : 'text-base'} font-semibold tabular-nums leading-none ${t.warn ? 'text-amber-700' : 'text-gray-900'}`}>
-                  {t.value}
-                </span>
-              )}
-              <span className={`block text-[10px] font-medium uppercase tracking-wide mt-1 ${t.warn ? 'text-amber-600' : 'text-gray-400'}`}>
-                {t.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Footer: last activity (left), Set up (right). */}
-      <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between gap-3 min-w-0">
+      <div className="mt-auto pt-5">
         {locked ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
-            <Lock className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700">
+            <Lock className="w-4 h-4" />
             Locked
           </span>
         ) : (
-          <>
-            {activityLine ? (
-              <span className={`inline-flex items-center gap-1 text-[11px] font-medium min-w-0 truncate ${activityLine.quiet ? 'text-gray-400' : 'text-gray-600'}`} title={activityLine.detail}>
-                <Clock className="w-3 h-3 flex-shrink-0" /> {activityLine.text}
+          <div className="flex rounded-xl bg-gray-50 ring-1 ring-gray-100 overflow-hidden">
+            <StatCount value={stats?.metrics} label={stats?.metrics === 1 ? 'metric' : 'metrics'} loading={statsLoading} />
+            <div className="w-px bg-gray-200/80 my-2.5" />
+            <StatCount value={stats?.locations} label={stats?.locations === 1 ? 'location' : 'locations'} loading={statsLoading} />
+          </div>
+        )}
+        <div className="mt-3.5 flex items-center justify-between gap-3 min-w-0">
+          {!locked && (
+            activityLine ? (
+              <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium min-w-0 truncate ${activityLine.quiet ? 'text-secondary-400' : 'text-secondary-600'}`} title={activityLine.detail}>
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activityLine.quiet ? 'bg-gray-300' : 'bg-impact-500'}`} />
+                {activityLine.text}
               </span>
             ) : (
               <span className="block h-3.5 w-24 rounded bg-gray-100 animate-pulse" />
-            )}
-            {canEditInitiatives && (
-              <button
-                type="button"
-                onClick={(e) => { stop(e); openSetup(initiative) }}
-                title={ready ? 'Metrics, tags, locations, groups' : 'Finish setting up this program'}
-                className={`app-btn app-btn-sm flex-shrink-0 ${ready
-                  ? 'app-btn-secondary'
-                  : 'app-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'}`}
-              >
-                <Settings2 className="w-3.5 h-3.5" /> Set up
-              </button>
-            )}
-          </>
-        )}
+            )
+          )}
+          {!locked && canEditInitiatives && (
+            <button
+              type="button"
+              onClick={(e) => { stop(e); openSetup(initiative) }}
+              title={ready || !stats ? 'Metrics, tags, locations, groups' : 'Finish setting up this program'}
+              className={`app-btn app-btn-sm flex-shrink-0 ${stats && !ready
+                ? 'app-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'
+                : 'app-btn-secondary'}`}
+            >
+              <Settings2 className="w-3.5 h-3.5" /> Set up
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -244,10 +238,13 @@ function SortableInitiativeCard({
     <div ref={setNodeRef} style={style} className="h-full">
       <div
         className={`group relative h-full ${locked
-          ? 'app-tile-static transition-all duration-200 hover:border-amber-300/70 hover:shadow-card-hover'
-          : 'app-tile'
+          ? 'app-tile-static shadow-card-lg transition-all duration-200 hover:border-amber-300/70 hover:shadow-card-hover'
+          : 'app-tile shadow-card-lg'
         } ${menuOpen ? 'z-20' : ''}`}
       >
+        {!locked && (
+          <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-primary-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        )}
         {locked ? (
           <button type="button" onClick={onLockedClick} className="block w-full h-full text-left">
             {inner}
@@ -349,7 +346,6 @@ function MenuItem({ icon: Icon, label, onClick, tone = 'default' }: {
   )
 }
 
-/** Amber "fix this" chip shown only while something required is missing. */
 export default function Dashboard() {
  const [searchParams, setSearchParams] = useSearchParams()
  const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
@@ -373,6 +369,7 @@ export default function Dashboard() {
  const [initiatives, setInitiatives] = useState<Initiative[]>([])
  const [allKPIs, setAllKPIs] = useState<KPI[]>([])
  const [allLocations, setAllLocations] = useState<Location[]>([])
+ const [allTags, setAllTags] = useState<MetricTag[]>([])
  // Organization info now comes from TeamContext
  const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
  const [isLoadingStats, setIsLoadingStats] = useState(true)
@@ -418,6 +415,7 @@ export default function Dashboard() {
  if (cached && cached.length) setLoadingState({ isLoading: false })
  setAllKPIs([])
  setAllLocations([])
+ setAllTags([])
  setIsLoadingStats(true)
  // Drop any in-flight promise from the previous org so loadAllData's
  // dedupe guard doesn't return the old promise to the new effect.
@@ -550,15 +548,17 @@ export default function Dashboard() {
  .catch(() => { /* non-fatal */ })
 
  // Load KPIs, evidence, and locations in background
- const [{ kpis }, locations, groups] = await Promise.all([
+ const [{ kpis }, locations, groups, tags] = await Promise.all([
         apiService.loadKPIsAndEvidence(),
-        apiService.getLocations(), // Get all locations across all initiatives
+        apiService.getLocations(),
         apiService.getBeneficiaryGroups().catch(() => []),
+        apiService.getMetricTags().catch(() => [] as MetricTag[]),
       ])
       if (isStale()) return
       setAllKPIs(kpis)
       setAllLocations(locations)
       setAllGroups(groups || [])
+      setAllTags(tags || [])
       setIsLoadingStats(false)
       apiService.getInitiativeActivity().then(setActivity).catch(() => setActivity({}))
 
@@ -750,8 +750,14 @@ export default function Dashboard() {
     return map
   }, [initiatives, allKPIs, allLocations, allGroups])
 
-  // A handful of programs gets roomier two-column cards; a long list stays compact.
-  const largeCards = initiatives.length <= 4
+  const latestLogAt = useMemo(() => {
+    if (!activity) return null
+    return Object.values(activity).reduce<string | null>((best, a) => {
+      if (!a.last_log_at) return best
+      if (!best || a.last_log_at > best) return a.last_log_at
+      return best
+    }, null)
+  }, [activity])
 
 
  if (loadingState.isLoading) {
@@ -779,37 +785,70 @@ export default function Dashboard() {
  return (
  <>
  <motion.div
- className="min-h-screen pt-8 pb-10 px-4 sm:px-6 lg:px-8"
+ className="min-h-screen pt-10 pb-12 px-4 sm:px-6 lg:px-8"
  initial={{ opacity: 0, y: 8 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ duration: 0.35, ease: easeOut }}
  >
  <div className="max-w-6xl mx-auto">
- <PageHeader
- title={isSharedMember ? 'Team programs' : 'Programs'}
- subtitle={isSharedMember && organizationName
- ? `Team · ${organizationName}`
- : 'Set up metrics and locations here, then log claims and evidence.'}
- help={<InitiativesHelp />}
- actions={canCreateInitiatives ? (
- <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary app-btn-sm">
- <Plus className="w-4 h-4" />
- New program
- </button>
- ) : undefined}
- />
+ <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8 pb-6 border-b border-gray-200/70">
+   <div className="min-w-0">
+     <div className="flex items-center gap-2.5 mb-2.5">
+       {dashboardOrg?.logo_url && (
+         <span className="w-7 h-7 rounded-lg overflow-hidden bg-white ring-1 ring-gray-200/80 shadow-card flex-shrink-0">
+           <img src={dashboardOrg.logo_url} alt="" className="w-full h-full object-contain" />
+         </span>
+       )}
+       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-800">
+         {isSharedMember && organizationName ? `Team · ${organizationName}` : 'Tracking'}
+       </p>
+     </div>
+     <div className="flex items-center gap-2 min-w-0">
+       <h1 className="app-page-title text-[1.75rem] sm:text-[1.85rem]">
+         {isSharedMember ? 'Team programs' : 'Programs'}
+       </h1>
+       <PageHelpTip label="Programs"><InitiativesHelp /></PageHelpTip>
+     </div>
+     <p className="mt-2.5 text-sm text-secondary-500">
+       {latestLogAt
+         ? `Last activity ${formatRelativeTime(latestLogAt)}.`
+         : 'Open a program to log claims, evidence, and stories.'}
+     </p>
+   </div>
+   <div className="flex items-center gap-3 flex-shrink-0">
+     {initiatives.length > 0 && (
+       <div className="hidden sm:flex items-baseline gap-1.5 px-3 py-2 rounded-xl bg-white border border-gray-200/80 shadow-card">
+         <span className="text-xl font-semibold leading-none text-secondary-900 tabular-nums">{initiatives.length}</span>
+         <span className="text-[11px] font-medium text-secondary-400">
+           {initiatives.length === 1 ? 'program' : 'programs'}
+         </span>
+       </div>
+     )}
+     {canCreateInitiatives && (
+       <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary">
+         <Plus className="w-4 h-4" />
+         New program
+       </button>
+     )}
+   </div>
+ </div>
 
  {initiatives.length === 0 ? (
- <div className="app-card p-10">
- <EmptyState
- title="No programs yet"
- description="Create one to start tracking metrics, locations, and evidence."
- action={canCreateInitiatives ? (
- <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary">
- Create program
- </button>
- ) : undefined}
- />
+ <div className="relative overflow-hidden app-card px-8 py-16 sm:py-20 text-center">
+   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-200 via-primary-500 to-primary-200" />
+   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-800">Start here</p>
+   <h2 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-secondary-900">
+     Your first program
+   </h2>
+   <p className="mt-3 text-sm text-secondary-500 max-w-md mx-auto leading-relaxed">
+     A program is the work you prove. Attach metrics and locations, then log what happened.
+   </p>
+   {canCreateInitiatives && (
+     <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary mt-7">
+       <Plus className="w-4 h-4" />
+       Create program
+     </button>
+   )}
  </div>
  ) : (
  <DndContext
@@ -821,14 +860,13 @@ export default function Dashboard() {
  items={initiatives.map(i => i.id!).filter(Boolean)}
  strategy={rectSortingStrategy}
  >
- <div className={`grid grid-cols-1 md:grid-cols-2 ${largeCards ? 'gap-4' : 'xl:grid-cols-3 gap-3'}`}>
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  {initiatives.map((initiative) => (
  <SortableInitiativeCard
  key={initiative.id}
  initiative={initiative}
- size={largeCards ? 'large' : 'compact'}
  activity={activity === null ? undefined : (initiative.id ? activity[initiative.id] ?? null : null)}
- stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0, tags: 0, groups: 0 }}
+                      stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0, tags: 0, groups: 0 }}
                       canEditInitiatives={canEditInitiatives}
                       canDeleteInitiatives={canDelete}
                       openEditModal={openEditModal}
@@ -844,10 +882,10 @@ export default function Dashboard() {
  <button
  type="button"
  onClick={() => setShowCreateModal(true)}
- className="min-h-[9.5rem] flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
+ className="group h-full min-h-[17.5rem] flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-gray-300 bg-white text-secondary-500 hover:text-primary-800 hover:border-primary-300 hover:bg-primary-50/40 transition-colors"
  >
  <Plus className="w-4 h-4" />
- New program
+ <span className="text-sm font-semibold">New program</span>
  </button>
  )}
  </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { MapPin, Plus, Edit, Trash2, AlertCircle, GripVertical, Link2Off } from 'lucide-react'
+import { MapPin, Plus, Edit, Trash2, AlertCircle, GripVertical, Link2Off, Search, X } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Location } from '../../types'
 import { apiService } from '../../services/api'
@@ -169,6 +169,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
  const [unlinkConfirmId, setUnlinkConfirmId] = useState<string | null>(null)
+ const [searchQuery, setSearchQuery] = useState('')
  const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
  // Initialize ordered locations from state, sorted by display_order
@@ -198,6 +199,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  const { active, over } = event
 
  if (!over || active.id === over.id) return
+ if (searchQuery.trim()) return
 
  const oldIndex = orderedLocations.findIndex((loc) => loc.id === active.id)
  const newIndex = orderedLocations.findIndex((loc) => loc.id === over.id)
@@ -351,6 +353,13 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  setIsDetailsModalOpen(true)
  }
 
+ const q = searchQuery.trim().toLowerCase()
+ const visibleLocations = q
+  ? orderedLocations.filter(l =>
+      l.name.toLowerCase().includes(q) || (l.country || '').toLowerCase().includes(q)
+    )
+  : orderedLocations
+
  if (loading) {
  return <PageLoader />
  }
@@ -369,19 +378,35 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  return (
  <div className="h-full overflow-hidden flex flex-col mobile-content-padding">
  {/* Header */}
- <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
- <div className="flex items-center justify-between gap-3">
- <div className="min-w-0">
- <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Locations</h2>
- <p className="text-sm text-gray-500 mt-1 hidden sm:block">Manage geographic locations for your program</p>
+ <div className="px-4 sm:px-6 pt-2.5 pb-2 border-b border-gray-100 bg-white flex-shrink-0">
+ <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
+ <div className="relative flex-1 min-w-[140px] max-w-sm">
+ <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+ <input
+ type="text"
+ value={searchQuery}
+ onChange={(e) => setSearchQuery(e.target.value)}
+ placeholder="Search locations"
+ className="w-full h-8 pl-9 pr-8 bg-white border border-gray-200 rounded-full text-xs md:text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+ />
+ {searchQuery && (
+ <button
+ type="button"
+ onClick={() => setSearchQuery('')}
+ className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+ aria-label="Clear search"
+ >
+ <X className="w-3.5 h-3.5" />
+ </button>
+ )}
  </div>
  {canEditLocations && (
  <button
  onClick={handleAddClick}
- className="app-btn app-btn-primary app-btn-lg shadow-sm flex-shrink-0"
+ className="app-btn app-btn-sm app-btn-primary shadow-sm ml-auto flex-shrink-0"
  >
- <Plus className="w-5 h-5" />
- <span className="hidden sm:inline">Add Location</span>
+ <Plus className="w-4 h-4" />
+ <span className="hidden sm:inline">Add location</span>
  <span className="sm:hidden">Add</span>
  </button>
  )}
@@ -389,7 +414,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  </div>
 
  {/* Main Content */}
- <div className="flex-1 bg-gray-50 px-4 sm:px-6 py-4 overflow-hidden min-h-0">
+ <div className="flex-1 bg-gray-50 px-4 sm:px-6 pt-2.5 pb-4 overflow-hidden min-h-0">
  <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
  {/* Map - 2/3 width - hidden on mobile */}
  <div className="lg:col-span-2 rounded-2xl border border-gray-200/70 bg-white shadow-card p-3 overflow-hidden flex-col min-h-0 h-full hidden md:flex">
@@ -412,20 +437,20 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
 
  {/* Location List - 1/3 width on desktop, full width on mobile */}
  <div className="col-span-1 lg:col-span-1 rounded-2xl border border-gray-200/70 bg-white shadow-card p-4 overflow-hidden flex flex-col min-h-0 h-full">
- <div className="mb-3 flex-shrink-0">
- <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
- All locations ({orderedLocations.length})
+ <div className="mb-2 flex-shrink-0">
+ <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+ {q ? `${visibleLocations.length} of ${orderedLocations.length}` : `${orderedLocations.length} location${orderedLocations.length === 1 ? '' : 's'}`}
  </h3>
- <p className="text-xs text-gray-400 hidden sm:block">Click a location to view details • Edit button opens editor</p>
- <p className="text-xs text-gray-400 sm:hidden">Tap a location for details</p>
  </div>
 
  <div className="flex-1 overflow-y-auto space-y-2 min-h-0 scrollbar-thin">
- {orderedLocations.length === 0 ? (
+ {visibleLocations.length === 0 ? (
  <div className="text-center py-8">
  <div className="app-icon-tile mx-auto mb-3">
  <MapPin className="w-5 h-5 text-gray-400" />
  </div>
+ {orderedLocations.length === 0 ? (
+ <>
  <p className="text-gray-500 text-sm mb-3">No locations yet</p>
  <button
  onClick={handleAddClick}
@@ -433,6 +458,10 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  >
  Add your first location
  </button>
+ </>
+ ) : (
+ <p className="text-gray-500 text-sm">No locations match that search</p>
+ )}
  </div>
  ) : (
  <DndContext
@@ -441,10 +470,10 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  onDragEnd={handleDragEnd}
  >
  <SortableContext
- items={orderedLocations.map(loc => loc.id!)}
+ items={visibleLocations.map(loc => loc.id!)}
  strategy={verticalListSortingStrategy}
  >
- {orderedLocations.map((location) => (
+ {visibleLocations.map((location) => (
  <SortableLocationCard
  key={location.id}
  location={location}

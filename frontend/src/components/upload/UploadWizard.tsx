@@ -200,7 +200,7 @@ function stateFromClaimScope(claim?: TimelineClaim): Partial<WizardState> {
     kind: 'evidence',
     evidenceKpiIds: claim.kpi_id ? [claim.kpi_id] : [],
     locationIds: claim.location_id ? [claim.location_id] : [],
-    tagIds: (claim as any).tag_id ? [(claim as any).tag_id] : [],
+    tagIds: claim.tag_id ? [claim.tag_id] : [],
     beneficiaryGroupIds: claim.beneficiary_group_ids || [],
     dateMode: isRange ? 'range' : 'single',
     dateSingle: isRange ? '' : (claim.date_represented || ''),
@@ -727,11 +727,20 @@ export default function UploadWizard({
  initiative_id: initiativeId,
  location_ids: state.locationIds,
  kpi_ids: state.kind === 'both' ? claimedKpiIds : state.evidenceKpiIds,
- // Explicit links to the claims created moments ago (the auto-matcher
- // would also catch them — belt and braces against clock skew).
- kpi_update_ids: createdClaimIds.length > 0 ? createdClaimIds : undefined,
- tag_ids: state.tagIds,
- beneficiary_group_ids: state.beneficiaryGroupIds,
+ // Pin a claim when this wizard was opened from "Add evidence" on it.
+ // Explicit links to claims created in this save (both-mode).
+ kpi_update_ids: [
+   ...(evidenceForClaim?.id ? [evidenceForClaim.id] : []),
+   ...createdClaimIds,
+ ].filter((id, i, all) => all.indexOf(id) === i),
+ tag_ids: [
+   ...state.tagIds,
+   ...(evidenceForClaim?.tag_id ? [evidenceForClaim.tag_id] : []),
+ ].filter((id, i, all) => all.indexOf(id) === i),
+ beneficiary_group_ids: [
+   ...state.beneficiaryGroupIds,
+   ...(evidenceForClaim?.beneficiary_group_ids || []),
+ ].filter((id, i, all) => all.indexOf(id) === i),
  file_url: fileUrls[0],
  file_urls: fileUrls,
  file_sizes: fileSizes,
@@ -1014,6 +1023,7 @@ export default function UploadWizard({
  beneficiaryGroups={beneficiaryGroups}
  existingClaims={existingClaims}
  existingEvidence={existingEvidence}
+ pinClaim={evidenceForClaim}
  />
  </>
  )}
