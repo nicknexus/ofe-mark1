@@ -23,16 +23,23 @@ import {
  MetricTag,
  MetricDefinitionWithUsage,
  CreateMetricDefinitionForm,
-    TimelineResponse,
-    ConnectEvidenceResult,
-    ProgramTemplate,
-    StructureSummary,
-    ProgramReadiness,
-  InitiativeActivity,
-    MatchPreviewScope,
-    MatchPreviewResult,
-    EvidenceMatchDiagnostics,
-    ClaimMatchDiagnostics
+ TimelineResponse,
+ ConnectEvidenceResult,
+ ProgramTemplate,
+ StructureSummary,
+ ProgramReadiness,
+ InitiativeActivity,
+ MatchPreviewScope,
+ MatchPreviewResult,
+ EvidenceMatchDiagnostics,
+ ClaimMatchDiagnostics,
+ ContentCopy,
+ ContentPost,
+ ContentPostFormat,
+ ContentPostKind,
+ ContentSource,
+ ContentSourceType,
+ GraphicLayout,
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
@@ -1448,6 +1455,88 @@ class ApiService {
  return this.request<OnboardingChatResponse>('/onboarding/chat', {
  method: 'POST',
  body: JSON.stringify({ messages, stage, context })
+ })
+ }
+
+ async getContentSources(opts?: {
+ offset?: number
+ limit?: number
+ source_type?: ContentSourceType | 'all'
+ singleDate?: string
+ startDate?: string
+ endDate?: string
+ }): Promise<{ sources: ContentSource[]; has_more: boolean }> {
+ const params = new URLSearchParams()
+ if (opts?.offset) params.set('offset', String(opts.offset))
+ if (opts?.limit) params.set('limit', String(opts.limit))
+ if (opts?.source_type && opts.source_type !== 'all') params.set('source_type', opts.source_type)
+ if (opts?.singleDate) params.set('single_date', opts.singleDate)
+ if (opts?.startDate) params.set('start_date', opts.startDate)
+ if (opts?.endDate) params.set('end_date', opts.endDate)
+ const qs = params.toString()
+ return this.request<{ sources: ContentSource[]; has_more: boolean }>(`/content/sources${qs ? `?${qs}` : ''}`)
+ }
+
+ async getContentPosts(): Promise<ContentPost[]> {
+ return this.request<ContentPost[]>('/content/posts')
+ }
+
+ async createContentPost(input: {
+ kind: ContentPostKind
+ format?: ContentPostFormat
+ source_type: ContentSourceType
+ source_id: string
+ caption?: string | null
+ email_subject?: string | null
+ email_body?: string | null
+ }): Promise<ContentPost> {
+ return this.request<ContentPost>('/content/posts', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async updateContentPost(id: string, patch: Partial<Pick<ContentPost, 'caption' | 'email_subject' | 'email_body' | 'kind' | 'format'>>): Promise<ContentPost> {
+ return this.request<ContentPost>(`/content/posts/${id}`, {
+ method: 'PATCH',
+ body: JSON.stringify(patch),
+ })
+ }
+
+ async deleteContentPost(id: string): Promise<void> {
+ await this.request(`/content/posts/${id}`, { method: 'DELETE' })
+ }
+
+ async getContentImageFile(source_type: ContentSourceType, source_id: string, title: string): Promise<File> {
+ return this.fetchContentFile(`/api/content/image?${new URLSearchParams({ source_type, source_id })}`, title, 'image/jpeg')
+ }
+
+ async getContentGraphicFile(source_type: ContentSourceType, source_id: string, title: string, layout: GraphicLayout = 'clean'): Promise<File> {
+ return this.fetchContentFile(`/api/content/graphic?${new URLSearchParams({ source_type, source_id, layout })}`, title, 'image/png')
+ }
+
+ private async fetchContentFile(path: string, title: string, fallbackType: string): Promise<File> {
+ const headers = await this.getAuthHeaders()
+ const response = await fetch(`${API_BASE_URL}${path}`, { headers })
+ if (!response.ok) {
+ let message = 'Could not download photo'
+ try {
+ const err = await response.json()
+ message = err.error || err.message || message
+ } catch { /* ignore */ }
+ throw new Error(message)
+ }
+ const blob = await response.blob()
+ const type = blob.type && blob.type !== 'application/octet-stream' ? blob.type : fallbackType
+ const ext = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : 'jpg'
+ const base = title.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'impact-photo'
+ return new File([blob], `${base}.${ext}`, { type })
+ }
+
+ async generateContentCopy(source_type: ContentSourceType, source_id: string): Promise<ContentCopy> {
+ return this.request<ContentCopy>('/content/generate-copy', {
+ method: 'POST',
+ body: JSON.stringify({ source_type, source_id }),
  })
  }
 

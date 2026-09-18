@@ -27,6 +27,7 @@ import adminRoutes from './routes/admin';
 import metricTagRoutes from './routes/metricTags';
 import metricDefinitionRoutes from './routes/metricDefinitions';
 import onboardingRoutes from './routes/onboarding';
+import contentRoutes from './routes/content';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 import { auditSupportWrites } from './middleware/supportMode';
@@ -205,6 +206,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/metric-tags', metricTagRoutes);
 app.use('/api/metric-definitions', metricDefinitionRoutes);
 app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/content', contentRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

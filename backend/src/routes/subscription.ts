@@ -201,6 +201,7 @@ function getFeaturesByPlan(
         { name: plan.ai_reports_per_day === null ? 'Unlimited AI reports' : `${plan.ai_reports_per_day} AI report/day`, included: true },
         { name: 'Metric tags / themes', included: plan.features.tags },
         { name: 'Beneficiary groups', included: plan.features.beneficiaryGroups },
+        { name: 'Impact content studio', included: plan.features.contentStudio },
     ];
 }
 

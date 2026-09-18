@@ -652,16 +652,22 @@ export class SubscriptionService {
 
     /**
      * Feature access for the user's active org, derived from the owner's plan tier.
-     * Currently only Free restricts tags + beneficiary groups.
+     * Currently Free restricts tags, beneficiary groups, and content studio.
      */
     static async getFeatureAccess(userId: string, requestedOrgId?: string): Promise<{
         tier: PlanTier;
         tags: boolean;
         beneficiaryGroups: boolean;
+        contentStudio: boolean;
     }> {
         const { subscription } = await this.resolveActiveOrg(userId, requestedOrgId);
         const plan = getPlan(subscription.plan_tier);
-        return { tier: plan.tier, tags: plan.features.tags, beneficiaryGroups: plan.features.beneficiaryGroups };
+        return {
+            tier: plan.tier,
+            tags: plan.features.tags,
+            beneficiaryGroups: plan.features.beneficiaryGroups,
+            contentStudio: plan.features.contentStudio,
+        };
     }
 
     /** Locations usage (org-scoped count vs the owner plan's limit). */
