@@ -278,7 +278,7 @@ export default function InitiativePage() {
 
   // Optimistic while the dashboard payload is still in flight so the primary
   // action is never greyed out during the first paint.
-  const setupReady = !dashboard || dashboard.kpis.length > 0
+  const setupReady = canAddEvidence || !dashboard || dashboard.kpis.length > 0
 
   // ── Body ───────────────────────────────────────────────────────────────
 
@@ -334,7 +334,7 @@ export default function InitiativePage() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'logs':
-        return <TimelineTab initiativeId={id!} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} hideHeader />
+        return <TimelineTab initiativeId={id!} programTitle={initiative?.title} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} hideHeader />
       case 'location':
         return <LocationTab onStoryClick={openStory} onMetricClick={handleMetricCardClick} />
       case 'beneficiaries':
@@ -496,8 +496,12 @@ export default function InitiativePage() {
       {addLogOpen && (
         <UploadWizardLauncher
           initiativeId={id!}
+          programTitle={initiative.title}
           onClose={() => setAddLogOpen(false)}
-          onCreated={refreshAfterChange}
+          onCreated={() => {
+            refreshAfterChange()
+            handleTabChange('logs')
+          }}
         />
       )}
 

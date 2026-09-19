@@ -5,9 +5,12 @@ import { useTeam } from '../../context/TeamContext'
 import { BeneficiaryGroup, Location, MetricTag, TimelineResponse } from '../../types'
 import { PageLoader } from '../ui'
 import UploadWizard from './UploadWizard'
+import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
+import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 
 interface UploadWizardLauncherProps {
  initiativeId: string
+ programTitle?: string
  onClose: () => void
  onCreated?: () => void
 }
@@ -16,15 +19,16 @@ interface UploadWizardLauncherProps {
  * Self-fetching wrapper around the full-screen UploadWizard for entry points
  * that don't already hold the Timeline payload (the mobile + button, quick
  * actions). Loads everything the wizard needs, then hands over.
- * Mobile-only: no Advanced claim board / evidence batch paths.
+ * Uses the same capture form and optional bulk tools as the Logs page.
  */
-export default function UploadWizardLauncher({ initiativeId, onClose, onCreated }: UploadWizardLauncherProps) {
+export default function UploadWizardLauncher({ initiativeId, programTitle, onClose, onCreated }: UploadWizardLauncherProps) {
  const { canAddImpactClaims, canAddEvidence, canEditMetrics } = useTeam()
  const [data, setData] = useState<TimelineResponse | null>(null)
  const [locations, setLocations] = useState<Location[]>([])
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
  const [tags, setTags] = useState<MetricTag[]>([])
  const [loading, setLoading] = useState(true)
+ const [bulk, setBulk] = useState<'claim' | 'evidence' | null>(null)
 
  useEffect(() => {
  let cancelled = false
@@ -57,11 +61,17 @@ export default function UploadWizardLauncher({ initiativeId, onClose, onCreated 
  )
  }
 
+ if (bulk === 'claim') return <ImpactClaimUploadModal isOpen initiativeId={initiativeId} onClose={onClose} onCreated={onCreated || (() => {})} />
+ if (bulk === 'evidence') return <EvidenceUploadModal isOpen initiativeId={initiativeId} onClose={onClose} onCreated={onCreated || (() => {})} />
+
  return (
  <UploadWizard
  initiativeId={initiativeId}
+ programTitle={programTitle}
  canCreateClaim={canAddImpactClaims}
  canCreateEvidence={canAddEvidence}
+ onAdvancedClaim={canAddImpactClaims ? () => setBulk('claim') : undefined}
+ onAdvancedEvidence={canAddEvidence ? () => setBulk('evidence') : undefined}
  kpis={data.kpis}
  locations={locations}
  tags={tags}

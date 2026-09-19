@@ -2,7 +2,7 @@ import { Evidence } from '../../types'
 
 export type WizardKind = 'evidence' | 'claim' | 'both'
 
-export type WizardStepId = 'type' | 'mode' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
+export type WizardStepId = 'entry' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
 
 export interface WizardFile {
  /** uploadId from the upload manager. */
@@ -35,6 +35,8 @@ export interface ClaimEntry {
 
 export interface WizardState {
  kind: WizardKind | null
+ /** New logs infer their contents from the form; editing keeps its fixed kind. */
+ entryMode?: boolean
  /** Edit mode: the wizard is updating an existing record, not creating one. */
  editing?: boolean
 
@@ -149,6 +151,7 @@ export function wizardDates(state: WizardState): { start: string; end: string } 
 }
 
 export function validateMetricStep(state: WizardState): string | null {
+ if (state.editing && state.kind === 'evidence') return null
  if (includesClaim(state.kind)) {
  return state.claimKpiId ? null : 'Choose the metric this result belongs to'
  }
@@ -163,14 +166,36 @@ export function filledClaimEntries(
   return Object.entries(state.claimEntries).filter(([, entry]) => entry.value.trim() !== '')
 }
 
+export function wizardHasClaims(state: WizardState): boolean {
+ return state.entryMode ? filledClaimEntries(state).length > 0 : includesClaim(state.kind)
+}
+
+export function wizardHasEvidence(state: WizardState): boolean {
+ return state.entryMode ? state.files.length > 0 : includesEvidence(state.kind)
+}
+
+export function wizardClaims(state: WizardState) {
+ if (state.entryMode || state.kind === 'both') {
+  return filledClaimEntries(state).map(([kpiId, entry]) => ({ kpiId, ...entry }))
+ }
+ return includesClaim(state.kind) && state.claimKpiId
+  ? [{ kpiId: state.claimKpiId, value: state.claimValue, label: state.claimLabel, note: state.claimNote }]
+  : []
+}
+
+export function wizardEvidenceMetricIds(state: WizardState): string[] {
+ if (state.entryMode) return [...new Set([...state.evidenceKpiIds, ...wizardClaims(state).map(c => c.kpiId)])]
+ return state.kind === 'both' ? wizardClaims(state).map(c => c.kpiId) : state.evidenceKpiIds
+}
+
 export function validateClaimStep(
   state: WizardState,
   kpis?: Array<{ id?: string; tag_ids?: string[] }>,
 ): string | null {
-  if (state.kind === 'both') {
+  if (state.entryMode || state.kind === 'both') {
     const filled = filledClaimEntries(state, kpis)
     if (filled.length === 0) return 'Enter a result for at least one metric'
-    if (filled.some(([, entry]) => Number.isNaN(Number(entry.value)))) return 'Claim values must be numbers'
+    if (filled.some(([, entry]) => !Number.isFinite(Number(entry.value)))) return 'Result values must be numbers'
     return null
   }
   if (!state.claimValue.trim() || Number.isNaN(Number(state.claimValue))) return 'Enter the number you\'re claiming'
@@ -190,6 +215,22 @@ export function validateAll(
   state: WizardState,
   kpis?: Array<{ id?: string; tag_ids?: string[] }>,
 ): string | null {
+ if (state.entryMode) {
+  const claims = wizardHasClaims(state)
+  const evidence = wizardHasEvidence(state)
+  if (!claims && !evidence) return 'Add files or enter a result to save this log'
+  if (claims) {
+   const error = validateClaimStep(state, kpis)
+   if (error) return error
+   if (state.locationIds.length > 1) return 'Choose one location for these results. Use bulk entry for multiple locations.'
+   if (state.tagIds.length > 1) return 'Choose one tag for these results. Use bulk entry for multiple tags.'
+  }
+  if (evidence) {
+   const error = validateEvidenceStep(state)
+   if (error) return error
+  }
+  return validateScopeStep(state)
+ }
  // The "both" flow has no metric step — its metrics come from the claims list.
  if (state.kind !== 'both') {
  const metricError = validateMetricStep(state)
@@ -207,7 +248,7 @@ export function validateAll(
 }
 
 export function validateScopeStep(state: WizardState): string | null {
- if (state.locationIds.length === 0) return 'Choose at least one location'
+ if (wizardHasClaims(state) && state.locationIds.length === 0) return 'Choose at least one location'
  const { start } = wizardDates(state)
  if (!start) return 'Choose the activity date'
  if (state.dateMode === 'range' && state.dateEnd && state.dateStart > state.dateEnd) return 'The date range is reversed'

@@ -275,7 +275,7 @@ export default function TimelineFilterBar({
  onChange={(ids) => set({ contributors: ids })}
  emptyText="No contributors yet"
  />
- {view === 'evidence' && (
+ {(view === 'evidence' || view === 'all') && (
  <FilterPill
  icon={FileText}
  label="Evidence type"

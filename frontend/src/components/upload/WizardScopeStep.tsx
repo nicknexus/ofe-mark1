@@ -64,7 +64,7 @@ interface ScopeOption {
  * and calls `onCreate(name)`; otherwise it just fires `onCreate()` so the
  * parent can open a richer form.
  */
-function ScopeChips({
+export function ScopeChips({
   icon: Icon,
   label,
   hint,

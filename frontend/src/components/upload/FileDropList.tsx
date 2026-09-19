@@ -75,7 +75,8 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
      <button
       type="button"
       onClick={(e) => (menu?.fileId === file.id ? setMenu(null) : openMenu(file.id, e))}
-      title={`Type: ${meta.label} — click to change`}
+      aria-label={`${file.name}: ${meta.label}. Change file type`}
+      title={`Type: ${meta.label}. Click to change`}
       className={`inline-flex items-center gap-1 h-8 pl-2 pr-1.5 rounded-lg border transition-colors flex-shrink-0 ${menu?.fileId === file.id ? 'border-primary-400 bg-primary-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
      >
       <meta.icon className={`w-4 h-4 ${meta.color}`} />
@@ -111,15 +112,17 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
 
  return (
   <div>
-   <div
+   <button
+    type="button"
     onDrop={handleDrop}
     onDragOver={(e) => e.preventDefault()}
     onClick={() => fileInputRef.current?.click()}
-    className={`border-2 border-dashed border-gray-200 hover:border-primary-400 rounded-2xl text-center cursor-pointer transition-colors bg-white ${compact ? 'p-5' : 'p-8'}`}
+    className={`w-full border-2 border-dashed border-gray-200 hover:border-primary-400 rounded-xl text-center cursor-pointer transition-colors bg-white ${compact ? 'p-5' : 'p-8'}`}
    >
     <UploadCloud className={`text-gray-300 mx-auto mb-2 ${compact ? 'w-7 h-7' : 'w-9 h-9'}`} />
-    <p className="text-sm font-medium text-gray-700">Drop files here, or click to browse</p>
-    <p className="text-xs text-gray-400 mt-1">Photos, documents, receipts, recordings — up to 5 GB each</p>
+    <span className="block text-sm font-medium text-gray-700">Add photos or documents</span>
+    <span className="block text-xs text-gray-500 mt-1">Choose files or drag them here. Up to 5 GB each.</span>
+   </button>
     <input
      ref={fileInputRef}
      type="file"
@@ -131,7 +134,6 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
       e.target.value = ''
      }}
     />
-   </div>
 
    {/* Create flow: "set all" bar + files grouped into type sections. */}
    {showTypePicker && files.length > 0 ? (

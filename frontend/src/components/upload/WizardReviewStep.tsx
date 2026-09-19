@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link2, Unlink, TrendingUp, FileText, MapPin, CalendarRange, Tag as TagIcon, Users, Loader2 } from 'lucide-react'
+import { Link2, Unlink, TrendingUp, FileText, MapPin, CalendarRange, Tag as TagIcon, Users, Loader2, Clock, BarChart3 } from 'lucide-react'
 import { BeneficiaryGroup, KPI, Location, MatchPreviewResult, MetricTag, TimelineClaim, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
 import { apiService } from '../../services/api'
 import { previewMatchingClaims, previewMatchingEvidence } from '../../utils/timeline'
-import { WizardState, filledClaimEntries, includesClaim, includesEvidence, wizardDates, evidenceBuckets, EVIDENCE_TYPE_LABELS } from './wizardTypes'
+import { WizardState, wizardClaims, wizardHasClaims, wizardHasEvidence, wizardEvidenceMetricIds, wizardDates, evidenceBuckets, EVIDENCE_TYPE_LABELS } from './wizardTypes'
 import { EVIDENCE_TYPE_STYLE } from '../timeline/EvidenceTypeCounts'
 
 interface WizardReviewStepProps {
@@ -19,6 +19,7 @@ interface WizardReviewStepProps {
  existingEvidence: TimelineEvidence[]
  /** Opened from a specific claim (Connections "Add evidence"). Always treat as connected. */
  pinClaim?: TimelineClaim
+ evidenceNeedsApproval?: boolean
 }
 
 /**
@@ -37,20 +38,18 @@ export default function WizardReviewStep({
  existingClaims,
  existingEvidence,
  pinClaim,
+ evidenceNeedsApproval = false,
 }: WizardReviewStepProps) {
- const claim = includesClaim(state.kind)
- const evidence = includesEvidence(state.kind)
+ const claim = wizardHasClaims(state)
+ const evidence = wizardHasEvidence(state)
+ const kind = claim && evidence ? 'both' : claim ? 'claim' : 'evidence'
  const evBuckets = evidence && !state.editing ? evidenceBuckets(state.files) : []
  const { start, end } = wizardDates(state)
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
 
  // Claims to be created: per-metric entries in the "both" flow, or the
  // single claim-only record, normalised to one shape for rendering.
- const newClaims = state.kind === 'both'
- ? filledClaimEntries(state, kpis).map(([kpiId, entry]) => ({ kpiId, value: entry.value, label: entry.label, note: entry.note }))
- : claim && state.claimKpiId
- ? [{ kpiId: state.claimKpiId, value: state.claimValue, label: state.claimLabel, note: state.claimNote }]
- : []
+ const newClaims = wizardClaims(state)
 
  const dateLabel = start === end ? formatDate(start) : `${formatDate(start)} – ${formatDate(end)}`
  const locationNames = state.locationIds
@@ -64,9 +63,7 @@ export default function WizardReviewStep({
  // What will the auto-matcher connect? Client mirror first (instant) …
  const localClaims = useMemo(() => {
  if (!evidence) return []
- const kpiIds = state.kind === 'both'
- ? filledClaimEntries(state, kpis).map(([kpiId]) => kpiId)
- : state.evidenceKpiIds
+ const kpiIds = wizardEvidenceMetricIds(state)
  return previewMatchingClaims(existingClaims, {
  kpiIds,
  locationIds: state.locationIds,
@@ -78,21 +75,19 @@ export default function WizardReviewStep({
  }, [evidence, state, existingClaims, start, end])
 
  const localEvidence = useMemo(() => {
- if (state.kind !== 'claim' || !state.claimKpiId || state.locationIds.length === 0) return []
- return previewMatchingEvidence(existingEvidence, {
- kpiId: state.claimKpiId,
+ if (!claim || state.locationIds.length === 0) return []
+ const matched = newClaims.flatMap(c => previewMatchingEvidence(existingEvidence, {
+ kpiId: c.kpiId,
  locationId: state.locationIds[0],
  tagId: state.tagIds[0] || null,
  beneficiaryGroupIds: state.beneficiaryGroupIds,
  dateStart: start,
  dateEnd: end,
- })
+ }))
+ return [...new Map(matched.map(e => [e.id, e])).values()]
  }, [state, existingEvidence, start, end])
 
- // … then the server's answer, which is authoritative.
- const previewKpiIds = state.kind === 'both'
- ? newClaims.map(c => c.kpiId)
- : state.kind === 'claim' && state.claimKpiId ? [state.claimKpiId] : state.evidenceKpiIds
+ const previewKpiIds = evidence ? wizardEvidenceMetricIds(state) : newClaims.map(c => c.kpiId)
  const previewKey = JSON.stringify([previewKpiIds, state.locationIds, state.tagIds, state.beneficiaryGroupIds, start, end])
  const [server, setServer] = useState<{ key: string; result: MatchPreviewResult } | null>(null)
  const [previewing, setPreviewing] = useState(false)
@@ -151,7 +146,7 @@ export default function WizardReviewStep({
  }
 
  const connectionCount = (evidence ? matchedClaims.length : matchedEvidence.length)
- + (state.kind === 'both' ? newClaims.length : 0)
+ + (kind === 'both' ? newClaims.length : 0)
 
  return (
  <div className="space-y-4 max-w-2xl">
@@ -217,58 +212,60 @@ export default function WizardReviewStep({
  {/* Shared scope summary */}
  <div className="flex flex-wrap gap-x-4 gap-y-1.5 px-1">
  {scopeRow(CalendarRange, dateLabel)}
+ {evidence && scopeRow(BarChart3, wizardEvidenceMetricIds(state).map(id => kpiById.get(id)?.title).filter(Boolean).join(', ') || 'Metric can be assigned later')}
  {locationNames.length > 0 && scopeRow(MapPin, locationNames.length > 2 ? `${locationNames.length} locations` : locationNames.join(', '))}
+ {evidence && locationNames.length === 0 && scopeRow(MapPin, 'Location can be added later')}
  {tagNames.length > 0 && scopeRow(TagIcon, tagNames.length > 2 ? `${tagNames.length} tags` : tagNames.join(', '))}
  {groupNames.length > 0 && scopeRow(Users, groupNames.length > 2 ? `${groupNames.length} groups` : groupNames.join(', '))}
  </div>
 
  {/* Connect preview — connected state uses the Connections-tab gradient */}
- <div className={`rounded-2xl border p-4 ${connectionCount > 0
+ <div className={`rounded-2xl border p-4 ${evidence && evidenceNeedsApproval ? 'border-amber-200 bg-amber-50' : connectionCount > 0
  ? 'border-primary-300 bg-gradient-to-r from-claim-50 to-primary-50'
- : 'border-amber-200 bg-amber-50/50'
+ : 'border-gray-200 bg-gray-50'
  }`}>
  <div className="flex items-center gap-2 mb-1">
- {previewing && !serverFresh
+ {evidence && evidenceNeedsApproval ? <Clock className="w-4 h-4 text-amber-600" /> : previewing && !serverFresh
  ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
  : connectionCount > 0
  ? <Link2 className="w-4 h-4 text-impact-500" />
- : <Unlink className="w-4 h-4 text-amber-600" />}
+ : <Unlink className="w-4 h-4 text-gray-500" />}
  <p className="text-sm font-semibold text-gray-800">
- {state.kind === 'both' && (
+ {evidence && evidenceNeedsApproval && 'Evidence will connect to matching results after approval.'}
+ {!evidenceNeedsApproval && kind === 'both' && (
  matchedClaims.length > 0
- ? `${newClaims.length} claim${newClaims.length === 1 ? '' : 's'} and the evidence will be connected, plus ${matchedClaims.length} other matching claim${matchedClaims.length === 1 ? '' : 's'}`
- : `${newClaims.length} claim${newClaims.length === 1 ? '' : 's'} and the evidence will be connected to each other`
+ ? `${newClaims.length} result${newClaims.length === 1 ? '' : 's'} and the evidence will be connected, plus ${matchedClaims.length} other matching result${matchedClaims.length === 1 ? '' : 's'}`
+ : `${newClaims.length} result${newClaims.length === 1 ? '' : 's'} and the evidence will be connected to each other`
  )}
- {state.kind === 'evidence' && (
+ {!evidenceNeedsApproval && kind === 'evidence' && (
  pinClaim
- ? `Will connect to this claim${matchedClaims.length > 1 ? ` and ${matchedClaims.length - 1} other matching claim${matchedClaims.length === 2 ? '' : 's'}` : ''}`
+ ? `Will connect to this result${matchedClaims.length > 1 ? ` and ${matchedClaims.length - 1} other matching result${matchedClaims.length === 2 ? '' : 's'}` : ''}`
  : matchedClaims.length > 0
- ? `Will connect to ${matchedClaims.length} existing claim${matchedClaims.length === 1 ? '' : 's'}`
- : 'No existing claims match this scope'
+ ? `Will connect to ${matchedClaims.length} existing result${matchedClaims.length === 1 ? '' : 's'}`
+ : 'Your evidence will be saved to this program'
  )}
- {state.kind === 'claim' && (
+ {kind === 'claim' && (
  matchedEvidence.length > 0
  ? `Will connect to ${matchedEvidence.length} existing evidence record${matchedEvidence.length === 1 ? '' : 's'}`
- : 'No existing evidence matches this scope'
+ : 'Your results will be saved. Evidence can be added later.'
  )}
  </p>
  </div>
 
- {state.kind === 'evidence' && matchedClaims.length === 0 && !pinClaim && (
- <p className="text-xs text-amber-700">
- It will appear as unconnected evidence in your Logs. You can connect it manually there, or it
- will link automatically when a matching claim is added.
+ {kind === 'evidence' && matchedClaims.length === 0 && !pinClaim && (
+ <p className="text-xs text-gray-500">
+ Find it in Logs after saving. Add metrics or other details later to connect it to relevant results.
  </p>
  )}
- {state.kind === 'claim' && matchedEvidence.length === 0 && (
- <p className="text-xs text-amber-700">
- The claim will show as missing evidence until matching evidence is uploaded.
+ {kind === 'claim' && matchedEvidence.length === 0 && (
+ <p className="text-xs text-gray-500">
+ Matching evidence can be uploaded or connected later.
  </p>
  )}
 
- {(state.kind !== 'claim' ? matchedClaims.length : matchedEvidence.length) > 0 && (
+ {(kind !== 'claim' ? matchedClaims.length : matchedEvidence.length) > 0 && (
  <ul className="mt-2 space-y-1">
- {state.kind !== 'claim'
+ {kind !== 'claim'
  ? matchedClaims.slice(0, 6).map(c => (
  <li key={c.id} className="text-xs text-gray-700 flex items-center gap-1.5">
  <span className="w-1 h-1 rounded-full bg-impact-500 flex-shrink-0" />
@@ -284,9 +281,9 @@ export default function WizardReviewStep({
  <span className="text-gray-400">· {formatDate(ev.date_represented)}</span>
  </li>
  ))}
- {(state.kind !== 'claim' ? matchedClaims.length : matchedEvidence.length) > 6 && (
+ {(kind !== 'claim' ? matchedClaims.length : matchedEvidence.length) > 6 && (
  <li className="text-xs text-gray-500 pl-2.5">
- …and {(state.kind !== 'claim' ? matchedClaims.length : matchedEvidence.length) - 6} more
+ …and {(kind !== 'claim' ? matchedClaims.length : matchedEvidence.length) - 6} more
  </li>
  )}
  </ul>

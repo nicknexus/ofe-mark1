@@ -6,7 +6,7 @@ import { TimelineClaim, TimelineEvidence } from '../types'
  * components stay thin and this logic is unit-testable.
  */
 
-export type TimelineView = 'claims' | 'evidence' | 'connections'
+export type TimelineView = 'all' | 'claims' | 'evidence' | 'connections'
 export type ConnectionStatus = 'connected' | 'not_connected' | 'pending'
 /**
  * Which date the results are ordered by / the date-range filter applies to.
@@ -309,4 +309,3 @@ export function getEvidenceImageUrl(evidence: TimelineEvidence): string | null {
  const image = candidates.find(isImageLike)
  return image?.file_url || null
 }
-

@@ -21,6 +21,7 @@ import {
  TimelineFilters,
  TimelineView,
  applyFiltersToParams,
+ EMPTY_TIMELINE_FILTERS,
  filtersFromParams,
 } from '../../utils/timeline'
 import { readSWR, writeSWR } from '../../utils/swrCache'
@@ -30,6 +31,7 @@ import TimelineStatCards from '../timeline/TimelineStatCards'
 import TimelineFilterBar from '../timeline/TimelineFilterBar'
 import UploadWizard from '../upload/UploadWizard'
 import ClaimsView from '../timeline/ClaimsView'
+import AllLogsView from '../timeline/AllLogsView'
 import EvidenceView from '../timeline/EvidenceView'
 import EvidenceViewModeToggle from '../timeline/EvidenceViewModeToggle'
 import type { EvidenceViewMode } from '../timeline/EvidenceViewModeToggle'
@@ -45,6 +47,7 @@ import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 // impact green (the link color), claims are seafoam teal, evidence is the
 // primary brand green — matching the Add Log wizard's branding.
 const VIEWS: Array<{ id: TimelineView; label: string; activeClass: string }> = [
+ { id: 'all', label: 'All logs', activeClass: 'border-gray-200 bg-white text-gray-900' },
  { id: 'connections', label: 'Connections', activeClass: 'border-primary-300 bg-gradient-to-r from-claim-50 to-primary-50 text-gray-900' },
  { id: 'claims', label: 'Claims', activeClass: 'border-claim-300 bg-claim-50 text-gray-900' },
  { id: 'evidence', label: 'Evidence', activeClass: 'border-primary-300 bg-primary-50 text-gray-900' },
@@ -52,6 +55,7 @@ const VIEWS: Array<{ id: TimelineView; label: string; activeClass: string }> = [
 
 interface TimelineTabProps {
  initiativeId: string
+ programTitle?: string
  onRefresh?: () => void
  /** When set, the logs are locked to this metric: all views/filters/counts are
   * scoped to it and the Metric filter is hidden. Used by the metric detail page. */
@@ -104,7 +108,7 @@ function LogsSkeleton() {
  * params so filtered views can be deep-linked, refreshed, and navigated with
  * browser controls (?tab=logs&view=...&metric=...).
  */
-export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal, hideHeader }: TimelineTabProps) {
+export default function TimelineTab({ initiativeId, programTitle, onRefresh, lockedMetricId, embedded, openAddLogSignal, hideHeader }: TimelineTabProps) {
  const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canDelete, canManageTeam, canEditMetrics } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
@@ -134,7 +138,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  const [evidenceMode, setEvidenceMode] = useState<EvidenceViewMode>('list')
 
  const rawView = searchParams.get('view')
- const view: TimelineView = rawView === 'evidence' || rawView === 'claims' ? rawView : 'connections'
+ const view: TimelineView = rawView === 'evidence' || rawView === 'claims' || rawView === 'connections' ? rawView : 'all'
  // When locked to a metric, force the metric filter so every view/count is scoped.
  const filters = useMemo(() => {
  const base = filtersFromParams(searchParams)
@@ -143,7 +147,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
 
  const setView = (next: TimelineView) => {
  const params = new URLSearchParams(searchParams)
- if (next === 'connections') params.delete('view')
+ if (next === 'all') params.delete('view')
  else params.set('view', next)
  setSearchParams(params, { replace: true })
  }
@@ -224,6 +228,14 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  await load()
  onRefresh?.()
  }, [initiativeId, load, onRefresh])
+
+ const handleLogCreated = () => {
+  const params = new URLSearchParams(searchParams)
+  applyFiltersToParams(params, EMPTY_TIMELINE_FILTERS)
+  params.delete('view')
+  setSearchParams(params, { replace: true })
+  void refresh()
+ }
 
  const handleOpenClaim = (claim: TimelineClaim, kpi: KPI | undefined) => {
  setSelectedEvidence(null)
@@ -393,7 +405,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
           </div>
 
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-            {data && displayStats && (
+            {data && displayStats && (view !== 'all' || filters.status) && (
               <TimelineStatCards
                 stats={displayStats}
                 activeStatus={filters.status}
@@ -478,7 +490,13 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
               animate={viewSwap.animate}
               exit={viewSwap.exit}
             >
-              {view === 'claims' ? (
+              {view === 'all' ? (
+                <AllLogsView
+                  claims={data.claims} evidence={data.evidence} kpis={data.kpis}
+                  locations={locations} filters={filters}
+                  onOpenClaim={handleOpenClaim} onOpenEvidence={handleOpenEvidence}
+                />
+              ) : view === 'claims' ? (
                 <ClaimsView
                   claims={data.claims}
                   kpis={data.kpis}
@@ -523,6 +541,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  {isWizardOpen && data && (
  <UploadWizard
  initiativeId={initiativeId}
+ programTitle={programTitle}
  canCreateClaim={canAddImpactClaims}
  canCreateEvidence={canAddEvidence}
  lockedMetricId={lockedMetricId}
@@ -537,7 +556,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  existingClaims={data.claims}
  existingEvidence={data.evidence}
  onClose={() => setIsWizardOpen(false)}
- onCreated={refresh}
+ onCreated={handleLogCreated}
  />
  )}
 
@@ -547,7 +566,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  isOpen
  initiativeId={initiativeId}
  onClose={() => setAdvancedUpload(null)}
- onCreated={() => refresh()}
+ onCreated={handleLogCreated}
  />
  )}
 
@@ -557,7 +576,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  isOpen
  initiativeId={initiativeId}
  onClose={() => setAdvancedUpload(null)}
- onCreated={() => refresh()}
+ onCreated={handleLogCreated}
  />
  )}
 
@@ -593,7 +612,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  existingEvidence={data.evidence}
  evidenceForClaim={addEvidenceTarget.claim}
  onClose={() => setAddEvidenceTarget(null)}
- onCreated={refresh}
+ onCreated={handleLogCreated}
  />
  )}
 
