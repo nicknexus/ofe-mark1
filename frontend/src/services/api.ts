@@ -34,12 +34,22 @@ import {
  EvidenceMatchDiagnostics,
  ClaimMatchDiagnostics,
  ContentCopy,
+ ContentChannel,
+ ContentChannelVersion,
+ ContentDraftStatus,
+ ContentMaster,
+ ContentPackage,
  ContentPost,
  ContentPostFormat,
  ContentPostKind,
  ContentSource,
  ContentSourceType,
+ ContentStoryType,
+ ContentUsageFilter,
  GraphicLayout,
+ GraphicAspect,
+ GraphicChrome,
+ GraphicCopy,
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
@@ -1462,6 +1472,7 @@ class ApiService {
  offset?: number
  limit?: number
  source_type?: ContentSourceType | 'all'
+ usage?: ContentUsageFilter
  singleDate?: string
  startDate?: string
  endDate?: string
@@ -1470,6 +1481,7 @@ class ApiService {
  if (opts?.offset) params.set('offset', String(opts.offset))
  if (opts?.limit) params.set('limit', String(opts.limit))
  if (opts?.source_type && opts.source_type !== 'all') params.set('source_type', opts.source_type)
+ if (opts?.usage && opts.usage !== 'all') params.set('usage', opts.usage)
  if (opts?.singleDate) params.set('single_date', opts.singleDate)
  if (opts?.startDate) params.set('start_date', opts.startDate)
  if (opts?.endDate) params.set('end_date', opts.endDate)
@@ -1511,8 +1523,35 @@ class ApiService {
  return this.fetchContentFile(`/api/content/image?${new URLSearchParams({ source_type, source_id })}`, title, 'image/jpeg')
  }
 
- async getContentGraphicFile(source_type: ContentSourceType, source_id: string, title: string, layout: GraphicLayout = 'clean'): Promise<File> {
- return this.fetchContentFile(`/api/content/graphic?${new URLSearchParams({ source_type, source_id, layout })}`, title, 'image/png')
+ async getContentGraphicFile(
+ source_type: ContentSourceType,
+ source_id: string,
+ title: string,
+ opts?: {
+ layout?: GraphicLayout
+ aspect?: GraphicAspect
+ chrome?: GraphicChrome
+ copy?: GraphicCopy
+ }
+ ): Promise<File> {
+ const params = new URLSearchParams({ source_type, source_id })
+ if (opts?.layout) params.set('layout', opts.layout)
+ if (opts?.aspect) params.set('aspect', opts.aspect)
+ if (opts?.chrome) {
+ params.set('show_logo', opts.chrome.logo ? '1' : '0')
+ params.set('show_name', opts.chrome.orgName ? '1' : '0')
+ params.set('show_title', opts.chrome.title ? '1' : '0')
+ params.set('show_metric', opts.chrome.metric ? '1' : '0')
+ params.set('show_location', opts.chrome.location ? '1' : '0')
+ }
+ if (opts?.copy) {
+ params.set('org_name', opts.copy.orgName || '')
+ params.set('title', opts.copy.title || '')
+ params.set('metric_text', opts.copy.metricText || '')
+ params.set('metric_label', opts.copy.metricLabel || '')
+ params.set('location', opts.copy.location || '')
+ }
+ return this.fetchContentFile(`/api/content/graphic?${params}`, title, 'image/png')
  }
 
  private async fetchContentFile(path: string, title: string, fallbackType: string): Promise<File> {
@@ -1538,6 +1577,94 @@ class ApiService {
  method: 'POST',
  body: JSON.stringify({ source_type, source_id }),
  })
+ }
+
+ async recommendContent(story_type?: ContentStoryType): Promise<ContentMaster> {
+ return this.request<ContentMaster>('/content/recommend', {
+ method: 'POST',
+ body: JSON.stringify(story_type ? { story_type } : {}),
+ })
+ }
+
+ async generateContentMaster(input: {
+ source_type: ContentSourceType
+ source_id: string
+ story_type: ContentStoryType
+ why?: string
+ }): Promise<ContentMaster> {
+ return this.request<ContentMaster>('/content/generate-master', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async refineContentMaster(input: {
+ source_type: ContentSourceType
+ source_id: string
+ story_type: ContentStoryType
+ hook: string
+ body: string
+ evidence_line?: string
+ cta?: string
+ context: string
+ why?: string
+ }): Promise<ContentMaster> {
+ return this.request<ContentMaster>('/content/refine-master', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async generateContentVersions(input: {
+ source_type: ContentSourceType
+ source_id: string
+ story_type: ContentStoryType
+ hook: string
+ body: string
+ evidence_line?: string
+ cta?: string
+ context?: string
+ channels: ContentChannel[]
+ }): Promise<ContentChannelVersion[]> {
+ const result = await this.request<{ versions: ContentChannelVersion[] }>('/content/generate-versions', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ return result.versions
+ }
+
+ async getContentPackages(): Promise<ContentPackage[]> {
+ return this.request<ContentPackage[]>('/content/packages')
+ }
+
+ async saveContentPackage(input: {
+ story_type: ContentStoryType
+ hook: string
+ body: string
+ evidence_line?: string
+ cta?: string
+ why?: string
+ layout?: GraphicLayout
+ status?: ContentDraftStatus
+ source_type: ContentSourceType
+ source_id: string
+ versions: ContentChannelVersion[]
+ }): Promise<ContentPackage> {
+ return this.request<ContentPackage>('/content/packages', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async updateContentPackageStatus(id: string, status: ContentDraftStatus): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}`, {
+ method: 'PATCH',
+ body: JSON.stringify({ status }),
+ })
+ }
+
+ async deleteContentPackage(id: string): Promise<void> {
+ await this.request(`/content/packages/${id}`, { method: 'DELETE' })
  }
 
  // Storage - Phase 1: Tracking Only

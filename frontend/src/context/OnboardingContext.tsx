@@ -7,7 +7,7 @@ interface OnboardingContextType {
   isActive: boolean
   /** True once the user has finished or skipped onboarding (persisted to user_metadata). */
   hasCompletedOnboarding: boolean
-  /** Launch the wizard manually (e.g. from the dashboard "Set up" entry point). */
+  /** Launch the wizard manually (e.g. from the dashboard "Quick setup" entry point). */
   startOnboarding: () => void
   /** Close the wizard without marking complete (lets the user resume later). */
   pauseOnboarding: () => void

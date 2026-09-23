@@ -1,16 +1,25 @@
 import { supabase } from '../utils/supabase'
 import { openai, isOpenAIConfigured } from '../utils/openai'
-import { composeBrandedPng, parseGraphicLayout } from '../utils/contentCompose'
+import { composeBrandedPng, parseGraphicAspect, parseGraphicLayout, type GraphicChrome, type GraphicCopy } from '../utils/contentCompose'
+import { masterWriterPrompt, refineMasterPrompt, versionsWriterPrompt } from '../prompts/nexusCopyFramework'
 import { OrgAccessService } from './orgAccessService'
 import { SubscriptionService } from './subscriptionService'
 import {
+    ContentChannel,
+    ContentChannelVersion,
     ContentCopy,
+    ContentDraftStatus,
+    ContentMaster,
     ContentOverlay,
+    ContentPackage,
     ContentPost,
     ContentPostFormat,
     ContentPostKind,
     ContentSource,
     ContentSourceType,
+    ContentStoryType,
+    ContentUsageFilter,
+    GraphicLayout,
 } from '../types'
 
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'gif']
@@ -24,6 +33,8 @@ type OrgRow = {
     is_demo?: boolean | null
     logo_url?: string | null
     brand_color?: string | null
+    slug?: string | null
+    is_public?: boolean | null
 }
 
 function httpError(status: number, message: string, code?: string): Error {
@@ -72,6 +83,73 @@ function escapeHtml(value: string): string {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
+}
+
+function asLineCopy(value: string): string {
+    return String(value || '')
+        .replace(/\\n/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/[ \t]+\n/g, '\n')
+        .trim()
+}
+
+function splitSentences(text: string): string {
+    return text
+        .split(/(?<=[.!?])\s+/)
+        .map(part => part.trim())
+        .filter(Boolean)
+        .join('\n\n')
+}
+
+function explodeLineCopy(text: string): string {
+    const cleaned = asLineCopy(text)
+    if (!cleaned) return ''
+    const rows = cleaned.split('\n')
+    const spoken = rows.filter(row => row.trim())
+    if (spoken.length >= 2) {
+        return rows
+            .map(row => {
+                if (!row.trim()) return ''
+                if (row.length < 90 || !/[.!?].+\S/.test(row)) return row.trim()
+                return splitSentences(row)
+            })
+            .join('\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim()
+    }
+    return splitSentences(cleaned)
+}
+
+function fromCopyLines(lines: unknown, fallback: string): string {
+    if (Array.isArray(lines) && lines.length > 0) {
+        return explodeLineCopy(lines.map(line => String(line ?? '')).join('\n'))
+    }
+    return explodeLineCopy(fallback)
+}
+
+function asStanzaBody(lines: unknown, fallback: string): string {
+    const raw = Array.isArray(lines) && lines.length > 0
+        ? lines.map(line => String(line ?? '')).join('\n')
+        : String(fallback || '')
+    return explodeLineCopy(raw)
+        .split(/\n+/)
+        .map(row => row.trim())
+        .filter(Boolean)
+        .join('\n\n')
+}
+
+function publicOrgUrl(org: OrgRow): string | null {
+    if (!org.is_public || !org.slug) return null
+    const origin = (process.env.APP_URL || process.env.FRONTEND_URL || 'https://www.nexusimpacts.ai').replace(/\/+$/, '')
+    return `${origin}/org/${org.slug}`
+}
+
+function withSeeMore(channel: ContentChannel, text: string, publicUrl: string | null): string {
+    const body = (text || '').trim()
+    if (/see more of our impact here/i.test(body) || /see more @nexusimpacts/i.test(body)) return body
+    if (channel === 'instagram') return `${body}\n\nSee more @nexusimpacts`
+    if (!publicUrl) return body
+    return `${body}\n\nSee more of our impact here: ${publicUrl}`
 }
 
 function publicThumbUrl(publicUrl: string, size = 480): string {
@@ -155,6 +233,44 @@ function formatMetricLine(kpi: any): string {
     return `- ${kpi.title}${bits.length ? ` (${bits.join(', ')})` : ''}${desc}`
 }
 
+function sourceKey(source: Pick<ContentSource, 'source_type' | 'source_id'>): string {
+    return `${source.source_type}:${source.source_id}`
+}
+
+function isMissingRelation(error: { code?: string; message?: string } | null | undefined): boolean {
+    const message = error?.message || ''
+    return error?.code === '42P01' || /does not exist/i.test(message) || /schema cache/i.test(message)
+}
+
+function schemaMissing(table: string): Error {
+    return httpError(
+        503,
+        `Content library is missing ${table}. Run database/migrations/add_content_posts.sql then add_content_engine_v1.sql.`,
+        'SCHEMA_MISSING'
+    )
+}
+
+const CHANNELS: ContentChannel[] = ['instagram', 'linkedin', 'facebook', 'donor_email', 'newsletter', 'sms']
+
+function channelKind(channel: ContentChannel): { kind: ContentPostKind; format: ContentPostFormat } {
+    if (channel === 'donor_email' || channel === 'newsletter') return { kind: 'email', format: 'email' }
+    if (channel === 'linkedin') return { kind: 'social', format: 'linkedin' }
+    return { kind: 'social', format: 'ig_square' }
+}
+
+function defaultLayout(storyType: ContentStoryType): GraphicLayout {
+    if (storyType === 'glance') return 'stats'
+    if (storyType === 'moment') return 'title'
+    return 'clean'
+}
+
+function daysAgo(iso?: string | null): number {
+    if (!iso) return 365
+    const then = new Date(iso).getTime()
+    if (!Number.isFinite(then)) return 365
+    return Math.max(0, (Date.now() - then) / 86400000)
+}
+
 function uniqueMetrics(kpis: Array<any | null>): any[] {
     const seen = new Set<string>()
     const out: any[] = []
@@ -178,7 +294,7 @@ export class ContentService {
 
         const { data: org, error } = await supabase
             .from('organizations')
-            .select('id, name, statement, is_demo, logo_url, brand_color')
+            .select('id, name, statement, is_demo, logo_url, brand_color, slug, is_public')
             .eq('id', ctx.organizationId)
             .maybeSingle()
         if (error) throw new Error(`Failed to load organization: ${error.message}`)
@@ -202,6 +318,7 @@ export class ContentService {
             singleDate?: string
             startDate?: string
             endDate?: string
+            usage?: ContentUsageFilter
         }
     ): Promise<{ sources: ContentSource[]; has_more: boolean }> {
         const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
@@ -299,9 +416,17 @@ export class ContentService {
         }
 
         sources.sort((a, b) => (a.date_represented < b.date_represented ? 1 : -1))
-        const page = sources.slice(offset, offset + limit)
+        const usedKeys = await this.loadUsedSourceKeys(organizationId)
+        for (const source of sources) source.used = usedKeys.has(sourceKey(source))
+        const usage = opts?.usage
+        const filtered = usage === 'unused'
+            ? sources.filter(s => !s.used)
+            : usage === 'used'
+                ? sources.filter(s => s.used)
+                : sources
+        const page = filtered.slice(offset, offset + limit)
         const hitFetchCap = (evidenceRes.data || []).length >= fetchCount || (storiesRes.data || []).length >= fetchCount
-        const has_more = sources.length > offset + limit || (hitFetchCap && page.length === limit)
+        const has_more = filtered.length > offset + limit || (hitFetchCap && page.length === limit)
         return { sources: page, has_more }
     }
 
@@ -458,19 +583,16 @@ export class ContentService {
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
             temperature: 0.7,
-            max_tokens: 900,
+            max_tokens: 1100,
             messages: [
                 {
                     role: 'system',
-                    content: `You write short, factual copy for charities from proof they already logged.
-Use the photo title and description as the human story. Use connected claims for numbers. Use the program (initiative) and its metrics so the copy is about the right work.
-Never invent numbers, names, locations, or outcomes that are not in the facts.
-If there are connected claims, lead with the strongest number. If there are none, write from title, description, and program only. Do not guess a count.
-No hashtag spam (at most 3, only if they fit). No emojis. No em dashes.
-Return JSON with keys: caption, email_subject, email_body.
-caption: one social post, max 160 words, first line is the hook. Same text works for Instagram, Facebook, and LinkedIn.
-email_subject: max 70 characters.
-email_body: 2-4 short paragraphs, first-person plural ("we"), suitable to paste into Gmail or Mailchimp.`,
+                    content: `${masterWriterPrompt('moment')}
+
+Also return JSON keys caption, email_subject, email_body for this legacy endpoint.
+caption: Instagram/Facebook moment style, with line breaks and 1-3 emojis.
+email_subject: max 70 characters, no emoji.
+email_body: donor-email depth, line breaks, no emojis.`,
                 },
                 {
                     role: 'user',
@@ -535,7 +657,12 @@ email_body: 2-4 short paragraphs, first-person plural ("we"), suitable to paste 
         sourceType: ContentSourceType,
         sourceId: string,
         requestedOrgId?: string,
-        layout?: string
+        opts?: {
+            layout?: string
+            aspect?: string
+            chrome?: Partial<GraphicChrome>
+            copy?: GraphicCopy
+        }
     ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
         const { org } = await this.assertStudioAccess(userId, requestedOrgId)
         const source = await this.loadSource(userId, sourceType, sourceId, requestedOrgId)
@@ -543,7 +670,7 @@ email_body: 2-4 short paragraphs, first-person plural ("we"), suitable to paste 
 
         const photo = await this.downloadImage(userId, sourceType, sourceId, requestedOrgId)
         const [logo, overlay, location] = await Promise.all([
-            org.logo_url ? this.fetchBinary(org.logo_url) : Promise.resolve(null),
+            opts?.chrome?.logo === false ? Promise.resolve(null) : (org.logo_url ? this.fetchBinary(org.logo_url) : Promise.resolve(null)),
             this.loadOverlay(source),
             this.loadLocation(source),
         ])
@@ -556,7 +683,10 @@ email_body: 2-4 short paragraphs, first-person plural ("we"), suitable to paste 
             location,
             brandColor: org.brand_color,
             overlay,
-            layout: parseGraphicLayout(layout),
+            layout: parseGraphicLayout(opts?.layout),
+            aspect: parseGraphicAspect(opts?.aspect),
+            chrome: opts?.chrome,
+            copy: opts?.copy,
         })
         return {
             buffer,
@@ -576,6 +706,8 @@ email_body: 2-4 short paragraphs, first-person plural ("we"), suitable to paste 
             `Date: ${source.date_represented}`,
             `Program: ${source.initiative_title}`,
         ]
+        const extra = await this.loadOrgStoryContext(org.id)
+        if (extra) sections.push(extra)
 
         if (source.source_type === 'evidence') {
             const { data, error } = await supabase
@@ -807,5 +939,495 @@ email_body: 2-4 short paragraphs, first-person plural ("we"), suitable to paste 
             initiative_id: data.initiative_id,
             initiative_title: (data as any).initiatives?.title || 'Program',
         }
+    }
+
+    static async recommend(
+        userId: string,
+        requestedOrgId?: string,
+        _storyType?: ContentStoryType
+    ): Promise<ContentMaster> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const { sources } = await this.listSources(userId, requestedOrgId, { offset: 0, limit: SOURCE_PAGE, usage: 'all' })
+        // Pull extra pages so scoring sees more than one screen of photos.
+        let all = [...sources]
+        let offset = sources.length
+        while (all.length < SOURCE_FETCH_CAP) {
+            const next = await this.listSources(userId, requestedOrgId, { offset, limit: SOURCE_PAGE, usage: 'all' })
+            if (next.sources.length === 0) break
+            all = all.concat(next.sources)
+            offset += next.sources.length
+            if (!next.has_more) break
+        }
+        if (all.length === 0) {
+            throw httpError(404, 'No photos to share yet. Log visual evidence or a photo story first.', 'NO_SOURCES')
+        }
+
+        const evidenceIds = all.filter(s => s.source_type === 'evidence').map(s => s.source_id)
+        const [claimRows, recentTypes] = await Promise.all([
+            evidenceIds.length
+                ? supabase.from('evidence_kpi_updates').select('evidence_id').in('evidence_id', evidenceIds)
+                : Promise.resolve({ data: [] as Array<{ evidence_id: string }>, error: null }),
+            this.loadRecentStoryTypes(organizationId),
+        ])
+
+        const withClaims = new Set((claimRows.data || []).map(r => r.evidence_id))
+
+        const scored = all.map(source => {
+            let score = source.used ? 8 : 42
+            score += Math.max(0, 30 - daysAgo(source.date_represented))
+            if (recentTypes.includes('moment') && source.used) score -= 12
+            return { source, story_type: 'moment' as const, score }
+        }).sort((a, b) => b.score - a.score)
+
+        const pick = scored[0]
+        const why = this.recommendWhy(pick.source, 'moment', withClaims.has(pick.source.source_id), !pick.source.used)
+        return this.generateMaster(
+            userId,
+            pick.source.source_type,
+            pick.source.source_id,
+            'moment',
+            why,
+            requestedOrgId
+        )
+    }
+
+    static async generateMaster(
+        userId: string,
+        sourceType: ContentSourceType,
+        sourceId: string,
+        storyType: ContentStoryType,
+        why?: string,
+        requestedOrgId?: string
+    ): Promise<ContentMaster> {
+        const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
+        this.assertOpenAi()
+        await this.assertQuota(userId, requestedOrgId)
+        storyType = 'moment'
+
+        const source = await this.loadSource(userId, sourceType, sourceId, requestedOrgId)
+        if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
+        const usedKeys = await this.loadUsedSourceKeys(organizationId)
+        source.used = usedKeys.has(sourceKey(source))
+        const [overlay, location] = await Promise.all([
+            this.loadOverlay(source),
+            this.loadLocation(source),
+        ])
+        source.overlay = overlay
+        source.location = location
+
+        const facts = await this.loadCopyFacts(source, org)
+        const completion = await openai!.chat.completions.create({
+            model: 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            temperature: 0.7,
+            max_tokens: 450,
+            messages: [
+                {
+                    role: 'system',
+                    content: masterWriterPrompt(storyType),
+                },
+                { role: 'user', content: facts },
+            ],
+        })
+        const parsed = this.parseJson(completion.choices[0]?.message?.content)
+        const hook = String(parsed.hook || source.title).trim()
+        const body = asStanzaBody(parsed.body_lines || parsed.lines, parsed.body || source.description || '')
+        if (!hook || !body) throw httpError(500, 'Failed to write the story')
+        if (organizationId) await SubscriptionService.logAiReport(organizationId, userId)
+
+        return {
+            story_type: storyType,
+            hook,
+            body,
+            evidence_line: '',
+            cta: String(parsed.cta || 'Learn more about our work.').trim(),
+            why: (why || '').trim(),
+            layout: defaultLayout(storyType),
+            source,
+        }
+    }
+
+    static async refineMaster(
+        userId: string,
+        input: {
+            source_type: ContentSourceType
+            source_id: string
+            story_type: ContentStoryType
+            hook: string
+            body: string
+            evidence_line?: string
+            cta?: string
+            context: string
+            why?: string
+        },
+        requestedOrgId?: string
+    ): Promise<ContentMaster> {
+        const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
+        this.assertOpenAi()
+        await this.assertQuota(userId, requestedOrgId)
+        const context = String(input.context || '').trim()
+        if (!context) throw httpError(400, 'Add context first')
+
+        const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
+        if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
+        const usedKeys = await this.loadUsedSourceKeys(organizationId)
+        source.used = usedKeys.has(sourceKey(source))
+        const [overlay, location] = await Promise.all([
+            this.loadOverlay(source),
+            this.loadLocation(source),
+        ])
+        source.overlay = overlay
+        source.location = location
+
+        const facts = await this.loadCopyFacts(source, org)
+        const draft = [
+            `HOOK: ${input.hook}`,
+            `BODY: ${input.body}`,
+            `CTA: ${input.cta || ''}`,
+            `USER CONTEXT:\n${context.slice(0, 4000)}`,
+        ].join('\n')
+        const completion = await openai!.chat.completions.create({
+            model: 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            temperature: 0.65,
+            max_tokens: 450,
+            messages: [
+                { role: 'system', content: refineMasterPrompt() },
+                { role: 'user', content: `${draft}\n\nFACTS:\n${facts}` },
+            ],
+        })
+        const parsed = this.parseJson(completion.choices[0]?.message?.content)
+        const hook = String(input.hook || '').trim()
+        const body = asStanzaBody(parsed.body_lines || parsed.lines, parsed.body || input.body)
+        if (!hook || !body) throw httpError(500, 'Failed to update the story')
+        if (organizationId) await SubscriptionService.logAiReport(organizationId, userId)
+
+        return {
+            story_type: 'moment',
+            hook,
+            body,
+            evidence_line: input.evidence_line || '',
+            cta: String(input.cta || 'Learn more about our work.').trim(),
+            why: (input.why || '').trim(),
+            layout: defaultLayout('moment'),
+            source,
+        }
+    }
+
+    static async generateVersions(
+        userId: string,
+        input: {
+            source_type: ContentSourceType
+            source_id: string
+            story_type: ContentStoryType
+            hook: string
+            body: string
+            evidence_line?: string
+            cta?: string
+            context?: string
+            channels: ContentChannel[]
+        },
+        requestedOrgId?: string
+    ): Promise<ContentChannelVersion[]> {
+        const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
+        this.assertOpenAi()
+        await this.assertQuota(userId, requestedOrgId)
+        const channels = (input.channels || []).filter((c): c is ContentChannel => CHANNELS.includes(c))
+        if (channels.length === 0) throw httpError(400, 'Pick at least one channel')
+
+        const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
+        if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
+        const facts = await this.loadCopyFacts(source, org)
+        const extra = String(input.context || '').trim()
+        const master = [
+            `HOOK: ${input.hook}`,
+            `BODY: ${input.body}`,
+            `CTA: ${input.cta || ''}`,
+            extra ? `USER CONTEXT:\n${extra.slice(0, 4000)}` : '',
+        ].filter(Boolean).join('\n')
+
+        const completion = await openai!.chat.completions.create({
+            model: 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            temperature: 0.75,
+            max_tokens: 2200,
+            messages: [
+                {
+                    role: 'system',
+                    content: versionsWriterPrompt(channels),
+                },
+                { role: 'user', content: `${master}\n\nFACTS:\n${facts}` },
+            ],
+        })
+        const parsed = this.parseJson(completion.choices[0]?.message?.content)
+        const raw = Array.isArray(parsed.versions) ? parsed.versions : []
+        const byChannel = new Map<string, any>()
+        for (const row of raw) {
+            if (row?.channel) byChannel.set(row.channel, row)
+        }
+        const seeMoreUrl = publicOrgUrl(org)
+        const versions: ContentChannelVersion[] = channels.map(channel => {
+            const row = byChannel.get(channel) || {}
+            if (channel === 'donor_email' || channel === 'newsletter') {
+                return {
+                    channel,
+                    email_subject: asLineCopy(row.email_subject || input.hook).slice(0, 80),
+                    email_body: withSeeMore(
+                        channel,
+                        fromCopyLines(row.email_lines || row.body_lines, row.email_body || `${input.body}\n\n${input.cta || ''}`),
+                        seeMoreUrl
+                    ),
+                }
+            }
+            const fallback = channel === 'sms'
+                ? input.hook.slice(0, 160)
+                : [input.hook, input.body, input.cta].filter(Boolean).join('\n\n')
+            return {
+                channel,
+                caption: withSeeMore(
+                    channel,
+                    fromCopyLines(row.caption_lines || row.lines, row.caption || fallback),
+                    seeMoreUrl
+                ),
+            }
+        })
+        if (organizationId) await SubscriptionService.logAiReport(organizationId, userId)
+        return versions
+    }
+
+    static async listPackages(userId: string, requestedOrgId?: string): Promise<ContentPackage[]> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const { data, error } = await supabase
+            .from('content_packages')
+            .select('*')
+            .eq('organization_id', organizationId)
+            .order('created_at', { ascending: false })
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_packages')
+            throw new Error(`Failed to load packages: ${error.message}`)
+        }
+        const packages = (data || []) as ContentPackage[]
+        if (packages.length === 0) return []
+        const { data: posts, error: postsError } = await supabase
+            .from('content_posts')
+            .select('*')
+            .eq('organization_id', organizationId)
+            .in('package_id', packages.map(p => p.id))
+            .order('created_at', { ascending: true })
+        if (postsError && !isMissingRelation(postsError)) {
+            throw new Error(`Failed to load versions: ${postsError.message}`)
+        }
+        const byPackage = new Map<string, ContentPost[]>()
+        for (const post of (posts || []) as ContentPost[]) {
+            if (!post.package_id) continue
+            const list = byPackage.get(post.package_id) || []
+            list.push(post)
+            byPackage.set(post.package_id, list)
+        }
+        return packages.map(pkg => ({
+            ...pkg,
+            image_url: pkg.image_url || byPackage.get(pkg.id)?.[0]?.image_url || null,
+            versions: byPackage.get(pkg.id) || [],
+        }))
+    }
+
+    static async savePackage(
+        userId: string,
+        input: {
+            story_type: ContentStoryType
+            hook: string
+            body: string
+            evidence_line?: string
+            cta?: string
+            why?: string
+            layout?: GraphicLayout
+            status?: ContentDraftStatus
+            source_type: ContentSourceType
+            source_id: string
+            versions: ContentChannelVersion[]
+        },
+        requestedOrgId?: string
+    ): Promise<ContentPackage> {
+        const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
+        const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
+        if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
+        const status: ContentDraftStatus = input.status === 'ready' ? 'ready' : 'draft'
+        const layout = input.layout || defaultLayout(input.story_type)
+
+        const { data: pkg, error } = await supabase
+            .from('content_packages')
+            .insert([{
+                organization_id: organizationId,
+                story_type: input.story_type,
+                hook: input.hook.trim(),
+                body: input.body.trim(),
+                evidence_line: input.evidence_line?.trim() || null,
+                cta: input.cta?.trim() || null,
+                why: input.why?.trim() || null,
+                visual_source_type: source.source_type,
+                visual_source_id: source.source_id,
+                layout,
+                status,
+                created_by: userId,
+            }])
+            .select('*')
+            .single()
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_packages')
+            throw new Error(`Failed to save story: ${error.message}`)
+        }
+
+        const rows = (input.versions || []).map(version => {
+            const { kind, format } = channelKind(version.channel)
+            const email_subject = version.email_subject?.trim() || null
+            const email_body = version.email_body?.trim() || null
+            return {
+                organization_id: organizationId,
+                kind,
+                format,
+                source_type: source.source_type,
+                source_id: source.source_id,
+                caption: version.caption?.trim() || null,
+                email_subject,
+                email_body,
+                email_html: kind === 'email' && email_subject && email_body
+                    ? wrapEmailHtml(org.name, email_subject, email_body, source.image_url)
+                    : null,
+                image_url: source.image_url,
+                overlay: source.overlay || null,
+                created_by: userId,
+                package_id: pkg.id,
+                channel: version.channel,
+                status,
+            }
+        })
+        if (rows.length) {
+            const { error: postError } = await supabase.from('content_posts').insert(rows)
+            if (postError) {
+                if (isMissingRelation(postError)) throw schemaMissing('content_posts')
+                throw new Error(`Failed to save versions: ${postError.message}`)
+            }
+        }
+        const match = (await this.listPackages(userId, requestedOrgId)).find(p => p.id === pkg.id)
+        return match || { ...pkg, versions: [] }
+    }
+
+    static async updatePackageStatus(
+        userId: string,
+        packageId: string,
+        status: ContentDraftStatus,
+        requestedOrgId?: string
+    ): Promise<ContentPackage> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const next = status === 'ready' ? 'ready' : 'draft'
+        const { error } = await supabase
+            .from('content_packages')
+            .update({ status: next })
+            .eq('id', packageId)
+            .eq('organization_id', organizationId)
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_packages')
+            throw new Error(`Failed to update story: ${error.message}`)
+        }
+        await supabase
+            .from('content_posts')
+            .update({ status: next })
+            .eq('package_id', packageId)
+            .eq('organization_id', organizationId)
+        const match = (await this.listPackages(userId, requestedOrgId)).find(p => p.id === packageId)
+        if (!match) throw OrgAccessService.accessDenied()
+        return match
+    }
+
+    static async deletePackage(userId: string, packageId: string, requestedOrgId?: string): Promise<void> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const { data: existing } = await supabase
+            .from('content_packages')
+            .select('id')
+            .eq('id', packageId)
+            .eq('organization_id', organizationId)
+            .maybeSingle()
+        if (!existing) throw OrgAccessService.accessDenied()
+        const { error } = await supabase
+            .from('content_packages')
+            .delete()
+            .eq('id', packageId)
+            .eq('organization_id', organizationId)
+        if (error) throw new Error(`Failed to delete story: ${error.message}`)
+    }
+
+    private static assertOpenAi() {
+        if (!isOpenAIConfigured() || !openai) throw httpError(500, 'OpenAI API key not configured')
+    }
+
+    private static async assertQuota(userId: string, requestedOrgId?: string) {
+        const quota = await SubscriptionService.checkAiReportQuota(userId, requestedOrgId)
+        if (!quota.canGenerate) {
+            throw httpError(
+                403,
+                `You've used your ${quota.limit} AI generation for today on the Free plan. Upgrade to Growth or Pro for unlimited.`,
+                'AI_REPORT_LIMIT_REACHED'
+            )
+        }
+    }
+
+    private static parseJson(raw?: string | null): any {
+        try {
+            return JSON.parse(raw || '{}')
+        } catch {
+            return {}
+        }
+    }
+
+    private static async loadUsedSourceKeys(organizationId: string): Promise<Set<string>> {
+        const { data, error } = await supabase
+            .from('content_posts')
+            .select('source_type, source_id')
+            .eq('organization_id', organizationId)
+        if (error) {
+            if (isMissingRelation(error)) return new Set()
+            throw new Error(`Failed to load used photos: ${error.message}`)
+        }
+        return new Set((data || []).map(row => `${row.source_type}:${row.source_id}`))
+    }
+
+    private static async loadRecentStoryTypes(organizationId: string): Promise<ContentStoryType[]> {
+        const { data, error } = await supabase
+            .from('content_packages')
+            .select('story_type, created_at')
+            .eq('organization_id', organizationId)
+            .order('created_at', { ascending: false })
+            .limit(8)
+        if (error || !data) return []
+        return data.map(row => row.story_type).filter(Boolean) as ContentStoryType[]
+    }
+
+    private static recommendWhy(
+        source: ContentSource,
+        storyType: ContentStoryType,
+        hasClaim: boolean,
+        unused: boolean
+    ): string {
+        const bits: string[] = []
+        if (unused) bits.push('it has not been used in a post yet')
+        if (daysAgo(source.date_represented) <= 21) bits.push('it is recent')
+        if (hasClaim) bits.push('it has a connected result')
+        if (storyType === 'journey') bits.push('it can show people over time')
+        if (storyType === 'glance') bits.push('it can lead with a number')
+        if (bits.length === 0) bits.push(`it is a strong ${storyType} from ${source.initiative_title}`)
+        return `Recommended because ${bits.join(', ')}.`
+    }
+
+    private static async loadOrgStoryContext(organizationId: string): Promise<string> {
+        const { data, error } = await supabase
+            .from('organization_context')
+            .select('problem_statement, theory_of_change')
+            .eq('organization_id', organizationId)
+            .maybeSingle()
+        if (error || !data) return ''
+        const parts: string[] = []
+        if (data.problem_statement?.trim()) parts.push(`Problem: ${trimText(data.problem_statement, 400)}`)
+        if (data.theory_of_change?.trim()) parts.push(`Theory of change: ${trimText(data.theory_of_change, 400)}`)
+        return parts.join('\n')
     }
 }

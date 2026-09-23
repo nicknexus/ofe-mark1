@@ -155,7 +155,7 @@ function ScopeChips({
       {!hideHeader && hint && <p className="text-[11px] text-gray-400 mb-1.5">{hint}</p>}
       <div className="flex flex-wrap gap-1.5">
         {options.length === 0 && !onCreate ? (
-          <p className="text-xs text-gray-400">None yet. An admin can add one from the program's Set up.</p>
+          <p className="text-xs text-gray-400">None yet. An admin can add one from the program's Quick setup.</p>
         ) : (
           <>
             {hideHeader && !single && allowAll && options.length > 1 && (

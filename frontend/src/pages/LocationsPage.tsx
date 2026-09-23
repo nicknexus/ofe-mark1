@@ -102,7 +102,7 @@ export default function LocationsPage() {
         <PageHeader
           className="mb-4 flex-shrink-0"
           title="Locations"
-          subtitle="Shared across programs. Create them here or from any program's Set up."
+          subtitle="Shared across programs. Create them here or from any program's Quick setup."
           help={<LocationsHelp />}
           actions={addButton}
         />
@@ -136,7 +136,7 @@ export default function LocationsPage() {
               ) : filtered.length === 0 ? (
                 <EmptyState
                   title={locations.length === 0 ? 'No locations yet' : 'No matches'}
-                  description={locations.length === 0 ? 'Locations are shared across programs. Add one here or from a program\'s Set up.' : undefined}
+                  description={locations.length === 0 ? 'Locations are shared across programs. Add one here or from a program\'s Quick setup.' : undefined}
                   action={locations.length === 0 && canEditLocations ? (
                     <button type="button" onClick={() => setIsCreateOpen(true)} className="app-btn app-btn-primary app-btn-sm">
                       Add location

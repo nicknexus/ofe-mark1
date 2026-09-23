@@ -100,8 +100,8 @@ export default function MobileDashboard({
 
  const handleDeleteInitiative = async (initiative: Initiative) => {
  if (!initiative.id) return
- if (deleteConfirmText !== 'DELETE MY INITIATIVE') {
- notify.error('Please type "DELETE MY INITIATIVE" exactly to confirm')
+ if (deleteConfirmText !== 'DELETE MY PROGRAM') {
+ notify.error('Please type "DELETE MY PROGRAM" exactly to confirm')
  return
  }
  try {
@@ -328,13 +328,13 @@ export default function MobileDashboard({
  </p>
  <div className="mb-4">
  <label className="app-label text-xs">
- Type <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">DELETE MY INITIATIVE</span> to confirm:
+ Type <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">DELETE MY PROGRAM</span> to confirm:
  </label>
  <input
  type="text"
  value={deleteConfirmText}
  onChange={(e) => setDeleteConfirmText(e.target.value)}
- placeholder="DELETE MY INITIATIVE"
+ placeholder="DELETE MY PROGRAM"
  className="app-input focus:border-red-500 focus:ring-red-100"
  />
  </div>
@@ -347,7 +347,7 @@ export default function MobileDashboard({
  </button>
  <button
  onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
- disabled={deleteConfirmText !== 'DELETE MY INITIATIVE'}
+ disabled={deleteConfirmText !== 'DELETE MY PROGRAM'}
  className="app-btn app-btn-danger flex-1 py-3"
  >
  Delete

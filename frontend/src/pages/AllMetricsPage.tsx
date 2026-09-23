@@ -181,7 +181,7 @@ export default function AllMetricsPage() {
       <div className="max-w-6xl mx-auto">
         <PageHeader
           title="Metrics"
-          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''}. Shared across programs. Create them here or from any program's Set up.`}
+          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''}. Shared across programs. Create them here or from any program's Quick setup.`}
           help={<MetricsHelp />}
           actions={addButton}
         />
@@ -205,7 +205,7 @@ export default function AllMetricsPage() {
             title={definitions.length === 0 ? 'No metrics yet' : `No metrics match "${search}"`}
             description={
               definitions.length === 0
-                ? 'Metrics are shared across programs. Create one here or attach it from a program\'s Set up.'
+                ? 'Metrics are shared across programs. Create one here or attach it from a program\'s Quick setup.'
                 : undefined
             }
           />

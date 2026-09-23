@@ -48,7 +48,7 @@ const TABS: { id: ProgramTab; label: string; icon: React.ComponentType<{ classNa
 
 /**
  * Program workspace. One compact header row (back, title, section switcher,
- * Report / Set up / Add log), one body. Logs is the default section: the
+ * Report / Quick setup / Add log), one body. Logs is the default section: the
  * page is a logging workspace first, metrics management lives one tab over.
  *
  * Perceived speed: the header paints immediately from the initiative passed
@@ -74,6 +74,7 @@ export default function InitiativePage() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
   const [kpiTotals, setKpiTotals] = useState<Record<string, number>>({})
   const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
+  const [locationCount, setLocationCount] = useState<number | null>(null)
 
   const [activeTab, setActiveTab] = useState<ProgramTab>(() => {
     const tab = searchParams.get('tab')
@@ -112,6 +113,7 @@ export default function InitiativePage() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
+    setLocationCount(null)
     if (id) loadDashboard()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -175,6 +177,7 @@ export default function InitiativePage() {
       setLoadingState({ isLoading: false })
       // Totals are only needed by the Metrics section; never block the page on them.
       if (data?.kpis) void loadKPITotals(data.kpis)
+      void apiService.getLocations(id).then(rows => setLocationCount(rows.length)).catch(() => setLocationCount(null))
     } catch (error: any) {
       if (error?.code === 'INITIATIVE_LOCKED') {
         notify.error('This program is locked on your current plan. Upgrade to unlock it.')
@@ -276,9 +279,12 @@ export default function InitiativePage() {
     return `${activeOrganization?.is_demo ? '/demo' : '/org'}/${orgSlug}/${initSlug}`
   }, [activeOrganization?.slug, activeOrganization?.is_demo, initiative?.slug])
 
-  // Optimistic while the dashboard payload is still in flight so the primary
-  // action is never greyed out during the first paint.
-  const setupReady = !dashboard || dashboard.kpis.length > 0
+  // Grey out only once we know a metric or a location is missing. While either
+  // count is still loading, leave Add log clickable.
+  const setupReady = !(
+    (dashboard != null && dashboard.kpis.length === 0) ||
+    locationCount === 0
+  )
 
   // ── Body ───────────────────────────────────────────────────────────────
 
@@ -293,21 +299,21 @@ export default function InitiativePage() {
               <div className="app-icon-tile mx-auto mb-6">
                 <BarChart3 className="w-6 h-6 text-primary-500" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Set up this program</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">Add a metric to this program</h3>
               <p className="text-gray-500 text-sm mb-6 leading-relaxed">
                 Add the metrics you want to track and the locations where the work happens. Then log claims and evidence against them.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                {canEditInitiatives && (
-                  <button onClick={() => setSetupOpen(true)} className="app-btn app-btn-primary">
-                    <Settings2 className="w-4 h-4" />
-                    <span>Open Set up</span>
-                  </button>
-                )}
                 {canAddMetrics && (
                   <button onClick={() => setIsKPIModalOpen(true)} className="app-btn app-btn-secondary">
                     <Plus className="w-4 h-4" />
                     <span>Add a metric</span>
+                  </button>
+                )}
+                {canEditInitiatives && (
+                  <button onClick={() => setSetupOpen(true)} className="app-btn app-btn-primary">
+                    <Settings2 className="w-4 h-4" />
+                    <span>Quick setup</span>
                   </button>
                 )}
               </div>
@@ -334,9 +340,9 @@ export default function InitiativePage() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'logs':
-        return <TimelineTab initiativeId={id!} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} hideHeader />
+        return <TimelineTab initiativeId={id!} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} hideHeader onQuickSetup={canEditInitiatives ? () => setSetupOpen(true) : undefined} knownMetricCount={dashboard?.kpis.length} knownLocationCount={locationCount} />
       case 'location':
-        return <LocationTab onStoryClick={openStory} onMetricClick={handleMetricCardClick} />
+        return <LocationTab onStoryClick={openStory} onMetricClick={handleMetricCardClick} onCount={setLocationCount} />
       case 'beneficiaries':
         return <BeneficiariesTab initiativeId={id!} onRefresh={loadDashboard} onStoryClick={openStory} onMetricClick={handleMetricCardClick} />
       case 'stories':
@@ -416,20 +422,20 @@ export default function InitiativePage() {
             <button type="button" onClick={() => setReportOpen(true)} className="app-btn app-btn-ghost text-gray-600" title="Generate an AI impact report">
               <Sparkles className="w-4 h-4 text-primary-800" /> <span className="hidden lg:inline">Report</span>
             </button>
-            {canEditInitiatives && (
-              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary" title="Metrics, tags, locations, groups">
-                <Settings2 className="w-4 h-4" /> <span className="hidden md:inline">Set up</span>
-              </button>
-            )}
             {canLog && (
               <button
                 type="button"
                 onClick={handleAddLog}
                 disabled={!setupReady}
-                title={setupReady ? 'Log a claim or evidence' : 'Add a metric first'}
+                title={setupReady ? 'Log a claim or evidence' : 'You must add at least one metric and 1 location to this program before making your first log.'}
                 className="app-btn app-btn-primary"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add log</span>
+              </button>
+            )}
+            {canEditInitiatives && (
+              <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary" title="Metrics, tags, locations, groups">
+                <Settings2 className="w-4 h-4" /> <span className="hidden md:inline">Quick setup</span>
               </button>
             )}
           </div>
@@ -442,6 +448,8 @@ export default function InitiativePage() {
               const Icon = t.icon
               const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
               const count = t.id === 'metrics' ? (dashboard?.kpis.length ?? 0) : t.id === 'logs' ? allKPIUpdates.length : null
+              const missing = (t.id === 'metrics' && dashboard != null && dashboard.kpis.length === 0)
+                || (t.id === 'location' && locationCount === 0)
               return (
                 <button
                   key={t.id}
@@ -454,6 +462,9 @@ export default function InitiativePage() {
                 >
                   <Icon className={`w-4 h-4 transition-colors ${active ? 'text-primary-700' : 'text-gray-400 group-hover:text-gray-600'}`} />
                   <span>{t.label}</span>
+                  {missing && (
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold leading-none" title="None yet" aria-label="None yet">!</span>
+                  )}
                   {count !== null && count > 0 && (
                     <span className={`min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-semibold tabular-nums text-center transition-colors ${
                       active ? 'bg-primary-100 text-primary-900' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200/80'
@@ -480,7 +491,14 @@ export default function InitiativePage() {
         {renderActiveTab()}
       </div>
 
-      <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        alerts={{
+          metrics: dashboard != null && dashboard.kpis.length === 0,
+          location: locationCount === 0,
+        }}
+      />
 
       {/* Overlays */}
       {setupOpen && (
@@ -490,6 +508,7 @@ export default function InitiativePage() {
           isOpen
           onClose={() => setSetupOpen(false)}
           onChanged={refreshAfterChange}
+          onLocationsAdded={(n) => setLocationCount(c => Math.max(0, (c ?? 0) + n))}
         />
       )}
 
@@ -515,9 +534,28 @@ export default function InitiativePage() {
         onClose={() => setIsKPIModalOpen(false)}
         onSubmit={handleCreateKPI}
         initiativeId={id!}
-        onAttached={async () => {
-          apiService.clearCache(`/initiatives/${id}/dashboard`)
-          if (!isLoadingDashboard) await loadDashboard()
+        onAttached={(created, meta) => {
+          const drop = new Set(meta?.dropPendingDefinitionIds || [])
+          if (created?.length || drop.size > 0) {
+            setDashboard(prev => {
+              if (!prev) return prev
+              const kept = prev.kpis.filter(k => !(String(k.id).startsWith('pending-') && drop.has(k.definition_id || '')))
+              const known = new Set(kept.map(k => k.id))
+              const added = (created || []).filter(k => k.id && !known.has(k.id)).map(k => ({
+                ...k,
+                evidence_count: 0,
+                evidence_percentage: 0,
+                total_updates: 0,
+                total_value: 0,
+                evidence_types: [],
+              }))
+              return { ...prev, kpis: [...kept, ...added] }
+            })
+          }
+          if (drop.size > 0) {
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+            if (!isLoadingDashboard) void loadDashboard()
+          }
         }}
       />
 

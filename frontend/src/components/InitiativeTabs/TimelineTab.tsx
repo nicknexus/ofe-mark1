@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../../services/api'
@@ -65,6 +65,11 @@ interface TimelineTabProps {
  /** The parent header already owns the "Logs" title and Add log button
   * (program page): drop our title row so the list gets the height. */
  hideHeader?: boolean
+ /** Opens Quick setup when a program has no metric or location yet. */
+ onQuickSetup?: () => void
+ /** Live structure counts. The timeline payload lags behind adds. */
+ knownMetricCount?: number
+ knownLocationCount?: number | null
 }
 
 /** Dimension filters that live behind the Filters toggle (search + status
@@ -104,7 +109,7 @@ function LogsSkeleton() {
  * params so filtered views can be deep-linked, refreshed, and navigated with
  * browser controls (?tab=logs&view=...&metric=...).
  */
-export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal, hideHeader }: TimelineTabProps) {
+export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal, hideHeader, onQuickSetup, knownMetricCount, knownLocationCount }: TimelineTabProps) {
  const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canDelete, canManageTeam, canEditMetrics } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
@@ -129,6 +134,8 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
  const [addEvidenceTarget, setAddEvidenceTarget] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [isWizardOpen, setIsWizardOpen] = useState(false)
+ const listRef = useRef<HTMLDivElement>(null)
+ const scrollAfterCreate = useRef(false)
  // Advanced flows picked from the wizard's Simple/Advanced step
  const [advancedUpload, setAdvancedUpload] = useState<'claim' | 'evidence' | null>(null)
  const [evidenceMode, setEvidenceMode] = useState<EvidenceViewMode>('list')
@@ -194,8 +201,12 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [])
 
- // Parent-triggered "Add Log" (e.g. metric detail header). Ignore the initial 0.
+ // Parent-triggered "Add Log". The tab unmounts when you leave Logs, so a
+ // leftover signal from an earlier click must not reopen the wizard on return.
+ const seenAddLogSignal = useRef(openAddLogSignal)
  useEffect(() => {
+ if (openAddLogSignal === seenAddLogSignal.current) return
+ seenAddLogSignal.current = openAddLogSignal
  if (openAddLogSignal) setIsWizardOpen(true)
  }, [openAddLogSignal])
 
@@ -224,6 +235,15 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  await load()
  onRefresh?.()
  }, [initiativeId, load, onRefresh])
+
+ useEffect(() => {
+ if (!scrollAfterCreate.current || loading) return
+ scrollAfterCreate.current = false
+ requestAnimationFrame(() => {
+ const el = listRef.current
+ if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+ })
+ }, [data, loading])
 
  const handleOpenClaim = (claim: TimelineClaim, kpi: KPI | undefined) => {
  setSelectedEvidence(null)
@@ -459,7 +479,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
       </div>
 
       {/* Active view — fills remaining height down to the phone nav / desktop chrome */}
-      <div className={`px-4 sm:px-6 pb-2 md:pb-6 pt-2.5 bg-gray-50 min-h-0 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
+      <div ref={listRef} className={`px-4 sm:px-6 pb-2 md:pb-6 pt-2.5 bg-gray-50 min-h-0 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
         {loading ? (
           <LogsSkeleton />
         ) : !data ? (
@@ -489,6 +509,9 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                   onOpenClaim={handleOpenClaim}
                   onAddEvidenceToClaim={handleAddEvidenceToClaim}
                   onConnectExistingToClaim={handleConnectExistingToClaim}
+                  onQuickSetup={onQuickSetup}
+                  knownMetricCount={knownMetricCount}
+                  knownLocationCount={knownLocationCount}
                 />
               ) : view === 'evidence' ? (
                 <EvidenceView
@@ -499,6 +522,9 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                   filters={filters}
                   mode={evidenceMode}
                   onOpenEvidence={handleOpenEvidence}
+                  onQuickSetup={onQuickSetup}
+                  knownMetricCount={knownMetricCount}
+                  knownLocationCount={knownLocationCount}
                 />
               ) : (
                 <ConnectionsView
@@ -512,6 +538,10 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                   onOpenEvidence={handleOpenEvidence}
                   onAddEvidenceToClaim={handleAddEvidenceToClaim}
                   onConnectExistingToClaim={handleConnectExistingToClaim}
+                  onAddLog={(canAddImpactClaims || canAddEvidence) ? () => setIsWizardOpen(true) : undefined}
+                  onQuickSetup={onQuickSetup}
+                  knownMetricCount={knownMetricCount}
+                  knownLocationCount={knownLocationCount}
                 />
               )}
             </motion.div>
@@ -537,7 +567,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  existingClaims={data.claims}
  existingEvidence={data.evidence}
  onClose={() => setIsWizardOpen(false)}
- onCreated={refresh}
+ onCreated={() => { scrollAfterCreate.current = true; return refresh() }}
  />
  )}
 
@@ -547,7 +577,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  isOpen
  initiativeId={initiativeId}
  onClose={() => setAdvancedUpload(null)}
- onCreated={() => refresh()}
+ onCreated={() => { scrollAfterCreate.current = true; return refresh() }}
  />
  )}
 
@@ -557,7 +587,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  isOpen
  initiativeId={initiativeId}
  onClose={() => setAdvancedUpload(null)}
- onCreated={() => refresh()}
+ onCreated={() => { scrollAfterCreate.current = true; return refresh() }}
  />
  )}
 
@@ -593,7 +623,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  existingEvidence={data.evidence}
  evidenceForClaim={addEvidenceTarget.claim}
  onClose={() => setAddEvidenceTarget(null)}
- onCreated={refresh}
+ onCreated={() => { scrollAfterCreate.current = true; return refresh() }}
  />
  )}
 

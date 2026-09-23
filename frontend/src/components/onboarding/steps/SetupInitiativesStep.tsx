@@ -83,7 +83,7 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
           <p className="text-sm text-secondary-600">
             Prefer one screen? Open the full setup for <span className="font-medium text-secondary-900">{active.title}</span> to add metrics, tags, locations and groups together.
           </p>
-          <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary app-btn-sm flex-shrink-0">Open full setup</button>
+          <button type="button" onClick={() => setSetupOpen(true)} className="app-btn app-btn-secondary app-btn-sm flex-shrink-0">Quick setup</button>
         </div>
 
         <MetricsSection

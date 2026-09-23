@@ -89,6 +89,16 @@ export class InitiativeService {
             slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
         }
 
+        // Append. The column default is 0, which sorts a new program in with
+        // every other unset row instead of after the ones already arranged.
+        const { data: lastRows } = await supabase
+            .from('initiatives')
+            .select('display_order')
+            .eq('organization_id', organizationId)
+            .order('display_order', { ascending: false })
+            .limit(1);
+        const displayOrder = ((lastRows?.[0]?.display_order as number | undefined) ?? -1) + 1;
+
         const { data, error } = await supabase
             .from('initiatives')
             .insert([{
@@ -96,7 +106,8 @@ export class InitiativeService {
                 user_id: userId,
                 organization_id: organizationId,
                 slug: slug,
-                is_public: initiative.is_public || false
+                is_public: initiative.is_public || false,
+                display_order: displayOrder,
             }])
             .select()
             .single();
@@ -112,7 +123,8 @@ export class InitiativeService {
                         user_id: userId,
                         organization_id: organizationId,
                         slug: fallbackSlug,
-                        is_public: initiative.is_public || false
+                        is_public: initiative.is_public || false,
+                        display_order: displayOrder,
                     }])
                     .select()
                     .single();

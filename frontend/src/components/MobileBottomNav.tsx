@@ -12,9 +12,10 @@ import {
 interface MobileBottomNavProps {
  activeTab: string
  onTabChange: (tab: string) => void
+ alerts?: Partial<Record<string, boolean>>
 }
 
-export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps) {
+export default function MobileBottomNav({ activeTab, onTabChange, alerts }: MobileBottomNavProps) {
   const tabs = [
     { id: 'logs', label: 'Logs', icon: Activity },
     { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
@@ -45,7 +46,12 @@ export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottom
  onClick={() => onTabChange(tab.id)}
  className={`mobile-nav-item ${isActive ? 'mobile-nav-item-active' : ''}`}
  >
+ <span className="relative">
  <Icon className="w-6 h-6" />
+ {alerts?.[tab.id] && (
+ <span className="absolute -top-1.5 -right-2 text-[12px] font-bold leading-none text-amber-600" aria-label="None yet">!</span>
+ )}
+ </span>
  <span className="text-sm font-semibold">{tab.label}</span>
  </button>
  )

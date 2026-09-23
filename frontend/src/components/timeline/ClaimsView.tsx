@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { TrendingUp, Paperclip, Link2 } from 'lucide-react'
+import { TrendingUp, Paperclip, Link2, AlertCircle, Settings2 } from 'lucide-react'
 import { EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
@@ -8,6 +8,7 @@ import {
   deriveClaimStatus,
   filterClaims,
   hasActiveFilters,
+  needsFirstLogSetup,
   sortByMode,
 } from '../../utils/timeline'
 import TimelineRow, { TimelineRowHeader } from './TimelineRow'
@@ -27,10 +28,13 @@ interface ClaimsViewProps {
   onAddEvidenceToClaim?: (claim: TimelineClaim, kpi: KPI | undefined) => void
   /** Attach an existing unconnected evidence record to this claim. */
   onConnectExistingToClaim?: (claim: TimelineClaim) => void
+  onQuickSetup?: () => void
+  knownMetricCount?: number
+  knownLocationCount?: number | null
 }
 
-/** All impact claims in the initiative, newest upload first. */
-export default function ClaimsView({ claims, kpis, locations, evidence, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim }: ClaimsViewProps) {
+/** All impact claims in the initiative, oldest first so a new log sits at the bottom. */
+export default function ClaimsView({ claims, kpis, locations, evidence, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim, onQuickSetup, knownMetricCount, knownLocationCount }: ClaimsViewProps) {
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
 
@@ -57,16 +61,30 @@ export default function ClaimsView({ claims, kpis, locations, evidence, contribu
   )
 
   if (rows.length === 0) {
+    const needsSetup = !hasActiveFilters(filters) && needsFirstLogSetup({
+      kpiCount: kpis.length,
+      locationCount: locations.length,
+      knownMetricCount,
+      knownLocationCount,
+    })
     return (
-      <div className="app-card md:p-8">
+      <div className="app-card md:p-8 min-h-[24rem] flex items-center justify-center">
         <EmptyState
-          icon={TrendingUp}
-          title="No impact claims found"
+          icon={needsSetup ? AlertCircle : TrendingUp}
+          title={needsSetup ? 'Before your first log' : 'No impact claims found'}
           description={
-            hasActiveFilters(filters)
-              ? 'Try adjusting your filters or search query'
-              : 'Add your first impact claim to start tracking progress'
+            needsSetup
+              ? 'You must add at least one metric and 1 location to this program before making your first log.'
+              : hasActiveFilters(filters)
+                ? 'Try adjusting your filters or search query'
+                : 'Add your first impact claim to start tracking progress'
           }
+          action={needsSetup && onQuickSetup ? (
+            <button type="button" onClick={onQuickSetup} className="app-btn app-btn-lg app-btn-primary">
+              <Settings2 className="w-5 h-5" />
+              Quick setup
+            </button>
+          ) : undefined}
         />
       </div>
     )

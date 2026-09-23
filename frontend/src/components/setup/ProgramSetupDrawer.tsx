@@ -23,6 +23,8 @@ interface ProgramSetupDrawerProps {
   onClose: () => void
   /** Fired after any structural change so the parent can refresh counts. */
   onChanged?: () => void
+  /** Immediate location-count delta so other tabs do not wait on the reload. */
+  onLocationsAdded?: (delta: number) => void
 }
 
 /**
@@ -35,7 +37,7 @@ interface ProgramSetupDrawerProps {
  * forms, so validation, plan gates and permissions behave exactly as
  * they do elsewhere.
  */
-export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOpen, onClose, onChanged }: ProgramSetupDrawerProps) {
+export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOpen, onClose, onChanged, onLocationsAdded }: ProgramSetupDrawerProps) {
   const { canAddMetrics, canEditMetrics, canDelete, canEditLocations, canAddBeneficiaries, canEditBeneficiaries, canEditTags, activeOrganization } = useTeam()
 
   const [loading, setLoading] = useState(true)
@@ -212,7 +214,7 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
   const orgLogoUrl = activeOrganization?.logo_url
 
   return createPortal(
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Program setup">
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Quick setup">
       <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm animate-fade-in" onClick={onClose} />
       <aside className="absolute inset-y-0 right-0 w-full max-w-2xl app-canvas shadow-app-modal border-l border-gray-200 flex flex-col animate-slide-in-right">
         {/* Header: branded identity + readiness at a glance */}
@@ -230,7 +232,7 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-primary-900/70 leading-none mb-1 inline-flex items-center gap-1">
-                  <Settings2 className="w-3 h-3" /> Program setup
+                  <Settings2 className="w-3 h-3" /> Quick setup
                 </p>
                 <h2 className="text-xl font-semibold text-gray-900 tracking-tight truncate leading-tight">{initiativeTitle || 'Program'}</h2>
                 <p className="text-sm text-gray-500 mt-0.5">Metrics, tags, locations and groups. Everything a log needs to connect.</p>
@@ -454,6 +456,7 @@ export default function ProgramSetupDrawer({ initiativeId, initiativeTitle, isOp
           initiativeId={initiativeId}
           excludeIds={locations.map(l => l.id!).filter(Boolean)}
           onCreateNew={() => { setLocationPickerOpen(false); setLocationModal({}) }}
+          onOptimisticAdd={(n) => onLocationsAdded?.(n)}
           onLinked={async () => { setLocationPickerOpen(false); await changed() }}
         />
       )}

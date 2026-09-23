@@ -26,7 +26,6 @@ import { User } from '../types'
 import { AuthService } from '../services/auth'
 import { useTeam } from '../context/TeamContext'
 import { useTutorial } from '../context/TutorialContext'
-import { useOnboarding } from '../context/OnboardingContext'
 import { notify } from '../lib/notify'
 import { getSupportContext } from '../admin/support'
 import { dropdownPop } from './timeline/motion'
@@ -89,6 +88,7 @@ function NavRow({
   compact,
   soon,
   nudge,
+  beta,
   accent = 'primary',
 }: {
   to: string
@@ -99,6 +99,7 @@ function NavRow({
   compact?: boolean
   soon?: boolean
   nudge?: boolean
+  beta?: boolean
   accent?: 'primary' | 'claim'
 }) {
   const claim = accent === 'claim'
@@ -130,6 +131,9 @@ function NavRow({
       {soon && (
         <span className="relative z-10 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Soon</span>
       )}
+      {beta && (
+        <span className="relative z-10 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary-600 text-white">Beta</span>
+      )}
       {nudge && (
         <span className="relative z-10 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
       )}
@@ -160,7 +164,6 @@ export default function AppSidebar({ user }: AppSidebarProps) {
     loading: teamLoading,
   } = useTeam()
   const { startTutorial } = useTutorial()
-  const { startOnboarding } = useOnboarding()
   const isDemoOrg = !!activeOrganization?.is_demo
   const supportContext = getSupportContext()
   const canEditShare = isOwner || isAdmin
@@ -351,18 +354,25 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             }`} />
           </Link>
           {trackingOpen && (
-            <div className="mt-1.5 ml-8 mr-1.5 mb-1 rounded-xl bg-primary-50/50 p-1 space-y-0.5">
-              {LIBRARY_ITEMS.map(item => (
-                <NavRow
-                  key={item.to}
-                  to={item.to}
-                  label={item.label}
-                  icon={item.icon}
-                  active={pathActive(pathname, item.to)}
-                  nested
-                  compact
-                />
-              ))}
+            <div className="relative ml-5 mt-0.5 mb-1 pl-3">
+              <span className="absolute left-0 top-1 bottom-2 w-px bg-gray-200" aria-hidden />
+              {LIBRARY_ITEMS.map(item => {
+                const Icon = item.icon
+                const active = pathActive(pathname, item.to)
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                    }`}
+                  >
+                    <span className="absolute -left-3 top-1/2 w-2.5 h-px bg-gray-200" aria-hidden />
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-gray-700' : 'text-gray-400'}`} />
+                    <span className="truncate">Global {item.label}</span>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
@@ -382,6 +392,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
               active={pathActive(pathname, item.to)}
               nested
               nudge={item.to === '/share/public' && needsPublicNudge}
+              beta={item.to === '/share/create'}
               accent="claim"
             />
           ))}
@@ -392,15 +403,6 @@ export default function AppSidebar({ user }: AppSidebarProps) {
         </p>
         <div>
           <NavRow to="/explore" label="Explore" icon={Compass} active={pathActive(pathname, '/explore')} nested />
-          <button
-            type="button"
-            onClick={startOnboarding}
-            className="relative w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50"
-          >
-            <Sparkles className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span className="flex-1 text-left">Setup</span>
-            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary-600 text-white">Beta</span>
-          </button>
           <button
             type="button"
             onClick={startTutorial}

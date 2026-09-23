@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { FileText, Camera, MessageSquare, DollarSign } from 'lucide-react'
+import { FileText, Camera, MessageSquare, DollarSign, AlertCircle, Settings2 } from 'lucide-react'
 import { EmptyState } from '../ui'
 import { getStatusStyle } from './statusStyles'
 import { KPI, Location, TimelineContributor, TimelineEvidence } from '../../types'
@@ -10,6 +10,7 @@ import {
   filterEvidence,
   getEvidenceImageUrl,
   hasActiveFilters,
+  needsFirstLogSetup,
   sortByMode,
 } from '../../utils/timeline'
 import TimelineRow, { TimelineRowHeader } from './TimelineRow'
@@ -32,10 +33,13 @@ interface EvidenceViewProps {
   filters: TimelineFilters
   mode: EvidenceViewMode
   onOpenEvidence: (evidence: TimelineEvidence) => void
+  onQuickSetup?: () => void
+  knownMetricCount?: number
+  knownLocationCount?: number | null
 }
 
-/** All evidence in the initiative, newest upload first. */
-export default function EvidenceView({ evidence, kpis, locations, contributors, filters, mode, onOpenEvidence }: EvidenceViewProps) {
+/** All evidence in the initiative, oldest first so a new log sits at the bottom. */
+export default function EvidenceView({ evidence, kpis, locations, contributors, filters, mode, onOpenEvidence, onQuickSetup, knownMetricCount, knownLocationCount }: EvidenceViewProps) {
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
 
@@ -45,6 +49,29 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
   )
 
   if (rows.length === 0) {
+    const needsSetup = !hasActiveFilters(filters) && needsFirstLogSetup({
+      kpiCount: kpis.length,
+      locationCount: locations.length,
+      knownMetricCount,
+      knownLocationCount,
+    })
+    if (needsSetup) {
+      return (
+        <div className="app-card md:p-8 min-h-[24rem] flex items-center justify-center">
+          <EmptyState
+            icon={AlertCircle}
+            title="Before your first log"
+            description="You must add at least one metric and 1 location to this program before making your first log."
+            action={onQuickSetup ? (
+              <button type="button" onClick={onQuickSetup} className="app-btn app-btn-lg app-btn-primary">
+                <Settings2 className="w-5 h-5" />
+                Quick setup
+              </button>
+            ) : undefined}
+          />
+        </div>
+      )
+    }
     return (
       <div className="app-card overflow-hidden">
         <TimelineRowHeader kindLabel="Evidence" />

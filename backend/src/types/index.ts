@@ -393,6 +393,11 @@ export type ContentPostKind = 'social' | 'email';
 export type ContentPostFormat = 'ig_square' | 'linkedin' | 'email';
 export type ContentSourceType = 'evidence' | 'story';
 export type GraphicLayout = 'clean' | 'title' | 'stats';
+export type GraphicAspect = 'square' | 'landscape' | 'portrait';
+export type ContentStoryType = 'glance' | 'moment' | 'journey';
+export type ContentChannel = 'linkedin' | 'instagram' | 'facebook' | 'donor_email' | 'newsletter' | 'sms';
+export type ContentDraftStatus = 'draft' | 'ready';
+export type ContentUsageFilter = 'all' | 'unused' | 'used';
 
 export interface ContentOverlay {
     label: string;
@@ -411,6 +416,8 @@ export interface ContentSource {
     initiative_id: string;
     initiative_title: string;
     overlay?: ContentOverlay | null;
+    used?: boolean;
+    location?: string | null;
 }
 
 export interface ContentPost {
@@ -429,6 +436,9 @@ export interface ContentPost {
     created_by?: string | null;
     created_at: string;
     updated_at: string;
+    package_id?: string | null;
+    channel?: ContentChannel | null;
+    status?: ContentDraftStatus;
 }
 
 export interface ContentCopy {
@@ -436,6 +446,44 @@ export interface ContentCopy {
     caption_linkedin: string;
     email_subject: string;
     email_body: string;
+}
+
+export interface ContentMaster {
+    story_type: ContentStoryType;
+    hook: string;
+    body: string;
+    evidence_line: string;
+    cta: string;
+    why: string;
+    layout: GraphicLayout;
+    source: ContentSource;
+}
+
+export interface ContentChannelVersion {
+    channel: ContentChannel;
+    caption?: string;
+    email_subject?: string;
+    email_body?: string;
+}
+
+export interface ContentPackage {
+    id: string;
+    organization_id: string;
+    story_type: ContentStoryType;
+    hook?: string | null;
+    body?: string | null;
+    evidence_line?: string | null;
+    cta?: string | null;
+    why?: string | null;
+    visual_source_type?: ContentSourceType | null;
+    visual_source_id?: string | null;
+    layout: GraphicLayout;
+    status: ContentDraftStatus;
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+    image_url?: string | null;
+    versions?: ContentPost[];
 }
 
 export interface User {
