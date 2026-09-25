@@ -62,40 +62,6 @@ export class SubscriptionService {
  }
 
  /**
- * Redeem an access code for extended trial
- */
- static async redeemCode(code: string): Promise<{
- success: boolean
- subscription: Subscription
- remainingTrialDays: number
- daysGranted: number
- message: string
- }> {
- const headers = await getAuthHeaders()
- 
- const response = await fetch(`${API_BASE_URL}/api/subscription/redeem-code`, {
- method: 'POST',
- headers,
- body: JSON.stringify({ code })
- })
- 
- if (!response.ok) {
- let message = 'Failed to redeem access code'
- try {
- const error = await response.json()
- if (error?.error && typeof error.error === 'string') message = error.error
- } catch {
- // non-JSON or empty body
- }
- throw new Error(message)
- }
-
- apiService.clearCache('/subscription')
-
- return response.json()
- }
-
- /**
  * Create a Stripe checkout session. Pass a tier + interval for self-serve
  * Growth/Pro checkout, or an explicit priceId for legacy/offer links.
  */
@@ -117,11 +83,38 @@ export class SubscriptionService {
  })
  
  if (!response.ok) {
- const error = await response.json()
- throw new Error(error.error || 'Failed to create checkout session')
+ const error = await response.json().catch(() => ({}))
+ // 409 = already subscribed; callers send these users to billing management.
+ const err = new Error(
+ response.status === 409
+ ? 'You already have an active plan. Opening billing.'
+ : "Couldn't open checkout. Please try again.",
+ ) as Error & { usePortal?: boolean }
+ err.usePortal = !!error.usePortal
+ throw err
  }
  
  return response.json()
+ }
+
+ /**
+ * Send the browser to Stripe Checkout for a tier. If the account already has
+ * a live subscription, open billing management instead. Throws only
+ * client-safe messages.
+ */
+ static async startCheckout(tier: 'growth' | 'pro', interval: 'monthly' | 'annual'): Promise<void> {
+ try {
+ const { url } = await SubscriptionService.createCheckoutSession({ tier, interval })
+ if (!url) throw new Error("Couldn't open checkout. Please try again.")
+ window.location.href = url
+ } catch (error) {
+ if ((error as { usePortal?: boolean }).usePortal) {
+ const { url } = await SubscriptionService.createPortalSession()
+ window.location.href = url
+ return
+ }
+ throw error
+ }
  }
 
  /**
@@ -160,8 +153,7 @@ export class SubscriptionService {
  })
  
  if (!response.ok) {
- const error = await response.json()
- throw new Error(error.error || 'Failed to create portal session')
+ throw new Error("Couldn't open billing. Please try again.")
  }
  
  return response.json()

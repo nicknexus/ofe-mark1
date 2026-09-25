@@ -1,37 +1,70 @@
-import React, { useState, useEffect } from 'react'
-import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight, Users, Mail, Ticket } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { CreditCard, LogOut, Clock, Users, CheckCircle2, type LucideIcon } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { SubscriptionService } from '../services/subscription'
 import { TeamService } from '../services/team'
 import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
-import toast from 'react-hot-toast'
+import { notify } from '../lib/notify'
+import { PLAN_INFO } from './TrialActivationPage'
+import { TRIAL_DURATION_DAYS } from '../config/trial'
+import { useRecheckOnReturn } from '../hooks/useRecheckOnReturn'
+import type { PendingTier } from '../utils/pendingPlan'
 
 interface Props {
     reason: string
     remainingDays?: number | null
+    /** True when this account has never started a trial (they get one at checkout). */
+    trialAvailable?: boolean
+    /** Re-read subscription status (after returning from Stripe). */
+    onRecheck: () => void
 }
 
-export default function SubscriptionExpiredPage({ reason }: Props) {
-    const [subscribing, setSubscribing] = useState(false)
-    const [upgrading, setUpgrading] = useState<string | null>(null)
+type Variant = 'trial_ended' | 'subscription_ended' | 'payment_failed'
+
+function variantFor(reason: string): Variant {
+    switch (reason) {
+        case 'trial_payment_failed':
+            return 'payment_failed'
+        case 'subscription_ended':
+        case 'subscription_cancelled':
+        case 'payment_past_due':
+            return 'subscription_ended'
+        default:
+            return 'trial_ended'
+    }
+}
+
+const COPY: Record<Variant, { title: string; subtitle: string; icon: LucideIcon }> = {
+    trial_ended: {
+        title: 'Your free trial has ended',
+        subtitle: 'Pick a plan to keep going. Your programs and data are saved.',
+        icon: Clock,
+    },
+    subscription_ended: {
+        title: 'Your subscription has ended',
+        subtitle: 'Sign back up to pick up right where you left off. Your data is saved.',
+        icon: CreditCard,
+    },
+    payment_failed: {
+        title: 'Your trial has ended',
+        subtitle: "We couldn't charge your card. Update it to keep going. Your data is saved.",
+        icon: CreditCard,
+    },
+}
+
+export default function SubscriptionExpiredPage({ reason, trialAvailable, onRecheck }: Props) {
+    const [busy, setBusy] = useState<string | null>(null)
+    const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
     const [isSharedMember, setIsSharedMember] = useState(false)
     const [checkingPermissions, setCheckingPermissions] = useState(true)
-    const [showAccessCode, setShowAccessCode] = useState(false)
-    const [accessCode, setAccessCode] = useState('')
-    const [redeemingCode, setRedeemingCode] = useState(false)
+
+    useRecheckOnReturn(onRecheck)
 
     useEffect(() => {
-        const checkPermissions = async () => {
-            try {
-                const permissions = await TeamService.getPermissions()
-                setIsSharedMember(permissions.isSharedMember)
-            } catch (error) {
-                console.error('Error checking permissions:', error)
-            } finally {
-                setCheckingPermissions(false)
-            }
-        }
-        checkPermissions()
+        TeamService.getPermissions()
+            .then((permissions) => setIsSharedMember(permissions.isSharedMember))
+            .catch(() => setIsSharedMember(false))
+            .finally(() => setCheckingPermissions(false))
     }, [])
 
     const handleSignOut = async () => {
@@ -39,76 +72,24 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         window.location.reload()
     }
 
-    const handleSubscribe = async (tier: 'growth' | 'pro') => {
-        setUpgrading(tier)
+    const handleSubscribe = async (tier: PendingTier) => {
+        setBusy(tier)
         try {
-            const { url } = await SubscriptionService.createCheckoutSession({ tier, interval: 'monthly' })
-            if (url) window.location.href = url
-            else toast.error('Failed to start checkout')
+            await SubscriptionService.startCheckout(tier, interval)
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
-        } finally {
-            setUpgrading(null)
+            notify.error(error instanceof Error ? error.message : "Couldn't open checkout. Please try again.")
+            setBusy(null)
         }
     }
 
-    const handleManageBilling = async () => {
-        setSubscribing(true)
+    const handleUpdateCard = async () => {
+        setBusy('portal')
         try {
             const { url } = await SubscriptionService.createPortalSession()
-            if (url) {
-                window.location.href = url
-            } else {
-                toast.error('Failed to open billing portal')
-            }
+            window.location.href = url
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to open billing portal')
-        } finally {
-            setSubscribing(false)
-        }
-    }
-
-    const handleRedeemCode = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!accessCode.trim()) {
-            toast.error('Please enter an access code')
-            return
-        }
-        setRedeemingCode(true)
-        try {
-            await SubscriptionService.redeemCode(accessCode.trim())
-            toast.success('Access code redeemed! Reloading...')
-            window.location.reload()
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Invalid access code')
-        } finally {
-            setRedeemingCode(false)
-        }
-    }
-
-    const getMessage = () => {
-        // For shared members, show different message
-        if (isSharedMember) {
-            return {
-                title: 'Organization Access Unavailable',
-                subtitle: 'The organization subscription is no longer active',
-                icon: Users
-            }
-        }
-
-        switch (reason) {
-            case 'payment_past_due':
-                return {
-                    title: 'Payment Issue',
-                    subtitle: 'Update your payment method to keep your paid plan',
-                    icon: CreditCard
-                }
-            default:
-                return {
-                    title: 'Billing Needs Attention',
-                    subtitle: 'Subscribe to Growth or Pro to restore access',
-                    icon: CreditCard
-                }
+            notify.error(error instanceof Error ? error.message : "Couldn't open billing. Please try again.")
+            setBusy(null)
         }
     }
 
@@ -130,162 +111,135 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         )
     }
 
-    const { title, subtitle, icon: Icon } = getMessage()
+    if (isSharedMember) {
+        return (
+            <MarketingPageShell contentClassName="max-w-lg w-full">
+                <div className="text-center mb-8">
+                    <MarketingLogoHeader />
+                </div>
+                <div className="glass-card p-8 text-center">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary-500/40 shadow-md bg-primary-500/30">
+                        <Users className="w-8 h-8 text-gray-800" />
+                    </div>
+                    <h1 className="text-2xl font-semibold text-foreground mb-2">Your organization's plan has ended</h1>
+                    <p className="text-muted-foreground mb-8">
+                        Ask your organization owner to renew. You'll get access back automatically as soon as they do.
+                    </p>
+                    <button
+                        onClick={handleSignOut}
+                        className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 transition-all font-medium flex items-center justify-center gap-2"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        Sign out
+                    </button>
+                </div>
+                <div className="text-center mt-6 text-xs text-muted-foreground">
+                    <p>Need help? Contact support@nexusimpacts.com</p>
+                </div>
+            </MarketingPageShell>
+        )
+    }
+
+    const variant = variantFor(reason)
+    const { title, subtitle, icon: Icon } = COPY[variant]
 
     return (
-        <MarketingPageShell contentClassName="max-w-lg w-full">
-                    {/* Logo - public style */}
-                    <div className="text-center mb-8">
-                        <MarketingLogoHeader />
-                    </div>
+        <MarketingPageShell contentClassName="max-w-2xl w-full">
+            <div className="text-center mb-8">
+                <MarketingLogoHeader />
+            </div>
 
-                    {/* Main Card - glass style */}
-                    <div className="glass-card p-8 text-center">
-                        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary-500/40 shadow-md bg-primary-500/30">
-                            <Icon className="w-8 h-8 text-gray-800" />
-                        </div>
+            <div className="glass-card p-8 text-center">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary-500/40 shadow-md bg-primary-500/30">
+                    <Icon className="w-8 h-8 text-gray-800" />
+                </div>
+                <h1 className="text-2xl font-semibold text-foreground mb-2">{title}</h1>
+                <p className="text-muted-foreground mb-8">{subtitle}</p>
 
-                        <h1 className="text-2xl font-semibold text-foreground mb-2">
-                            {title}
-                        </h1>
-
-                        <p className="text-muted-foreground mb-8">
-                            {subtitle}
-                        </p>
-
-                        {isSharedMember ? (
-                            <>
-                                <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 mb-6 text-left">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Mail className="w-5 h-5 text-purple-600" />
-                                        <h3 className="font-medium text-foreground">Contact Your Organization Owner</h3>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Your access is managed by your organization owner. Please contact them to restore access to the organization's data.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-3">
+                {variant === 'payment_failed' ? (
+                    <button
+                        onClick={handleUpdateCard}
+                        disabled={!!busy}
+                        className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
+                    >
+                        <CreditCard className="w-5 h-5" />
+                        {busy === 'portal' ? 'Opening billing...' : 'Update payment method'}
+                    </button>
+                ) : (
+                    <>
+                        <div className="flex justify-center mb-5">
+                            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-white/50 border border-white/60">
+                                {(['monthly', 'annual'] as const).map((value) => (
                                     <button
-                                        onClick={handleSignOut}
-                                        className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 transition-all font-medium flex items-center justify-center gap-2"
+                                        key={value}
+                                        type="button"
+                                        onClick={() => setInterval(value)}
+                                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                            interval === value ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'
+                                        }`}
                                     >
-                                        <LogOut className="w-5 h-5" />
-                                        Sign Out
-                                    </button>
-                                </div>
-
-                                <p className="mt-6 text-xs text-muted-foreground">
-                                    Once your organization owner renews their subscription, you'll automatically regain access.
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 mb-6 text-left">
-                                    <p className="text-sm text-muted-foreground">
-                                        There's a problem with your subscription's billing. Update your payment
-                                        method or subscribe again to restore access. Your data is safe.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {reason === 'payment_past_due' ? (
-                                    <button
-                                        onClick={handleManageBilling}
-                                        disabled={subscribing || !!upgrading}
-                                        className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
-                                    >
-                                        {subscribing ? (
-                                            <>
-                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                Loading...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CreditCard className="w-5 h-5" />
-                                                Update payment method
-                                                <ArrowRight className="w-5 h-5" />
-                                            </>
+                                        {value === 'monthly' ? 'Monthly' : (
+                                            <>Annual <span className="text-xs text-primary-600">2 months free</span></>
                                         )}
                                     </button>
-                                    ) : (
-                                    <>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-4 text-left">
+                            {(['growth', 'pro'] as PendingTier[]).map((tier) => {
+                                const info = PLAN_INFO[tier]
+                                return (
+                                    <div key={tier} className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 flex flex-col">
+                                        <h2 className="text-lg font-semibold text-foreground">{info.name}</h2>
+                                        <p className="text-sm text-muted-foreground mb-3">
+                                            {interval === 'annual' ? info.annual : info.monthly}
+                                        </p>
+                                        <ul className="space-y-1.5 mb-4 flex-1">
+                                            {info.features.slice(0, 4).map((feature) => (
+                                                <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <CheckCircle2 className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                                                    {feature}
+                                                </li>
+                                            ))}
+                                        </ul>
                                         <button
-                                            onClick={() => handleSubscribe('growth')}
-                                            disabled={!!upgrading || subscribing}
-                                            className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                                            onClick={() => handleSubscribe(tier)}
+                                            disabled={!!busy}
+                                            className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
                                         >
-                                            {upgrading === 'growth' ? 'Opening checkout...' : 'Subscribe to Growth'}
+                                            {busy === tier
+                                                ? 'Opening checkout...'
+                                                : variant === 'subscription_ended'
+                                                    ? `Sign back up for ${info.name}`
+                                                    : `Choose ${info.name}`}
                                         </button>
-                                        <button
-                                            onClick={() => handleSubscribe('pro')}
-                                            disabled={!!upgrading || subscribing}
-                                            className="w-full bg-white/60 text-foreground py-3 px-6 rounded-xl border border-primary-500/30 hover:bg-primary-500/15 disabled:opacity-50 transition-all font-medium"
-                                        >
-                                            {upgrading === 'pro' ? 'Opening checkout...' : 'Subscribe to Pro'}
-                                        </button>
-                                    </>
-                                    )}
+                                    </div>
+                                )
+                            })}
+                        </div>
 
-                                    <button
-                                        onClick={handleSignOut}
-                                        className="w-full bg-white/60 text-foreground py-3 px-6 rounded-xl border border-primary-500/30 hover:bg-primary-500/15 hover:border-primary-500/40 transition-all font-medium flex items-center justify-center gap-2"
-                                    >
-                                        <LogOut className="w-5 h-5" />
-                                        Sign Out
-                                    </button>
-                                </div>
+                        <p className="mt-4 text-xs text-muted-foreground">
+                            {trialAvailable
+                                ? `Includes a ${TRIAL_DURATION_DAYS}-day free trial. A card is required and you can cancel any time.`
+                                : 'Billing starts today. Cancel any time.'}{' '}
+                            Have a promo code? Enter it at checkout.
+                        </p>
+                    </>
+                )}
 
-                                <div className="mt-6 bg-white/40 backdrop-blur rounded-xl border border-white/60 p-4 text-center">
-                                    {!showAccessCode ? (
-                                        <button
-                                            onClick={() => setShowAccessCode(true)}
-                                            className="text-sm text-primary-600 hover:text-primary-700 transition-colors flex items-center gap-1.5 mx-auto font-medium"
-                                        >
-                                            <Ticket className="w-4 h-4" />
-                                            Have an access code?
-                                        </button>
-                                    ) : (
-                                        <form onSubmit={handleRedeemCode} className="space-y-3 max-w-md mx-auto">
-                                            <div className="text-sm font-medium text-foreground text-left">Enter access code</div>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={accessCode}
-                                                    onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-                                                    placeholder="ENTER CODE"
-                                                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:outline-none uppercase tracking-wider font-mono bg-white/80"
-                                                    disabled={redeemingCode}
-                                                />
-                                                <button
-                                                    type="submit"
-                                                    disabled={redeemingCode || !accessCode.trim()}
-                                                    className="px-4 py-2.5 bg-primary-500 text-gray-800 rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    {redeemingCode ? 'Redeeming...' : 'Redeem'}
-                                                </button>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setShowAccessCode(false); setAccessCode('') }}
-                                                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </form>
-                                    )}
-                                </div>
+                <button
+                    onClick={handleSignOut}
+                    className="w-full mt-4 bg-white/60 text-foreground py-3 px-6 rounded-xl border border-primary-500/30 hover:bg-primary-500/15 transition-all font-medium flex items-center justify-center gap-2"
+                >
+                    <LogOut className="w-5 h-5" />
+                    Sign out
+                </button>
+            </div>
 
-                                <p className="mt-6 text-xs text-muted-foreground">
-                                    Your data is safely stored. Subscribe again to pick up where you left off. Your public page stays unpublished until you turn it back on.
-                                </p>
-                            </>
-                        )}
-                    </div>
-
-                    <div className="text-center mt-6 text-xs text-muted-foreground">
-                        <p>Need help? Contact support@nexusimpacts.com</p>
-                    </div>
+            <div className="text-center mt-6 text-xs text-muted-foreground">
+                <p>Need help? Contact support@nexusimpacts.com</p>
+            </div>
         </MarketingPageShell>
     )
 }

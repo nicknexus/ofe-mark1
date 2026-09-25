@@ -534,8 +534,17 @@ export class AdminAccountService {
         await SubscriptionService.getOrCreate(org.owner_id);
 
         const updates: Record<string, unknown> =
+            // There is no free plan: 'free' from the admin UI removes a comp and
+            // locks the account until the owner subscribes.
             tier === 'free'
-                ? { status: 'free', ...planLimitColumns('free') }
+                ? {
+                      status: 'expired',
+                      ...planLimitColumns('free'),
+                      stripe_subscription_id: null,
+                      stripe_price_id: null,
+                      cancel_at_period_end: false,
+                      trial_ends_at: null,
+                  }
                 : {
                       status: 'active',
                       ...planLimitColumns(tier),

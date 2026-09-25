@@ -31,6 +31,7 @@ import contentRoutes from './routes/content';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 import { auditSupportWrites } from './middleware/supportMode';
+import { requireAppAccess } from './middleware/requireAppAccess';
 
 // Load environment variables
 dotenv.config();
@@ -188,25 +189,38 @@ app.use('/api', auditSupportWrites);
 // Routes - Enable one by one to find the problem
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes); // Public routes (no auth required)
-app.use('/api/organizations', organizationRoutes);
-app.use('/api/initiatives', initiativeRoutes);
-app.use('/api/kpis', kpiRoutes);
-app.use('/api/evidence', evidenceRoutes);
-app.use('/api/beneficiaries', beneficiaryRoutes);
-app.use('/api/locations', locationRoutes);
-app.use('/api/stories', storyRoutes);
-app.use('/api/upload', uploadRoutes); // Now using Supabase Storage
-app.use('/api/reports', reportRoutes);
-app.use('/api/donors', donorRoutes);
-app.use('/api/donor-credits', donorCreditRoutes);
-app.use('/api/storage', storageRoutes);
+// App data routes sit behind the server-side paywall (ENFORCE_APP_ACCESS).
+// auth, public, subscription and admin stay open: the paywall screens,
+// checkout and support tooling need them.
+const appAccess = requireAppAccess();
+// Reachable while locked: the paywall reads permissions/orgs, and invite
+// lookup/accept/decline must work before billing state is known.
+const teamAccess = requireAppAccess(req =>
+    (req.method === 'GET' && ['/permissions', '/organizations', '/my-pending-invite'].includes(req.path)) ||
+    (req.method === 'GET' && /^\/invite\/[^/]+$/.test(req.path)) ||
+    (req.method === 'POST' && /^\/invite\/[^/]+\/(accept|decline)$/.test(req.path))
+);
+const orgAccess = requireAppAccess(req => req.path.startsWith('/public'));
+
+app.use('/api/organizations', orgAccess, organizationRoutes);
+app.use('/api/initiatives', appAccess, initiativeRoutes);
+app.use('/api/kpis', appAccess, kpiRoutes);
+app.use('/api/evidence', appAccess, evidenceRoutes);
+app.use('/api/beneficiaries', appAccess, beneficiaryRoutes);
+app.use('/api/locations', appAccess, locationRoutes);
+app.use('/api/stories', appAccess, storyRoutes);
+app.use('/api/upload', appAccess, uploadRoutes); // Now using Supabase Storage
+app.use('/api/reports', appAccess, reportRoutes);
+app.use('/api/donors', appAccess, donorRoutes);
+app.use('/api/donor-credits', appAccess, donorCreditRoutes);
+app.use('/api/storage', appAccess, storageRoutes);
 app.use('/api/subscription', subscriptionRoutes);
-app.use('/api/team', teamRoutes);
+app.use('/api/team', teamAccess, teamRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/metric-tags', metricTagRoutes);
-app.use('/api/metric-definitions', metricDefinitionRoutes);
-app.use('/api/onboarding', onboardingRoutes);
-app.use('/api/content', contentRoutes);
+app.use('/api/metric-tags', appAccess, metricTagRoutes);
+app.use('/api/metric-definitions', appAccess, metricDefinitionRoutes);
+app.use('/api/onboarding', appAccess, onboardingRoutes);
+app.use('/api/content', appAccess, contentRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

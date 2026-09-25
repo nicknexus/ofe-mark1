@@ -96,46 +96,6 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
 });
 
 /**
- * POST /api/subscription/redeem-code
- * Redeem an access code for extended trial
- */
-router.post('/redeem-code', authenticateUser, blockInSupportMode, async (req: AuthenticatedRequest, res) => {
-    try {
-        const { code } = req.body;
-        console.log('[redeem-code] body:', JSON.stringify(req.body), 'code:', code);
-
-        if (!code || typeof code !== 'string') {
-            console.log('[redeem-code] 400: Access code is required');
-            res.status(400).json({ error: 'Access code is required' });
-            return;
-        }
-
-        const result = await SubscriptionService.redeemAccessCode(req.user!.id, code);
-
-        if (!result.success) {
-            console.log('[redeem-code] 400:', result.error);
-            res.status(400).json({ error: result.error });
-            return;
-        }
-
-        const remainingTrialDays = result.subscription
-            ? SubscriptionService.getRemainingTrialDays(result.subscription)
-            : result.daysGranted;
-
-        res.json({
-            success: true,
-            subscription: result.subscription,
-            remainingTrialDays,
-            daysGranted: result.daysGranted,
-            message: `Access code redeemed! You have ${result.daysGranted} days of full access.`
-        });
-    } catch (error) {
-        console.error('Error redeeming access code:', error);
-        res.status(500).json({ error: (error as Error).message });
-    }
-});
-
-/**
  * Sync subscription row from Stripe (cancel_at_period_end, status, period end, cancelled_at).
  * Call when loading subscription so DB matches Stripe even if webhooks were missed.
  */
@@ -357,7 +317,8 @@ router.post('/confirm-checkout', authenticateUser, blockInSupportMode, async (re
             return;
         }
 
-        const stripeSub = await stripe.subscriptions.retrieve(session.subscription as string) as any;
+        let stripeSub = await stripe.subscriptions.retrieve(session.subscription as string) as any;
+        stripeSub = await SubscriptionService.enforceOneTrialPerCard(req.user!.id, stripeSub);
         const subscription = await SubscriptionService.applyStripeSubscription(req.user!.id, stripeSub, {
             markTrialUsed: true,
         });
@@ -365,7 +326,7 @@ router.post('/confirm-checkout', authenticateUser, blockInSupportMode, async (re
             success: true,
             subscription: toClientSubscription(subscription),
             remainingTrialDays: SubscriptionService.getRemainingTrialDays(subscription),
-            hasAccess: SubscriptionService.isLiveForPublic(subscription) || subscription.status === 'trial',
+            hasAccess: SubscriptionService.evaluate(subscription),
         });
     } catch (error) {
         console.error('Error confirming checkout:', error);
@@ -409,9 +370,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 const userId = session.metadata?.user_id;
 
                 if (userId && session.subscription) {
-                    const stripeSubscription = await stripe.subscriptions.retrieve(
+                    let stripeSubscription = await stripe.subscriptions.retrieve(
                         session.subscription as string
                     ) as any;
+                    stripeSubscription = await SubscriptionService.enforceOneTrialPerCard(userId, stripeSubscription);
                     const applied = await SubscriptionService.applyStripeSubscription(userId, stripeSubscription, {
                         markTrialUsed: true,
                     });
@@ -431,6 +393,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     subscriptionId: subscription.id,
                     status: subscription.status,
                     cancel_at_period_end: subscription.cancel_at_period_end,
+                    cancel_at: subscription.cancel_at,
                     hasUserId: !!userId,
                     metadata: subscription.metadata,
                 });
@@ -448,8 +411,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
                 }
                 if (userId) {
-                    await SubscriptionService.deactivateAndUnpublish(userId);
-                    console.log(`✅ Subscription deleted for user ${userId} → unpublished and locked`);
+                    const applied = await SubscriptionService.handleStripeCancellation(userId, subscription);
+                    console.log(`✅ Subscription deleted for user ${userId} (status=${applied.status}, access until ${applied.current_period_end ?? 'now'})`);
                 } else {
                     console.warn('[webhook] customer.subscription.deleted: no user_id (metadata or stripe_subscription_id lookup)', subscription.id);
                 }

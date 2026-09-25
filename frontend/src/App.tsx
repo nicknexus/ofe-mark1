@@ -4,6 +4,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParam
 import { AppToaster } from './components/ui'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
+import { apiService, SUBSCRIPTION_REQUIRED_EVENT } from './services/api'
+import { notify } from './lib/notify'
+import { useRecheckOnReturn } from './hooks/useRecheckOnReturn'
 import { TeamService, PendingInviteCheck } from './services/team'
 import { User, SubscriptionStatus } from './types'
 import { TutorialProvider } from './context/TutorialContext'
@@ -263,10 +266,33 @@ function App() {
  }
  }
 
- const handleTrialStarted = () => {
- // Re-check subscription after trial is started (show loader since user expects it)
- checkSubscription(true)
+ // Silent re-check (no full-screen loader): used when returning from Stripe
+ // and when the API reports the plan has ended mid-session.
+ const recheckSubscription = () => {
+ apiService.clearCache('/subscription')
+ checkSubscription(false)
  }
+
+ const lastLockRecheckRef = useRef(0)
+ useEffect(() => {
+ const onSubscriptionRequired = () => {
+ // Drop any "failed to load" toasts from the refused requests; the
+ // locked screen explains what happened.
+ notify.dismiss()
+ // Many requests can be refused at once; one re-check is enough.
+ if (Date.now() - lastLockRecheckRef.current < 10_000) return
+ lastLockRecheckRef.current = Date.now()
+ recheckSubscription()
+ }
+ window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, onSubscriptionRequired)
+ return () => window.removeEventListener(SUBSCRIPTION_REQUIRED_EVENT, onSubscriptionRequired)
+ })
+
+ // Coming back from the billing portal (new tab) or Checkout: pick up
+ // cancellations, plan changes and new subscriptions without a reload.
+ useRecheckOnReturn(() => {
+ if (user) recheckSubscription()
+ }, 30_000)
 
  // Shared public routes fragment used in multiple render branches
  const publicRoutes = (
@@ -379,7 +405,7 @@ function App() {
  </div>
  <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Issue</h2>
  <p className="text-gray-600 mb-6">
- We couldn't verify your account right now. This is usually caused by a weak connection — your account is fine.
+ We couldn't verify your account right now. This is usually caused by a weak connection. Your account is fine.
  </p>
  <button
  onClick={() => {
@@ -432,7 +458,7 @@ function App() {
  return (
  <>
  <TrialActivationPage
- onTrialStarted={handleTrialStarted}
+ onRecheck={recheckSubscription}
  trialDurationDays={subscriptionStatus.trialDurationDays}
  />
  <AppToaster />
@@ -447,6 +473,8 @@ function App() {
  <SubscriptionExpiredPage
  reason={subscriptionStatus.reason}
  remainingDays={subscriptionStatus.remainingTrialDays}
+ trialAvailable={!subscriptionStatus.subscription.trial_used_at}
+ onRecheck={recheckSubscription}
  />
  <AppToaster />
  </>
@@ -455,8 +483,11 @@ function App() {
 
  // All gates passed — render PWA app
  const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
- const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
- const showTrialBanner = isOnTrial && !bannerDismissed
+ const trialCardless = isOnTrial && !subscriptionStatus.subscription.stripe_subscription_id
+ const trialCancelling = isOnTrial && !!subscriptionStatus.subscription.cancel_at_period_end
+ // A trial with a card on file converts silently (details live in Billing);
+ // only warn when access is actually going to end.
+ const showTrialBanner = trialCardless || trialCancelling
 
  return (
  <AppRouter>
@@ -469,6 +500,8 @@ function App() {
  remainingDays={subscriptionStatus.remainingTrialDays}
  planName={subscriptionStatus.subscription.plan_tier || undefined}
  trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ cardless={trialCardless}
+ cancelling={trialCancelling}
  />
  )}
  <Routes>
@@ -596,7 +629,7 @@ function App() {
  </div>
  <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Issue</h2>
  <p className="text-gray-600 mb-6">
- We couldn't verify your account right now. This is usually caused by a weak connection — your account is fine.
+ We couldn't verify your account right now. This is usually caused by a weak connection. Your account is fine.
  </p>
  <button
  onClick={() => {
@@ -685,7 +718,7 @@ function App() {
  return (
  <>
  <TrialActivationPage
- onTrialStarted={handleTrialStarted}
+ onRecheck={recheckSubscription}
  trialDurationDays={subscriptionStatus.trialDurationDays}
  />
  <AppToaster />
@@ -701,6 +734,8 @@ function App() {
  <SubscriptionExpiredPage
  reason={subscriptionStatus.reason}
  remainingDays={subscriptionStatus.remainingTrialDays}
+ trialAvailable={!subscriptionStatus.subscription.trial_used_at}
+ onRecheck={recheckSubscription}
  />
  <AppToaster />
  </>
@@ -709,8 +744,11 @@ function App() {
 
  // User has access - show the app
  const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
- const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
- const showTrialBanner = isOnTrial && !bannerDismissed
+ const trialCardless = isOnTrial && !subscriptionStatus.subscription.stripe_subscription_id
+ const trialCancelling = isOnTrial && !!subscriptionStatus.subscription.cancel_at_period_end
+ // A trial with a card on file converts silently (details live in Billing);
+ // only warn when access is actually going to end.
+ const showTrialBanner = trialCardless || trialCancelling
 
  // Mobile browser: show install gate (prod only, skip in dev for testing)
  if (isMobile && import.meta.env.PROD) {
@@ -733,6 +771,8 @@ function App() {
  remainingDays={subscriptionStatus.remainingTrialDays}
  planName={subscriptionStatus.subscription.plan_tier || undefined}
  trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ cardless={trialCardless}
+ cancelling={trialCancelling}
  />
  )}
  <Routes>
@@ -783,6 +823,8 @@ function App() {
  remainingDays={subscriptionStatus.remainingTrialDays}
  planName={subscriptionStatus.subscription.plan_tier || undefined}
  trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ cardless={trialCardless}
+ cancelling={trialCancelling}
  />
  )}
 

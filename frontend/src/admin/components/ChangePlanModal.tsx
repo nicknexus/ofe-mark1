@@ -11,8 +11,9 @@ import { Modal, Button, formatBytes } from './ui'
  * write a wrong limit.
  */
 const CATALOG: Record<PlanTier, PlanLimits & { name: string }> = {
+    // No free plan exists: choosing this removes the comp and locks the account.
     free: {
-        name: 'Free',
+        name: 'No plan (locked)',
         initiatives_limit: 1,
         team_members_limit: 2,
         locations_limit: 3,

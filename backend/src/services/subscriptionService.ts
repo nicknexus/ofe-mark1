@@ -9,7 +9,8 @@ export interface Subscription {
     id: string;
     user_id: string;
     organization_id?: string;
-    // 'free' = on the always-free plan (no Stripe sub, permanent access).
+    // 'free' is legacy: remove_free_plan.sql converts every row and the CHECK
+    // constraint forbids new ones. Kept in the type until that has run everywhere.
     status: 'none' | 'free' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
     // Current tiers are free/growth/pro. Legacy values (starter/professional/
     // enterprise) may still exist until the rename migration runs; normaliseTier()
@@ -20,6 +21,10 @@ export interface Subscription {
     trial_ends_at?: string;
     /** Set once on the first Stripe Checkout (trial or paid). Never cleared. */
     trial_used_at?: string | null;
+    /** First real payment. Null = never paid (a failed post-trial charge locks). */
+    first_paid_at?: string | null;
+    /** Card fingerprint from Checkout, used to allow one trial per card. */
+    card_fingerprint?: string | null;
     stripe_customer_id?: string;
     stripe_subscription_id?: string;
     stripe_price_id?: string;
@@ -44,18 +49,6 @@ export interface SubscriptionAccessResult {
     inheritedFromOrgId?: string;
 }
 
-export interface AccessCode {
-    id: string;
-    code: string;
-    days_granted: number;
-    max_uses: number | null;
-    times_used: number;
-    description?: string;
-    expires_at?: string;
-    is_active: boolean;
-    created_at: string;
-}
-
 export class SubscriptionService {
     /**
      * Get subscription for user, create one with status 'none' if doesn't exist
@@ -73,8 +66,10 @@ export class SubscriptionService {
         }
 
         if (existing) {
-            // Check if trial expired and update status automatically
-            if (existing.status === 'trial' && existing.trial_ends_at) {
+            // Card-less trials (legacy grace) expire locally. Stripe-backed trials
+            // are left to the Stripe sync: at the trial→paid moment the local
+            // clock can pass trial_ends_at before Stripe's update lands.
+            if (existing.status === 'trial' && existing.trial_ends_at && !existing.stripe_subscription_id) {
                 if (new Date(existing.trial_ends_at) < new Date()) {
                     return await this.updateStatus(userId, 'expired');
                 }
@@ -113,31 +108,80 @@ export class SubscriptionService {
     }
 
     /**
-     * Activate the always-free plan for a user. Sets status 'free', plan_tier
-     * 'free', and applies all Free limits. Replaces the old free trial — no card,
-     * no expiry. Idempotent-ish: only meaningful from status 'none'.
+     * Whether a subscription row grants app access right now, from the row
+     * alone (no Stripe calls, no writes). The single access rule: hasAccess,
+     * inherited access, the API gate and public visibility all use it.
+     *
+     * `activeGraceDays` lets an 'active' row stay open that many days past
+     * current_period_end, so a missed renewal webhook can't lock out a paying
+     * customer between syncs. Only the API gate passes it.
      */
-    static async activateFree(userId: string): Promise<Subscription> {
-        const { data, error } = await supabase
-            .from('subscriptions')
-            .update({
-                status: 'free',
-                ...planLimitColumns('free'),
-            })
-            .eq('user_id', userId)
-            .select()
-            .single();
+    static evaluate(
+        sub: Subscription | null | undefined,
+        opts?: { activeGraceDays?: number; now?: Date }
+    ): boolean {
+        if (!sub) return false;
+        const now = opts?.now ?? new Date();
+        const after = (iso: string | null | undefined, days = 0) =>
+            !!iso && new Date(iso).getTime() + days * 86_400_000 > now.getTime();
 
-        if (error) {
-            throw new Error(`Failed to activate free plan: ${error.message}`);
+        switch (sub.status) {
+            case 'free':
+                return true;
+            case 'trial':
+                return after(sub.trial_ends_at);
+            case 'active':
+                // No Stripe sub behind it = admin comp; no period to check.
+                return !sub.stripe_subscription_id || after(sub.current_period_end, opts?.activeGraceDays ?? 0);
+            case 'past_due':
+                // Renewal failed for someone who has paid before: keep access
+                // while Stripe retries. A failed FIRST charge after the trial
+                // locks. `undefined` means the column isn't migrated yet.
+                return sub.first_paid_at !== null;
+            case 'cancelled':
+                return after(sub.current_period_end);
+            default:
+                return false;
         }
-
-        return data;
     }
 
-    /** @deprecated Trial removed — kept so old callers activate the free plan. */
-    static async startTrial(userId: string): Promise<Subscription> {
-        return this.activateFree(userId);
+    /** Client-facing reason for a locked account, so the UI can say trial vs subscription ended. */
+    static lockedReason(sub: Subscription): string {
+        const hasPaid = !!sub.first_paid_at;
+        switch (sub.status) {
+            case 'past_due':
+                return 'trial_payment_failed';
+            case 'trial':
+            case 'expired':
+            case 'cancelled':
+                return hasPaid ? 'subscription_ended' : 'trial_expired';
+            default:
+                return 'no_subscription';
+        }
+    }
+
+    /**
+     * Read-only access check for the API gate: no Stripe calls and no writes,
+     * so it's safe on every request. /subscription/status still does the full
+     * self-healing sync; this only reads rows.
+     */
+    static async checkAccessReadOnly(userId: string): Promise<{ hasAccess: boolean; reason: string; status: string }> {
+        const sub = await this.getByUserId(userId);
+        // Any 'active' row passes: hasAccess trusts Stripe's 'active' even with a
+        // stale period end, and the gate must never be stricter than the
+        // paywall screen or the client would bounce between them.
+        if (sub?.status === 'active' || this.evaluate(sub, { activeGraceDays: 7 })) {
+            return { hasAccess: true, reason: 'own_subscription', status: sub!.status };
+        }
+        const inherited = await this.checkInheritedAccess(userId);
+        if (inherited.hasAccess) {
+            return { hasAccess: true, reason: 'inherited_access', status: sub?.status ?? 'none' };
+        }
+        return {
+            hasAccess: false,
+            reason: sub ? this.lockedReason(sub) : 'no_subscription',
+            status: sub?.status ?? 'none',
+        };
     }
 
     /**
@@ -200,21 +244,73 @@ export class SubscriptionService {
         return data;
     }
 
+    /**
+     * Stripe says the subscription is over. If it was cancelled mid-trial
+     * (portal set to cancel immediately, or an admin cancel in Stripe), the
+     * user keeps the trial they were promised: stored as cancelled with the
+     * period running to trial_end, so access and the public page end then.
+     * Otherwise lock and unpublish now.
+     */
+    static async handleStripeCancellation(userId: string, stripeSub: any): Promise<Subscription> {
+        const trialEndMs = stripeSub?.trial_end ? stripeSub.trial_end * 1000 : 0;
+        if (trialEndMs > Date.now()) {
+            const updated = await this.updateFromStripe(userId, {
+                status: 'cancelled',
+                current_period_end: new Date(trialEndMs).toISOString(),
+                trial_ends_at: new Date(trialEndMs).toISOString(),
+                cancel_at_period_end: false,
+                cancelled_at: new Date().toISOString(),
+            });
+            EntitlementService.bustAll();
+            return updated;
+        }
+        return this.deactivateAndUnpublish(userId);
+    }
+
+    /**
+     * One free trial per card. When a trialing Checkout completes with a card
+     * that already started a trial on another account, end the trial now so
+     * Stripe bills immediately. Best-effort: any failure leaves the trial as-is.
+     * Returns the (possibly updated) Stripe subscription.
+     */
+    static async enforceOneTrialPerCard(userId: string, stripeSub: any): Promise<any> {
+        if (!stripe || stripeSub?.status !== 'trialing') return stripeSub;
+        try {
+            const existing = await this.getByUserId(userId);
+            if (!existing || !('card_fingerprint' in existing)) return stripeSub;
+
+            let pm = stripeSub.default_payment_method;
+            if (typeof pm === 'string') pm = await stripe.paymentMethods.retrieve(pm);
+            const fingerprint: string | undefined = pm?.card?.fingerprint;
+            if (!fingerprint) return stripeSub;
+
+            if (existing.card_fingerprint !== fingerprint) {
+                await supabase.from('subscriptions').update({ card_fingerprint: fingerprint }).eq('user_id', userId);
+            }
+
+            const { data: others } = await supabase
+                .from('subscriptions')
+                .select('user_id')
+                .eq('card_fingerprint', fingerprint)
+                .neq('user_id', userId)
+                .not('trial_used_at', 'is', null)
+                .limit(1);
+            if (!others?.length) return stripeSub;
+
+            console.warn(`[trial] card already used for a trial by ${others[0].user_id}; ending trial for ${userId}`);
+            return await stripe.subscriptions.update(stripeSub.id, { trial_end: 'now', proration_behavior: 'none' });
+        } catch (e) {
+            console.error(`[trial] one-trial-per-card check failed for ${userId}:`, (e as Error).message);
+            return stripeSub;
+        }
+    }
+
     /** Owner's public page may be served (or stay listed). Grandfathered free stays live. */
     static isLiveForPublic(sub: Subscription | null | undefined): boolean {
-        if (!sub) return false;
-        switch (sub.status) {
-            case 'free':
-            case 'active':
-            case 'past_due':
-                return true;
-            case 'trial':
-                return !sub.trial_ends_at || new Date(sub.trial_ends_at) > new Date();
-            case 'cancelled':
-                return !!(sub.current_period_end && new Date(sub.current_period_end) > new Date());
-            default:
-                return false;
-        }
+        // Paying rows stay live even with a stale period end: a paying org's
+        // public page must never drop because a renewal webhook was missed.
+        if (sub?.status === 'active' || sub?.status === 'past_due') return true;
+        return this.evaluate(sub);
     }
 
     /**
@@ -283,74 +379,21 @@ export class SubscriptionService {
     static async hasAccess(userId: string): Promise<SubscriptionAccessResult> {
         let subscription = await this.getOrCreate(userId);
 
-        // First check user's own subscription
-        switch (subscription.status) {
-            case 'free':
-                // Always-free plan: permanent access at Free limits.
-                return { hasAccess: true, reason: 'free_plan', subscription };
+        if (this.evaluate(subscription)) {
+            return { hasAccess: true, reason: `${subscription.status}_access`, subscription };
+        }
 
-            case 'trial':
-                if (subscription.trial_ends_at && new Date(subscription.trial_ends_at) > new Date()) {
-                    return { hasAccess: true, reason: 'trial_active', subscription };
-                }
-                // Trial expired - update status
-                const expiredSub = await this.updateStatus(userId, 'expired');
-                // Don't return yet - check inherited access
-                break;
-
-            case 'active':
-                // Admin-granted plan: 'active' with no Stripe subscription behind
-                // it. There's no billing period to check, so access holds until an
-                // admin changes it back — never expires it out from under them.
-                if (!subscription.stripe_subscription_id) {
-                    return { hasAccess: true, reason: 'admin_granted_plan', subscription };
-                }
-                if (subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
-                    return { hasAccess: true, reason: 'subscription_active', subscription };
-                }
-                // Period ended — try syncing from Stripe before giving up (webhook may have been missed)
-                if (subscription.stripe_subscription_id) {
-                    subscription = await this.syncFromStripeDirectly(userId, subscription.stripe_subscription_id);
-                    if (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
-                        return { hasAccess: true, reason: 'subscription_active', subscription };
-                    }
-                }
-                if (subscription.status === 'active') {
-                    subscription = await this.updateFromStripe(userId, {
-                        status: 'expired',
-                        cancelled_at: subscription.current_period_end || new Date().toISOString(),
-                    });
-                }
-                break;
-
-            case 'past_due':
-                // Payment failed but Stripe is still retrying (dunning). Keep access
-                // during the grace window — Stripe will either recover the payment
-                // (→ active) or eventually cancel (→ subscription.deleted →
-                // deactivateAndUnpublish). We never hard-lock the user out.
-                return { hasAccess: true, reason: 'payment_past_due_grace', subscription };
-
-            case 'cancelled':
-                // Check if still in paid period (user cancelled but period hasn't ended)
-                if (subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
-                    return { hasAccess: true, reason: 'subscription_active_until_period_end', subscription };
-                }
-                // Check inherited access
-                break;
-
-            case 'expired':
-                // If there's a Stripe subscription, re-check — it may have been renewed
-                if (subscription.stripe_subscription_id) {
-                    subscription = await this.syncFromStripeDirectly(userId, subscription.stripe_subscription_id);
-                    if (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
-                        return { hasAccess: true, reason: 'subscription_active', subscription };
-                    }
-                }
-                break;
-
-            case 'none':
-            default:
-                break;
+        // Row says no. If Stripe is behind it, ask Stripe before locking (a
+        // renewal or trial→paid webhook may have been missed). Stripe is the
+        // source of truth for anything it bills; a Stripe 'active' always wins.
+        if (subscription.stripe_subscription_id && subscription.status !== 'none') {
+            subscription = await this.syncFromStripeDirectly(userId, subscription.stripe_subscription_id);
+            if (subscription.status === 'active' || this.evaluate(subscription)) {
+                return { hasAccess: true, reason: `${subscription.status}_access`, subscription };
+            }
+        } else if (subscription.status === 'trial') {
+            // Card-less trial (legacy grace) ran out.
+            subscription = await this.updateStatus(userId, 'expired');
         }
 
         // Check for inherited access from team membership
@@ -365,19 +408,7 @@ export class SubscriptionService {
             };
         }
 
-        // No access - return appropriate reason based on subscription status
-        switch (subscription.status) {
-            case 'trial':
-            case 'expired':
-                return { hasAccess: false, reason: 'trial_expired', subscription };
-            case 'past_due':
-                return { hasAccess: false, reason: 'payment_past_due', subscription };
-            case 'cancelled':
-                return { hasAccess: false, reason: 'subscription_cancelled', subscription };
-            case 'none':
-            default:
-                return { hasAccess: false, reason: 'no_subscription', subscription };
-        }
+        return { hasAccess: false, reason: this.lockedReason(subscription), subscription };
     }
 
     /**
@@ -425,37 +456,10 @@ export class SubscriptionService {
             if (!ownerId) continue;
 
             const ownerSubscription = await this.getByUserId(ownerId);
-            if (!ownerSubscription) continue;
-
-            switch (ownerSubscription.status) {
-                case 'free':
-                    // Team member of a free-plan owner inherits access (Free allows team members).
-                    return { hasAccess: true, organizationId: membership.organization_id };
-
-                case 'trial':
-                    if (ownerSubscription.trial_ends_at && new Date(ownerSubscription.trial_ends_at) > new Date()) {
-                        return { hasAccess: true, organizationId: membership.organization_id };
-                    }
-                    break;
-
-                case 'active':
-                    if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
-                        return { hasAccess: true, organizationId: membership.organization_id };
-                    }
-                    return { hasAccess: true, organizationId: membership.organization_id };
-
-                case 'past_due':
-                    // Owner is in the payment-retry grace window — team keeps access.
-                    return { hasAccess: true, organizationId: membership.organization_id };
-
-                case 'cancelled':
-                    if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
-                        return { hasAccess: true, organizationId: membership.organization_id };
-                    }
-                    break;
-
-                default:
-                    break;
+            // Same grace as the API gate: a paying owner's missed renewal
+            // webhook must not lock their whole team out.
+            if (this.evaluate(ownerSubscription, { activeGraceDays: 7 })) {
+                return { hasAccess: true, organizationId: membership.organization_id };
             }
         }
 
@@ -503,78 +507,6 @@ export class SubscriptionService {
             .maybeSingle();
         if (error || !data) return null;
         return data.user_id;
-    }
-
-    /**
-     * Validate and redeem an access code
-     */
-    static async redeemAccessCode(userId: string, code: string): Promise<{ success: boolean; subscription?: Subscription; error?: string; daysGranted?: number }> {
-        // Find the access code
-        const { data: accessCode, error: codeError } = await supabase
-            .from('access_codes')
-            .select('*')
-            .eq('code', code.toUpperCase().trim())
-            .eq('is_active', true)
-            .maybeSingle();
-
-        if (codeError || !accessCode) {
-            console.log('[redeem-code] lookup failed — code:', code.toUpperCase().trim(), 'error:', codeError, 'data:', accessCode);
-            return { success: false, error: 'Invalid access code' };
-        }
-
-        // Check if code has expired
-        if (accessCode.expires_at && new Date(accessCode.expires_at) < new Date()) {
-            return { success: false, error: 'This access code has expired' };
-        }
-
-        // Check if code has reached max uses
-        if (accessCode.max_uses !== null && accessCode.times_used >= accessCode.max_uses) {
-            return { success: false, error: 'This access code has reached its maximum uses' };
-        }
-
-        // All good - redeem the code
-        const now = new Date();
-        const trialEnd = new Date(now.getTime() + accessCode.days_granted * 24 * 60 * 60 * 1000);
-
-        // Ensure subscription row exists, then update it
-        const existing = await this.getOrCreate(userId);
-        const { data: subscription, error: subError } = await supabase
-            .from('subscriptions')
-            .update({
-                status: 'trial',
-                trial_started_at: now.toISOString(),
-                trial_ends_at: trialEnd.toISOString(),
-                // Comped access codes grant Growth-level limits for the window.
-                ...planLimitColumns('growth'),
-            })
-            .eq('user_id', userId)
-            .select()
-            .single();
-
-        if (subError) {
-            console.error('[redeem-code] subscription update failed:', subError);
-            return { success: false, error: 'Failed to activate access code' };
-        }
-
-        // Record the redemption
-        await supabase
-            .from('access_code_redemptions')
-            .insert([{
-                access_code_id: accessCode.id,
-                user_id: userId
-            }]);
-
-        // Increment times_used
-        await supabase
-            .from('access_codes')
-            .update({ times_used: accessCode.times_used + 1 })
-            .eq('id', accessCode.id);
-
-        return {
-            success: true,
-            subscription,
-            daysGranted: accessCode.days_granted
-        };
     }
 
     /**
@@ -636,7 +568,7 @@ export class SubscriptionService {
                 subscription: {
                     id: '',
                     user_id: '',
-                    status: 'free',
+                    status: 'none',
                     ...planLimitColumns('free'),
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
@@ -828,15 +760,17 @@ export class SubscriptionService {
     ): Promise<Subscription> {
         const status = mapStripeSubscriptionStatus(stripeSub.status);
         if (status === 'cancelled') {
-            return this.deactivateAndUnpublish(userId);
+            return this.handleStripeCancellation(userId, stripeSub);
         }
 
         const item = stripeSub.items?.data?.[0];
         const rawPeriodStart = stripeSub.current_period_start ?? item?.current_period_start;
         const rawPeriodEnd = stripeSub.current_period_end ?? item?.current_period_end ?? stripeSub.cancel_at;
+        // Newer Stripe API versions record a portal cancel as `cancel_at` (the
+        // period/trial end) and leave cancel_at_period_end false.
         const cancelAtPeriodEnd =
             stripeSub.cancel_at_period_end === true ||
-            (!!stripeSub.cancel_at && stripeSub.status === 'active');
+            (!!stripeSub.cancel_at && (stripeSub.status === 'active' || stripeSub.status === 'trialing'));
         const priceId = item?.price?.id as string | undefined;
         const trialStart = stripeSub.trial_start
             ? new Date(stripeSub.trial_start * 1000).toISOString()
@@ -847,6 +781,9 @@ export class SubscriptionService {
 
         const existing = await this.getByUserId(userId);
         const markTrialUsed = !!(opts?.markTrialUsed || status === 'trial') && !existing?.trial_used_at;
+        // Stripe only reports 'active' once an invoice is settled. The `in`
+        // check keeps this a no-op until the column is migrated.
+        const markFirstPaid = status === 'active' && !!existing && 'first_paid_at' in existing && !existing.first_paid_at;
 
         const updated = await this.updateFromStripe(userId, {
             stripe_subscription_id: stripeSub.id,
@@ -867,6 +804,7 @@ export class SubscriptionService {
                 billing_interval: tierFromPriceId(priceId)?.interval || undefined,
             }),
             ...(markTrialUsed && { trial_used_at: new Date().toISOString() }),
+            ...(markFirstPaid && { first_paid_at: new Date().toISOString() }),
         });
 
         if (status === 'active' || status === 'trial') {
@@ -944,6 +882,7 @@ export class SubscriptionService {
             trial_started_at?: string;
             trial_ends_at?: string;
             trial_used_at?: string | null;
+            first_paid_at?: string | null;
         }
     ): Promise<Subscription> {
         const { data, error } = await supabase

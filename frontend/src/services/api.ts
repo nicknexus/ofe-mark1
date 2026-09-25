@@ -57,6 +57,13 @@ import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 /**
+ * Fired on window when the API refuses a request because the plan has ended.
+ * App.tsx re-checks the subscription and swaps to the "trial/subscription
+ * ended" screen instead of letting an error surface.
+ */
+export const SUBSCRIPTION_REQUIRED_EVENT = 'nexus:subscription-required'
+
+/**
  * Authenticated mirror of the anonymous widget payload, served by
  * GET /api/organizations/embed-preview/:slug. Same shapes as publicApi so
  * EmbedPage can render either source without branching on the data.
@@ -249,6 +256,9 @@ class ApiService {
  errorWithCode.code = error.code
  errorWithCode.status = response.status
  errorWithCode.usage = error.usage // For initiative limit errors
+ if (response.status === 403 && error.code === 'subscription_required') {
+ window.dispatchEvent(new CustomEvent(SUBSCRIPTION_REQUIRED_EVENT))
+ }
  throw errorWithCode
  } catch (parseError: any) {
  // If it's our custom error, re-throw it

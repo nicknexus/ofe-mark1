@@ -1,18 +1,20 @@
-import React, { useState } from 'react'
-import { CheckCircle2, ArrowRight, Ticket, CreditCard } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, ArrowRight, CreditCard } from 'lucide-react'
 import { SubscriptionService } from '../services/subscription'
 import { AuthService } from '../services/auth'
 import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
-import toast from 'react-hot-toast'
+import { notify } from '../lib/notify'
 import { readPendingPlan, writePendingPlan, type PendingTier } from '../utils/pendingPlan'
 import { TRIAL_DURATION_DAYS } from '../config/trial'
+import { useRecheckOnReturn } from '../hooks/useRecheckOnReturn'
 
 interface Props {
-    onTrialStarted: () => void
+    /** Re-read subscription status (after returning from Stripe Checkout). */
+    onRecheck: () => void
     trialDurationDays?: number
 }
 
-const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: string; features: string[] }> = {
+export const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: string; features: string[] }> = {
     growth: {
         name: 'Growth',
         monthly: '$75 / month',
@@ -27,46 +29,26 @@ const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: st
     },
 }
 
-export default function TrialActivationPage({ onTrialStarted, trialDurationDays }: Props) {
+export default function TrialActivationPage({ onRecheck, trialDurationDays }: Props) {
     const pending = readPendingPlan()
     const days = trialDurationDays || TRIAL_DURATION_DAYS
     const [interval, setInterval] = useState<'monthly' | 'annual'>(pending?.interval || 'monthly')
     const [selected, setSelected] = useState<PendingTier>(pending?.tier || 'growth')
     const [subscribing, setSubscribing] = useState(false)
-    const [showAccessCode, setShowAccessCode] = useState(false)
-    const [accessCode, setAccessCode] = useState('')
-    const [redeemingCode, setRedeemingCode] = useState(false)
+
+    // Stripe Checkout opens outside the installed app on iOS; when the user
+    // comes back, pick up the new subscription without a manual reload.
+    useRecheckOnReturn(onRecheck)
 
     const handleStartTrial = async (tier: PendingTier) => {
         setSelected(tier)
         writePendingPlan({ tier, interval })
         setSubscribing(true)
         try {
-            const { url } = await SubscriptionService.createCheckoutSession({ tier, interval })
-            if (url) window.location.href = url
-            else toast.error('Failed to start checkout')
+            await SubscriptionService.startCheckout(tier, interval)
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
+            notify.error(error instanceof Error ? error.message : "Couldn't open checkout. Please try again.")
             setSubscribing(false)
-        }
-    }
-
-    const handleRedeemCode = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!accessCode.trim()) {
-            toast.error('Please enter an access code')
-            return
-        }
-
-        setRedeemingCode(true)
-        try {
-            const result = await SubscriptionService.redeemCode(accessCode.trim())
-            toast.success(result.message || `Access code redeemed! You have ${result.daysGranted} days of full access.`)
-            onTrialStarted()
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Invalid access code')
-        } finally {
-            setRedeemingCode(false)
         }
     }
 
@@ -82,7 +64,7 @@ export default function TrialActivationPage({ onTrialStarted, trialDurationDays 
                 <h2 className="text-lg font-medium text-muted-foreground">Welcome to</h2>
                 <h1 className="text-2xl font-semibold text-foreground mt-1">Nexus Impacts AI</h1>
                 <p className="text-muted-foreground mt-2 text-sm">
-                    Pick a plan to start your {days}-day free trial. You will not be charged until the trial ends.
+                    Pick a plan to start your {days}-day free trial. A card is required. You won't be charged until the trial ends, and you can cancel any time before then.
                 </p>
             </div>
 
@@ -136,7 +118,7 @@ export default function TrialActivationPage({ onTrialStarted, trialDurationDays 
                             </div>
                             <button
                                 onClick={() => handleStartTrial(tier)}
-                                disabled={subscribing || redeemingCode}
+                                disabled={subscribing}
                                 className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
                             >
                                 {subscribing && selected === tier ? (
@@ -156,48 +138,8 @@ export default function TrialActivationPage({ onTrialStarted, trialDurationDays 
                 })}
             </div>
 
-            <div className="mt-6 glass-card p-4 text-center">
-                {!showAccessCode ? (
-                    <button
-                        onClick={() => setShowAccessCode(true)}
-                        className="text-sm text-primary-500 hover:text-primary-500/90 transition-colors flex items-center gap-1.5 mx-auto font-medium"
-                    >
-                        <Ticket className="w-4 h-4" />
-                        Have an access code?
-                    </button>
-                ) : (
-                    <form onSubmit={handleRedeemCode} className="space-y-3 max-w-md mx-auto">
-                        <div className="text-sm font-medium text-foreground text-left">Enter access code</div>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={accessCode}
-                                onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-                                placeholder="ENTER CODE"
-                                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:outline-none uppercase tracking-wider font-mono bg-white/80"
-                                disabled={redeemingCode}
-                            />
-                            <button
-                                type="submit"
-                                disabled={redeemingCode || subscribing || !accessCode.trim()}
-                                className="px-4 py-2.5 bg-primary-500 text-gray-800 rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                {redeemingCode ? 'Redeeming...' : 'Redeem'}
-                            </button>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => { setShowAccessCode(false); setAccessCode('') }}
-                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Cancel
-                        </button>
-                    </form>
-                )}
-            </div>
-
             <p className="mt-4 text-xs text-muted-foreground text-center">
-                By continuing, you agree to our Terms of Service
+                Have a promo code? Enter it on the checkout page. By continuing, you agree to our Terms of Service.
             </p>
             <div className="text-center mt-4">
                 <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors">

@@ -34,7 +34,7 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  const { url } = await SubscriptionService.createPortalSession()
  window.open(url, '_blank')
  } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to open billing portal')
+ notify.error(error instanceof Error ? error.message : "Couldn't open billing. Please try again.")
  } finally {
  setLoading(false)
  }
@@ -43,11 +43,9 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  const handleUpgrade = async (tier: 'growth' | 'pro') => {
  setUpgrading(tier)
  try {
- const { url } = await SubscriptionService.createCheckoutSession({ tier, interval })
- if (url) window.location.href = url
- else notify.error('Failed to start checkout')
+ await SubscriptionService.startCheckout(tier, interval)
  } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to start checkout')
+ notify.error(error instanceof Error ? error.message : "Couldn't open checkout. Please try again.")
  } finally {
  setUpgrading(null)
  }
@@ -70,6 +68,12 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
     ? '1 day left'
     : `${remainingDays} days left`
   : null
+ const sub = subscriptionStatus?.subscription
+ const endsAtIso = status === 'trial' ? sub?.trial_ends_at : sub?.current_period_end
+ const endsAt = endsAtIso ? new Date(endsAtIso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null
+ const cancelNote = hasStripe && sub?.cancel_at_period_end && endsAt
+  ? `Cancelled. Access ends ${endsAt}. You will not be billed again.`
+  : null
 
  return (
  <div className="app-card p-6">
@@ -86,16 +90,21 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  {daysLeft && (
   <p className="text-sm text-secondary-500 mt-1">{daysLeft}</p>
  )}
+ {cancelNote && (
+  <p className="text-sm text-amber-700 mt-1">{cancelNote}</p>
+ )}
  </div>
- <Badge tone={statusTone} className="shrink-0">{statusLabel}</Badge>
+ <Badge tone={cancelNote ? 'warning' : statusTone} className="shrink-0">{cancelNote ? 'Cancelling' : statusLabel}</Badge>
  </div>
  </div>
 
- {/* Upgrade options for free users */}
+ {/* Plan picker for accounts without a live Stripe subscription */}
  {!isPaid && (
  <div className="mb-6">
  <div className="flex items-center justify-between mb-3">
- <h3 className="text-sm font-semibold text-gray-900">Upgrade your plan</h3>
+ <h3 className="text-sm font-semibold text-gray-900">
+ {status === 'trial' ? 'Add a card to keep access' : 'Choose a plan'}
+ </h3>
  <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
  <button
  onClick={() => setInterval('monthly')}
@@ -125,7 +134,7 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  className="app-btn app-btn-primary w-full"
  >
  {upgrading === t.tier ? <Spinner className="w-4 h-4" /> : null}
- {upgrading === t.tier ? 'Opening...' : `Upgrade to ${t.name}`}
+ {upgrading === t.tier ? 'Opening...' : `Choose ${t.name}`}
  </button>
  </div>
  ))}
@@ -134,7 +143,7 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  )}
 
  <p className="text-sm text-gray-600 mb-4">
- Open the Stripe billing portal to manage your subscription, update payment methods, view past invoices, or {isPaid ? 'change or cancel your plan' : 'redeem details'}.
+ Open the Stripe billing portal to manage your subscription, update payment methods, view past invoices{isPaid ? ', or change or cancel your plan' : ''}.
  </p>
 
  <button
