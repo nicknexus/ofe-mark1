@@ -216,11 +216,14 @@ export class SubscriptionService {
         // canceled Stripe id left on the row after the old downgrade path.
         if (existing?.status === 'free') return existing;
 
+        const now = new Date().toISOString();
         const { data, error } = await supabase
             .from('subscriptions')
             .update({
                 status: 'cancelled',
-                cancelled_at: new Date().toISOString(),
+                cancelled_at: now,
+                // evaluate() grants cancelled rows access until this date.
+                current_period_end: now,
                 cancel_at_period_end: false,
             })
             .eq('user_id', userId)
@@ -245,25 +248,12 @@ export class SubscriptionService {
     }
 
     /**
-     * Stripe says the subscription is over. If it was cancelled mid-trial
-     * (portal set to cancel immediately, or an admin cancel in Stripe), the
-     * user keeps the trial they were promised: stored as cancelled with the
-     * period running to trial_end, so access and the public page end then.
-     * Otherwise lock and unpublish now.
+     * Stripe says the subscription is over, so access ends now. Customers can
+     * only cancel at period end (portal), which Stripe reports as ended once
+     * that date arrives; an ended subscription with time left means someone
+     * chose "cancel immediately" in Stripe.
      */
-    static async handleStripeCancellation(userId: string, stripeSub: any): Promise<Subscription> {
-        const trialEndMs = stripeSub?.trial_end ? stripeSub.trial_end * 1000 : 0;
-        if (trialEndMs > Date.now()) {
-            const updated = await this.updateFromStripe(userId, {
-                status: 'cancelled',
-                current_period_end: new Date(trialEndMs).toISOString(),
-                trial_ends_at: new Date(trialEndMs).toISOString(),
-                cancel_at_period_end: false,
-                cancelled_at: new Date().toISOString(),
-            });
-            EntitlementService.bustAll();
-            return updated;
-        }
+    static async handleStripeCancellation(userId: string, _stripeSub: any): Promise<Subscription> {
         return this.deactivateAndUnpublish(userId);
     }
 
