@@ -5,14 +5,10 @@ import { BarChart3, ChevronRight, Compass, Eye, Globe, LayoutDashboard } from 'l
 import { apiService } from '../services/api'
 import { Initiative, Location, MetricDefinitionWithUsage, OrganizationContext } from '../types'
 import { useTeam } from '../context/TeamContext'
-import { useTutorial } from '../context/TutorialContext'
-import { useOnboarding } from '../context/OnboardingContext'
 import { AppCard, PageLoader, InlineAlert, Skeleton } from '../components/ui'
 import LocationMap from '../components/LocationMap'
 import { getKPIColor } from '../components/metricsDashboard/metricColorPalette'
 import { fadeUp, staggerContainer, easeOut } from '../components/timeline/motion'
-import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
-
 type CheckItem = { id: string; label: string; done: boolean; to: string }
 type StepTone = 'tracking' | 'share'
 
@@ -121,8 +117,6 @@ function ProgressBar({ pct }: { pct: number }) {
 
 export default function OverviewPage() {
   const navigate = useNavigate()
-  const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
-  const { hasCompletedOnboarding, isActive: onboardingActive } = useOnboarding()
   const {
     isSharedMember,
     organizationName,
@@ -185,14 +179,6 @@ export default function OverviewPage() {
 
     return () => { cancelled = true }
   }, [orgId, reloadTick])
-
-  useEffect(() => {
-    if (!needsTutorial || tutorialActive) return
-    if (!hasCompletedOnboarding || onboardingActive) return
-    if (shouldHoldTutorialAutostart()) return
-    const t = setTimeout(() => startTutorial(), 900)
-    return () => clearTimeout(t)
-  }, [needsTutorial, tutorialActive, hasCompletedOnboarding, onboardingActive, startTutorial])
 
   const firstInit = initiatives[0]?.id
   const o = dashboardOrg

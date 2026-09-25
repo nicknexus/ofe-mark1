@@ -14,13 +14,57 @@
 -- SELECT user_id, org_name, plan_tier, updated_at
 -- FROM subscriptions WHERE status = 'active' AND stripe_subscription_id IS NULL;
 --
--- Accounts that get the 10-day grace (email this list):
--- SELECT s.user_id, u.email, s.org_name, s.plan_tier
--- FROM subscriptions s JOIN auth.users u ON u.id = s.user_id
--- WHERE s.status = 'free';
+-- Org owners who get the 10-day grace (email this list; team members excluded):
+-- SELECT s.user_id, u.email, o.name AS org, s.plan_tier
+-- FROM subscriptions s
+-- JOIN auth.users u ON u.id = s.user_id
+-- JOIN organizations o ON o.owner_id = s.user_id AND COALESCE(o.is_demo, false) = false
+-- WHERE s.status = 'free'
+-- ORDER BY s.plan_tier DESC, o.name;
+--
+-- Team members (set to 'none', inherit from their owner):
+-- SELECT s.user_id, u.email FROM subscriptions s JOIN auth.users u ON u.id = s.user_id
+-- WHERE s.status = 'free'
+--   AND NOT EXISTS (SELECT 1 FROM organizations o WHERE o.owner_id = s.user_id AND COALESCE(o.is_demo, false) = false);
+--
+-- Internal / comped accounts: grant them BEFORE running this so they're skipped:
+-- UPDATE subscriptions SET status = 'active', stripe_subscription_id = NULL,
+--     current_period_end = '2999-12-31', plan_tier = 'growth', initiatives_limit = 10,
+--     team_members_limit = 10, locations_limit = 15, storage_limit_bytes = 322122547200,
+--     ai_reports_per_day = NULL
+-- WHERE user_id IN ('<uuid>');
 
 BEGIN;
 
+-- Guard: a 'free' row still linked to a Stripe subscription may be someone
+-- paying whose row never updated. Clearing that link would cut them off from
+-- their billing, so abort (nothing changes) and review those rows by hand.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM subscriptions WHERE status = 'free' AND stripe_subscription_id IS NOT NULL) THEN
+        RAISE EXCEPTION 'Aborted: free rows linked to a Stripe subscription exist. Review them before converting.';
+    END IF;
+END $$;
+
+-- Team members (own no org) never needed a plan of their own: access comes
+-- from the org owner. 'none' = no own plan, no banner, inherits the owner's.
+UPDATE subscriptions s SET
+    status              = 'none',
+    stripe_subscription_id = NULL,
+    stripe_price_id     = NULL,
+    plan_tier           = 'free',
+    initiatives_limit   = 1,
+    team_members_limit  = 2,
+    locations_limit     = 3,
+    storage_limit_bytes = 26843545600,
+    ai_reports_per_day  = 1
+WHERE s.status = 'free'
+  AND NOT EXISTS (
+      SELECT 1 FROM organizations o
+      WHERE o.owner_id = s.user_id AND COALESCE(o.is_demo, false) = false
+  );
+
+-- Org owners → 10-day card-less grace, then locked.
 UPDATE subscriptions SET
     status              = 'trial',
     trial_started_at    = now(),

@@ -39,13 +39,10 @@ import UpgradeModal from '../components/UpgradeModal'
 import { SubscriptionService } from '../services/subscription'
 import { Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
-import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
 import { Button, PageLoader, InlineAlert, PageHelpTip } from '../components/ui'
 import { InitiativesHelp } from '../components/tracking/TrackingHelp'
 import { easeOut, dropdownPop } from '../components/timeline/motion'
-import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
-
 // Warm the program page's two payloads on hover so the click lands on an
 // in-memory cache hit. apiService dedupes in-flight requests and caches GETs
 // for 60s, so repeated hovers are free (and invalidation still works).
@@ -348,8 +345,7 @@ function MenuItem({ icon: Icon, label, onClick, tone = 'default' }: {
 export default function Dashboard() {
  const navigate = useNavigate()
  const [searchParams, setSearchParams] = useSearchParams()
- const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
- const { hasCompletedOnboarding, isActive: onboardingActive } = useOnboarding()
+ const { startTutorial } = useTutorial()
  const {
  isSharedMember,
  organizationName,
@@ -473,17 +469,6 @@ export default function Dashboard() {
  window.removeEventListener('show-tutorial', handleShowTutorial)
  }
  }, [])
-
- // Auto-launch the (versioned) tutorial for returning users who haven't seen
- // the current version. Held until onboarding is done and its wizard is closed
- // so the two full-screen overlays never fight for the screen.
- useEffect(() => {
- if (!needsTutorial || tutorialActive) return
- if (!hasCompletedOnboarding || onboardingActive) return
- if (shouldHoldTutorialAutostart()) return
- const t = setTimeout(() => startTutorial(), 900)
- return () => clearTimeout(t)
- }, [needsTutorial, tutorialActive, hasCompletedOnboarding, onboardingActive, startTutorial])
 
  // Refresh dashboard data when the onboarding wizard closes — entities it
  // created (initiatives, locations, metrics) should appear without a manual

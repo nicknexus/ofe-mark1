@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AuthService } from '../services/auth'
 import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
@@ -46,6 +46,19 @@ export default function AuthPage() {
         }
     }
 
+    const mountedRef = useRef(true)
+    useEffect(() => () => { mountedRef.current = false }, [])
+
+    // The session is set, so App's auth listener swaps this page for the next
+    // step (Terms, plan picker, app) without a reload. Just clean up the URL.
+    // If the swap somehow hasn't happened, fall back to a full load.
+    const continueInApp = () => {
+        window.history.replaceState({}, '', '/')
+        setTimeout(() => {
+            if (mountedRef.current) window.location.href = '/'
+        }, 4000)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
@@ -80,30 +93,23 @@ export default function AuthPage() {
                     sessionStorage.setItem('just_signed_up', 'true')
                 }
                 
-                // Small delay to ensure session is fully persisted before navigation
-                // This prevents race conditions where the new page loads before auth is ready
-                await new Promise(resolve => setTimeout(resolve, 500))
-                
-                // Use window.location for redirect to ensure URL is updated before App re-renders
-                // This is important because the Router instance changes when auth state changes
                 if (redirectPath) {
-                    console.log('[AuthPage] Redirecting to:', redirectPath)
+                    // Invite flow: the invite page is chosen from the URL at
+                    // render time, so it needs a real navigation.
+                    await new Promise(resolve => setTimeout(resolve, 500))
                     window.location.href = redirectPath
-                } else {
-                    window.location.href = '/'
+                    return
                 }
-                return // Don't continue after redirect
+                continueInApp()
+                return
             } else {
                 await AuthService.signIn(formData.email, formData.password)
                 toast.success('Welcome back!')
-                
-                // Use window.location for redirect
-                if (redirectPath) {
-                    window.location.href = redirectPath
-                } else {
-                    window.location.href = '/'
-                }
-                return // Don't continue after redirect
+
+                // Full load on sign-in: guarantees nothing from a previous
+                // account in this tab survives in memory.
+                window.location.href = redirectPath || '/'
+                return
             }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Authentication failed')

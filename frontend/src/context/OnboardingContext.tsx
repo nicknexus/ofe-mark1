@@ -44,15 +44,8 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         Number(user.user_metadata?.tutorial_version_seen ?? 0) > 0 ||
         accountAgeMs > 2 * 24 * 60 * 60 * 1000
 
+      // The setup wizard is retired and never auto-launches.
       setHasCompletedOnboarding(completed || established)
-
-      // Only auto-launch for brand-new accounts. Live orgs from before this
-      // flag existed were getting the setup wizard on every login, which also
-      // hid What's New (and stamped it seen if they clicked through).
-      if (!established) {
-        const timer = setTimeout(() => setIsActive(true), 1200)
-        return () => clearTimeout(timer)
-      }
     } catch (error) {
       console.error('Error checking onboarding status:', error)
     }

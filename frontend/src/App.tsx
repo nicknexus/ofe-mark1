@@ -15,7 +15,6 @@ import { StorageProvider } from './context/StorageContext'
 import { TeamProvider } from './context/TeamContext'
 import { UploadProvider } from './context/UploadContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
-import OnboardingWizard from './components/onboarding/OnboardingWizard'
 import LayoutIntro from './components/LayoutIntro'
 import FloatingUploadPanel from './components/FloatingUploadPanel'
 import TrialBanner from './components/TrialBanner'
@@ -353,7 +352,7 @@ function App() {
  {publicRoutes}
  <Route path="/invite/:token" element={<InviteAcceptPage />} />
  <Route path="/*" element={
- <PWAAuthPage onAuthSuccess={() => window.location.reload()} />
+ <PWAAuthPage onAuthSuccess={() => { checkUser() }} />
  } />
  </Routes>
  <AppToaster />
@@ -877,7 +876,6 @@ function App() {
  } />
  </Routes>
  <InteractiveTutorial />
- <OnboardingWizard />
  <LayoutIntro />
  {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
  </OnboardingProvider>

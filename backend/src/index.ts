@@ -38,6 +38,10 @@ dotenv.config();
 
 const app = express();
 
+// Behind Vercel's proxy: use the client IP from X-Forwarded-For (one hop) so
+// the rate limiter counts per visitor, not one shared bucket for everyone.
+app.set('trust proxy', 1);
+
 // CORS - must be before other middleware
 const allowedOrigins = [
     'http://localhost:3000',
