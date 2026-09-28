@@ -2,15 +2,35 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Loader2, X, ArrowUpDown, RefreshCw } from 'lucide-react'
 import { AdminApi, AdminOrg } from '../../services/adminApi'
-import { PlanBadge, StatCard, UsageMeter, Button, OrgAvatar, formatBytes, formatRelative } from '../components/ui'
+import {
+    PlanBadge,
+    StatCard,
+    UsageMeter,
+    Button,
+    OrgAvatar,
+    formatBytes,
+    formatDate,
+    formatMoney,
+    formatRelative,
+    describeState,
+} from '../components/ui'
+import type { AccountState } from '../../services/adminApi'
 
 type SortKey = 'created_at' | 'name' | 'plan' | 'initiatives' | 'storage' | 'last_seen'
-type Filter = 'all' | 'paying' | 'comped' | 'free' | 'attention'
+type Filter = 'all' | 'paying' | 'trialing' | 'grace' | 'comped' | 'locked' | 'attention'
 
-/** Accounts needing a human look: payment problems, or pressed against a limit. */
+const FILTER_STATES: Record<Exclude<Filter, 'all' | 'attention'>, AccountState[]> = {
+    paying: ['paying', 'discounted', 'past_due'],
+    trialing: ['trialing', 'trial_cancelling'],
+    grace: ['grace'],
+    comped: ['comped', 'internal'],
+    locked: ['ended', 'no_plan'],
+}
+
+/** Accounts needing a human look: a failed payment, or pressed against a limit while active. */
 function needsAttention(org: AdminOrg): boolean {
-    const status = org.subscription?.status
-    if (status === 'past_due' || status === 'expired') return true
+    if (org.state === 'past_due') return true
+    if (!org.has_access) return false
     const atLimit = (used: number, limit?: number | null) =>
         limit !== null && limit !== undefined && limit > 0 && used >= limit
     return (
@@ -20,19 +40,20 @@ function needsAttention(org: AdminOrg): boolean {
     )
 }
 
+/** Past due but never paid: locked, so it belongs with Locked, not Paying. */
+const lockedPastDue = (org: AdminOrg) => org.state === 'past_due' && !org.has_access
+
 function matchesFilter(org: AdminOrg, filter: Filter): boolean {
-    switch (filter) {
-        case 'paying':
-            return org.plan_source === 'stripe'
-        case 'comped':
-            return org.plan_source === 'admin' || org.plan_source === 'code'
-        case 'free':
-            return org.plan_source === 'free' || org.plan_source === 'none'
-        case 'attention':
-            return needsAttention(org)
-        default:
-            return true
-    }
+    if (filter === 'all') return true
+    if (filter === 'attention') return needsAttention(org)
+    if (filter === 'paying' && lockedPastDue(org)) return false
+    if (filter === 'locked' && lockedPastDue(org)) return true
+    return FILTER_STATES[filter].includes(org.state)
+}
+
+const STATE_RANK: Record<AccountState, number> = {
+    paying: 9, past_due: 8, discounted: 7, trialing: 6, trial_cancelling: 5,
+    comped: 4, internal: 4, grace: 3, ended: 1, no_plan: 0,
 }
 
 const TIER_RANK: Record<string, number> = { pro: 3, growth: 2, free: 1 }
@@ -81,15 +102,34 @@ export default function AdminOrgsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search])
 
-    const stats = useMemo(
-        () => ({
+    const stats = useMemo(() => {
+        const inState = (states: AccountState[]) => orgs.filter(o => states.includes(o.state))
+        const paying = orgs.filter(o => matchesFilter(o, 'paying'))
+        const mrrKnown = paying.some(o => o.mrr_cents !== null)
+        const mrr = paying.reduce((sum, o) => sum + (o.mrr_cents ?? 0), 0)
+        const coupons = paying.filter(o => o.state === 'discounted').length
+        const grace = inState(['grace'])
+        const graceEnds = grace
+            .map(o => o.key_date)
+            .filter((d): d is string => !!d)
+            .sort()[0]
+        return {
             total: orgs.length,
-            paying: orgs.filter(o => o.plan_source === 'stripe').length,
-            comped: orgs.filter(o => o.plan_source === 'admin' || o.plan_source === 'code').length,
+            withAccess: orgs.filter(o => o.has_access).length,
+            paying: paying.length,
+            payingHint: [mrrKnown ? `${formatMoney(mrr, 'usd')} MRR` : 'Charging a card', coupons ? `${coupons} on coupon` : null]
+                .filter(Boolean)
+                .join(' · '),
+            trialing: inState(FILTER_STATES.trialing).length,
+            trialCancelled: inState(['trial_cancelling']).length,
+            grace: grace.length,
+            graceHint: graceEnds ? `No card · locks ${formatDate(graceEnds)}` : 'No card on file',
+            comped: inState(['comped']).length,
+            internal: inState(['internal']).length,
+            locked: orgs.filter(o => matchesFilter(o, 'locked')).length,
             attention: orgs.filter(needsAttention).length,
-        }),
-        [orgs]
-    )
+        }
+    }, [orgs])
 
     const visible = useMemo(() => {
         const rows = orgs.filter(o => matchesFilter(o, filter))
@@ -99,8 +139,11 @@ export default function AdminOrgsPage() {
                 case 'name':
                     return a.name.localeCompare(b.name) * dir
                 case 'plan':
-                    return ((TIER_RANK[a.subscription?.plan_tier || 'free'] || 0) -
-                        (TIER_RANK[b.subscription?.plan_tier || 'free'] || 0)) * dir
+                    return (
+                        (STATE_RANK[a.state] - STATE_RANK[b.state]) * 10 +
+                        ((TIER_RANK[a.subscription?.plan_tier || 'free'] || 0) -
+                            (TIER_RANK[b.subscription?.plan_tier || 'free'] || 0))
+                    ) * dir
                 case 'initiatives':
                     return (a.usage.initiatives - b.usage.initiatives) * dir
                 case 'storage':
@@ -149,10 +192,13 @@ export default function AdminOrgsPage() {
             </div>
 
             {/* Stat tiles double as filters — the fastest path to "who needs me". */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                <StatCard label="Organizations" value={stats.total} onClick={() => setFilter('all')} active={filter === 'all'} />
-                <StatCard label="Paying" value={stats.paying} tone="positive" hint="Active Stripe subscription" onClick={() => setFilter('paying')} active={filter === 'paying'} />
-                <StatCard label="Comped" value={stats.comped} tone="warning" hint="Granted without payment" onClick={() => setFilter('comped')} active={filter === 'comped'} />
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-5">
+                <StatCard label="Organizations" value={stats.total} hint={`${stats.withAccess} with access`} onClick={() => setFilter('all')} active={filter === 'all'} />
+                <StatCard label="Paying" value={stats.paying} tone="positive" hint={stats.payingHint} onClick={() => setFilter('paying')} active={filter === 'paying'} />
+                <StatCard label="Trialing" value={stats.trialing} hint={stats.trialCancelled ? `Card on file · ${stats.trialCancelled} cancelled` : 'Card on file'} onClick={() => setFilter('trialing')} active={filter === 'trialing'} />
+                <StatCard label="Grace" value={stats.grace} tone={stats.grace ? 'warning' : 'default'} hint={stats.graceHint} onClick={() => setFilter('grace')} active={filter === 'grace'} />
+                <StatCard label="Comped" value={stats.comped} hint={stats.internal ? `+ ${stats.internal} internal` : 'Granted by an admin'} onClick={() => setFilter('comped')} active={filter === 'comped'} />
+                <StatCard label="Locked" value={stats.locked} hint="Ended or never added a card" onClick={() => setFilter('locked')} active={filter === 'locked'} />
                 <StatCard label="Needs attention" value={stats.attention} tone={stats.attention ? 'danger' : 'default'} hint="Past due or at a limit" onClick={() => setFilter('attention')} active={filter === 'attention'} />
             </div>
 
@@ -256,12 +302,11 @@ export default function AdminOrgsPage() {
                                         )}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <PlanBadge
-                                            tier={org.subscription?.plan_tier}
-                                            source={org.plan_source}
-                                            status={org.subscription?.status}
-                                            size="sm"
-                                        />
+                                        <PlanBadge tier={org.subscription?.plan_tier} state={org.state} size="sm" />
+                                        <div className="mt-1 text-[11px] text-slate-500 truncate max-w-[240px]">
+                                            {describeState(org.state, org.key_date, org.discount_label, org.has_access)}
+                                            {org.mrr_cents ? ` · ${formatMoney(org.mrr_cents, 'usd')}/mo` : ''}
+                                        </div>
                                         {org.limits_overridden && (
                                             <div className="mt-1 text-[11px] text-amber-600">Custom limits</div>
                                         )}

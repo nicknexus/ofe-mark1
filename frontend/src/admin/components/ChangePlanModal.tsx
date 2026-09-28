@@ -60,7 +60,8 @@ export default function ChangePlanModal({
     const [reason, setReason] = useState('')
     const [saving, setSaving] = useState(false)
 
-    const isPaying = account.plan.source === 'stripe' && account.billing?.status === 'active'
+    // Same statuses the server refuses to overwrite (isActivelyPaying).
+    const isPaying = ['active', 'trialing', 'past_due', 'unpaid'].includes(account.billing?.status ?? '')
     const target = CATALOG[tier]
     const current = account.plan.effective_limits
 
@@ -123,7 +124,7 @@ export default function ChangePlanModal({
                 <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 mb-4 flex gap-2.5">
                     <Lock className="w-4 h-4 text-sky-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-sky-900">
-                        <p className="font-medium">This customer is paying through Stripe.</p>
+                        <p className="font-medium">This customer has a live Stripe subscription ({account.billing?.status}).</p>
                         <p className="mt-0.5 text-sky-800">
                             Change their plan in Stripe instead — editing it here would leave billing and access out of
                             sync. Cancelled or lapsed subscriptions can be changed from here.
@@ -156,7 +157,7 @@ export default function ChangePlanModal({
                             )}
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">
-                            {CATALOG[t].initiatives_limit} initiatives · {formatBytes(CATALOG[t].storage_limit_bytes)}
+                            {CATALOG[t].initiatives_limit} programs · {formatBytes(CATALOG[t].storage_limit_bytes)}
                         </p>
                     </button>
                 ))}

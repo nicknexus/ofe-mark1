@@ -67,8 +67,18 @@ export interface AdminOrgSubscription {
  stripe_subscription_id?: string | null
 }
 
-/** Where a customer's plan came from — paid, comped by us, or neither. */
-export type PlanSource = 'stripe' | 'admin' | 'code' | 'free' | 'none'
+/** What an account actually is right now. Mirrors backend AccountState. */
+export type AccountState =
+ | 'paying'
+ | 'discounted'
+ | 'past_due'
+ | 'trialing'
+ | 'trial_cancelling'
+ | 'grace'
+ | 'comped'
+ | 'internal'
+ | 'ended'
+ | 'no_plan'
 
 export type PlanTier = 'free' | 'growth' | 'pro'
 
@@ -82,7 +92,11 @@ export interface AdminOrg {
  brand_color: string | null
  owner: { id: string | null; email?: string; name?: string; last_sign_in_at?: string | null }
  subscription: AdminOrgSubscription | null
- plan_source: PlanSource
+ state: AccountState
+ has_access: boolean
+ key_date: string | null
+ mrr_cents: number | null
+ discount_label: string | null
  limits_overridden: boolean
  usage: {
  team_members: number
@@ -149,7 +163,10 @@ export interface AdminAccount {
  tier: PlanTier
  name: string
  status: string
- source: PlanSource
+ state: AccountState
+ has_access: boolean
+ key_date: string | null
+ discount_label: string | null
  trial_ends_at: string | null
  catalog_limits: PlanLimits
  effective_limits: PlanLimits

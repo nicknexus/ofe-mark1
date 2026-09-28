@@ -21,13 +21,28 @@ import { PLAN_CATALOG, PlanTier, getPlan, normaliseTier, planLimitColumns } from
  */
 const COMP_PERIOD_END = '2999-12-31T00:00:00.000Z';
 
-/** Where a customer's current plan came from. */
-export type PlanSource =
-    | 'stripe'   // real, paying Stripe subscription
-    | 'admin'    // granted by a platform admin without payment
-    | 'code'     // access-code comped trial
-    | 'free'     // on the always-free plan
-    | 'none';    // never picked a plan
+/** What an account actually is right now: who pays, who has access, and why. */
+export type AccountState =
+    | 'paying'           // Stripe subscription being charged
+    | 'discounted'       // Stripe subscription currently 100% off via a coupon
+    | 'past_due'         // paid before, latest charge failed, Stripe retrying
+    | 'trialing'         // card on file, converts at trial end
+    | 'trial_cancelling' // card trial they cancelled; access ends at trial end
+    | 'grace'            // legacy free account with no card; locks at trial end
+    | 'comped'           // granted by an admin without payment
+    | 'internal'         // our own accounts
+    | 'ended'            // had access, it's over
+    | 'no_plan';         // signed up, never added a card
+
+const INTERNAL_EMAIL_DOMAIN = '@nexusimpacts.com';
+
+/** Live Stripe facts for one subscription (price after discount, coupon). */
+interface StripeFacts {
+    mrr_cents: number;
+    fully_discounted: boolean;
+    discount_label: string | null;
+    current_period_end: string | null;
+}
 
 export interface OrgUsage {
     initiatives: number;
@@ -46,7 +61,13 @@ export interface AdminOrgRow {
     brand_color: string | null;
     owner: { id: string | null; email?: string; name?: string; last_sign_in_at?: string | null };
     subscription: Partial<Subscription> | null;
-    plan_source: PlanSource;
+    state: AccountState;
+    has_access: boolean;
+    /** The date that matters for this state: converts, locks, renews, or ended. */
+    key_date: string | null;
+    /** Monthly recurring revenue in cents after discounts; null when unknown. */
+    mrr_cents: number | null;
+    discount_label: string | null;
     limits_overridden: boolean;
     usage: OrgUsage;
 }
@@ -106,19 +127,146 @@ export function bustUserDirectory(): void {
 
 // ─── Derivations ─────────────────────────────────────────────────────────────
 
+/** Same rule the app-access gate uses for an owner's own subscription. */
+function hasAccessNow(sub: Partial<Subscription> | null | undefined): boolean {
+    if (!sub) return false;
+    return sub.status === 'active' || SubscriptionService.evaluate(sub as Subscription, { activeGraceDays: 7 });
+}
+
 /**
- * Whether this plan is being paid for, comped by us, or neither.
- *
  * An admin-granted plan is stored as status 'active' with NO
- * stripe_subscription_id — that combination is what distinguishes a comp from
- * a real paying customer, so nothing extra needs storing.
+ * stripe_subscription_id; a card-less 'trial' is a legacy free account on its
+ * grace period. Everything with a Stripe id is judged by its status, not just
+ * by having one.
  */
-export function derivePlanSource(sub: Partial<Subscription> | null | undefined): PlanSource {
-    if (!sub || !sub.status || sub.status === 'none') return 'none';
-    if (sub.stripe_subscription_id) return 'stripe';
-    if (sub.status === 'active') return 'admin';
-    if (sub.status === 'trial') return 'code';
-    return 'free';
+export function deriveAccountState(
+    sub: Partial<Subscription> | null | undefined,
+    ownerEmail: string | undefined | null,
+    stripeFacts?: StripeFacts | null
+): AccountState {
+    if (ownerEmail?.toLowerCase().endsWith(INTERNAL_EMAIL_DOMAIN)) return 'internal';
+    if (!sub || !sub.status || sub.status === 'none') return 'no_plan';
+    // Stripe is still retrying, so this is a billing problem, not an ending;
+    // has_access says whether they're locked meanwhile (never paid → locked).
+    if (sub.stripe_subscription_id && sub.status === 'past_due') return 'past_due';
+    if (!hasAccessNow(sub)) return 'ended';
+    if (sub.stripe_subscription_id) {
+        if (sub.status === 'past_due') return 'past_due';
+        if (sub.status === 'trial') return sub.cancel_at_period_end ? 'trial_cancelling' : 'trialing';
+        if (sub.status === 'active') return stripeFacts?.fully_discounted ? 'discounted' : 'paying';
+        return 'ended';
+    }
+    if (sub.status === 'trial') return 'grace';
+    return 'comped';
+}
+
+function deriveKeyDate(
+    state: AccountState,
+    sub: Partial<Subscription> | null | undefined,
+    stripeFacts?: StripeFacts | null
+): string | null {
+    switch (state) {
+        case 'trialing':
+        case 'trial_cancelling':
+        case 'grace':
+            return sub?.trial_ends_at ?? null;
+        case 'paying':
+        case 'discounted':
+        case 'past_due':
+            return stripeFacts?.current_period_end ?? sub?.current_period_end ?? null;
+        case 'ended':
+            return sub?.cancelled_at ?? sub?.current_period_end ?? sub?.trial_ends_at ?? null;
+        default:
+            return null;
+    }
+}
+
+// ─── Stripe snapshot ─────────────────────────────────────────────────────────
+
+const STRIPE_TTL_MS = 60 * 1000;
+let stripeCache: { expires: number; map: Map<string, StripeFacts> } | null = null;
+
+/** Coupon object from a discount, across Stripe API versions (`coupon` → `source.coupon`). */
+function couponOf(discount: any): any | null {
+    if (!discount || typeof discount !== 'object') return null;
+    if (discount.coupon && typeof discount.coupon === 'object') return discount.coupon;
+    if (discount.source?.coupon && typeof discount.source.coupon === 'object') return discount.source.coupon;
+    return null;
+}
+
+function toMonthly(amount: number, interval?: string, count = 1): number {
+    switch (interval) {
+        case 'year': return amount / (12 * count);
+        case 'week': return (amount * 52) / (12 * count);
+        case 'day': return (amount * 365) / (12 * count);
+        default: return amount / count;
+    }
+}
+
+function factsFor(s: any): StripeFacts {
+    const nowSec = Date.now() / 1000;
+    const item = s.items?.data?.[0];
+    const price = item?.price;
+    const invoiceAmount = (price?.unit_amount ?? 0) * (item?.quantity ?? 1);
+
+    const discount = (s.discounts ?? []).find(
+        (d: any) => d && typeof d === 'object' && (!d.end || d.end > nowSec)
+    );
+    const coupon = couponOf(discount);
+    let discounted = invoiceAmount;
+    if (coupon?.percent_off != null) discounted = invoiceAmount * (1 - coupon.percent_off / 100);
+    else if (coupon?.amount_off != null) discounted = Math.max(0, invoiceAmount - coupon.amount_off);
+
+    let discountLabel: string | null = null;
+    if (discount) {
+        const amount =
+            coupon?.percent_off != null
+                ? `${coupon.percent_off}% off`
+                : coupon?.amount_off != null
+                    ? `${(coupon.amount_off / 100).toFixed(2)} off`
+                    : 'Discount';
+        const until = discount.end
+            ? ` until ${new Date(discount.end * 1000).toISOString().slice(0, 10)}`
+            : coupon?.duration === 'forever' ? ' forever' : '';
+        discountLabel = amount + until;
+    }
+
+    const periodEnd = item?.current_period_end ?? s.current_period_end;
+    return {
+        mrr_cents: s.status === 'trialing'
+            ? 0
+            : Math.round(toMonthly(discounted, price?.recurring?.interval, price?.recurring?.interval_count ?? 1)),
+        fully_discounted: invoiceAmount > 0 && discounted <= 0,
+        discount_label: discountLabel,
+        current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    };
+}
+
+/**
+ * Every live Stripe subscription's price and discount in one paginated call,
+ * cached briefly. Best-effort: on failure the console falls back to what the
+ * database knows (no MRR, coupons not detected).
+ */
+async function getStripeFacts(): Promise<Map<string, StripeFacts> | null> {
+    if (!stripe) return null;
+    if (stripeCache && stripeCache.expires > Date.now()) return stripeCache.map;
+
+    // Deepest expansion first; older API versions reject `source.coupon`.
+    const expansions = [['data.discounts.source.coupon'], ['data.discounts'], []];
+    for (const expand of expansions) {
+        try {
+            const map = new Map<string, StripeFacts>();
+            for await (const s of stripe.subscriptions.list({ status: 'all', limit: 100, expand }) as any) {
+                if (!['active', 'past_due', 'trialing', 'unpaid'].includes(s.status)) continue;
+                map.set(s.id, factsFor(s));
+            }
+            stripeCache = { expires: Date.now() + STRIPE_TTL_MS, map };
+            return map;
+        } catch (e) {
+            console.warn(`[adminAccount] Stripe list failed (expand=${expand.join(',') || 'none'}):`, (e as Error).message);
+        }
+    }
+    return null;
 }
 
 const LIMIT_FIELDS = [
@@ -189,13 +337,14 @@ export class AdminAccountService {
         const ownerIds = Array.from(new Set(orgs.map((o) => o.owner_id).filter(Boolean))) as string[];
 
         // Three batched queries instead of four per row.
-        const [subsResult, initiativeRows, memberRows, locationRows] = await Promise.all([
+        const [subsResult, initiativeRows, memberRows, locationRows, stripeFacts] = await Promise.all([
             ownerIds.length
                 ? supabase.from('subscriptions').select('*').in('user_id', ownerIds)
                 : Promise.resolve({ data: [] as any[] }),
             supabase.from('initiatives').select('organization_id').in('organization_id', orgIds),
             supabase.from('team_members').select('organization_id').in('organization_id', orgIds),
             supabase.from('locations').select('organization_id').in('organization_id', orgIds),
+            getStripeFacts(),
         ]);
 
         const subsByOwner = new Map<string, Subscription>();
@@ -215,6 +364,9 @@ export class AdminAccountService {
         return orgs.map((org) => {
             const owner = org.owner_id ? directory.get(org.owner_id) : undefined;
             const sub = org.owner_id ? subsByOwner.get(org.owner_id) ?? null : null;
+            const facts = sub?.stripe_subscription_id ? stripeFacts?.get(sub.stripe_subscription_id) ?? null : null;
+            const state = deriveAccountState(sub, owner?.email, facts);
+            const billed = state === 'paying' || state === 'discounted' || state === 'past_due';
             return {
                 id: org.id,
                 name: org.name,
@@ -230,7 +382,11 @@ export class AdminAccountService {
                     last_sign_in_at: owner?.last_sign_in_at ?? null,
                 },
                 subscription: sub,
-                plan_source: derivePlanSource(sub),
+                state,
+                has_access: hasAccessNow(sub),
+                key_date: deriveKeyDate(state, sub, facts),
+                mrr_cents: billed && facts ? facts.mrr_cents : null,
+                discount_label: facts?.discount_label ?? null,
                 limits_overridden: overriddenLimitFields(sub).length > 0,
                 usage: {
                     initiatives: initiativeCounts.get(org.id) || 0,
@@ -283,7 +439,14 @@ export class AdminAccountService {
                     .limit(20),
             ]);
 
-        const billing = await this.getBilling(subscription, opts.includeStripeIds);
+        const [billing, stripeFacts] = await Promise.all([
+            this.getBilling(subscription, opts.includeStripeIds),
+            getStripeFacts(),
+        ]);
+        const facts = subscription?.stripe_subscription_id
+            ? stripeFacts?.get(subscription.stripe_subscription_id) ?? null
+            : null;
+        const state = deriveAccountState(subscription, ownerEntry?.email, facts);
         const planTier = normaliseTier(subscription?.plan_tier);
         const catalog = PLAN_CATALOG[planTier];
         const overridden = overriddenLimitFields(subscription);
@@ -323,7 +486,10 @@ export class AdminAccountService {
                 tier: planTier,
                 name: catalog.name,
                 status: subscription?.status ?? 'none',
-                source: derivePlanSource(subscription),
+                state,
+                has_access: hasAccessNow(subscription),
+                key_date: deriveKeyDate(state, subscription, facts),
+                discount_label: facts?.discount_label ?? null,
                 trial_ends_at: subscription?.trial_ends_at ?? null,
                 catalog_limits: {
                     initiatives_limit: catalog.initiatives_limit,
@@ -395,14 +561,20 @@ export class AdminAccountService {
      */
     private static async retrieveSubscriptionWithDiscounts(subscriptionId: string): Promise<any> {
         const base = ['default_payment_method', 'items.data.price'];
-        try {
-            return await stripe!.subscriptions.retrieve(subscriptionId, {
-                expand: [...base, 'discounts.promotion_code'],
-            });
-        } catch (e) {
-            console.warn('[adminAccount] discount expansion failed, retrying without:', (e as Error).message);
-            return stripe!.subscriptions.retrieve(subscriptionId, { expand: base });
+        const attempts = [
+            [...base, 'discounts.promotion_code', 'discounts.source.coupon'],
+            [...base, 'discounts.promotion_code'],
+        ];
+        for (const expand of attempts) {
+            try {
+                return await stripe!.subscriptions.retrieve(subscriptionId, { expand });
+            } catch (e) {
+                // Only a rejected expansion is worth retrying.
+                if ((e as any)?.code === 'resource_missing') throw e;
+                console.warn('[adminAccount] discount expansion failed, retrying:', (e as Error).message);
+            }
         }
+        return stripe!.subscriptions.retrieve(subscriptionId, { expand: base });
     }
 
     /**
@@ -465,16 +637,19 @@ export class AdminAccountService {
                     ? { brand: card.brand, last4: card.last4, exp_month: card.exp_month, exp_year: card.exp_year }
                     : null,
                 discount: discount
-                    ? {
-                          code: discount.promotion_code?.code ?? null,
-                          name: discount.coupon?.name ?? discount.coupon?.id ?? null,
-                          percent_off: discount.coupon?.percent_off ?? null,
-                          amount_off: discount.coupon?.amount_off ?? null,
-                          currency: discount.coupon?.currency ?? null,
-                          duration: discount.coupon?.duration ?? null,
-                          duration_in_months: discount.coupon?.duration_in_months ?? null,
-                          ends_at: discount.end ? new Date(discount.end * 1000).toISOString() : null,
-                      }
+                    ? (() => {
+                          const coupon = couponOf(discount);
+                          return {
+                              code: discount.promotion_code?.code ?? null,
+                              name: coupon?.name ?? coupon?.id ?? null,
+                              percent_off: coupon?.percent_off ?? null,
+                              amount_off: coupon?.amount_off ?? null,
+                              currency: coupon?.currency ?? null,
+                              duration: coupon?.duration ?? null,
+                              duration_in_months: coupon?.duration_in_months ?? null,
+                              ends_at: discount.end ? new Date(discount.end * 1000).toISOString() : null,
+                          };
+                      })()
                     : null,
                 ...(includeStripeIds
                     ? {
@@ -484,6 +659,10 @@ export class AdminAccountService {
                     : {}),
             };
         } catch (e) {
+            // Usually a test-mode key (local dev) reading live ids from the shared database.
+            if ((e as any)?.code === 'resource_missing') {
+                return { available: false, reason: 'stripe_not_found' };
+            }
             console.error('[adminAccount] Stripe lookup failed:', (e as Error).message);
             return { available: false, reason: 'stripe_error', message: (e as Error).message };
         }

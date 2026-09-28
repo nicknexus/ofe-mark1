@@ -29,6 +29,7 @@ import {
     formatDate,
     formatRelative,
     formatMoney,
+    describeState,
 } from '../components/ui'
 
 /** Human summary of a Stripe discount: "SAVE20 · 20% off, forever". */
@@ -140,11 +141,18 @@ export default function AdminOrgAccountPage() {
                     <div className="min-w-0">
                         <h1 className="text-xl font-semibold text-slate-900 truncate">{org.name}</h1>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <PlanBadge tier={plan.tier} source={plan.source} status={plan.status} size="sm" />
+                            <PlanBadge tier={plan.tier} state={plan.state} size="sm" />
                             <span className="text-xs text-slate-400">
                                 /{org.slug} · {org.is_public ? 'Public' : 'Private'} · Joined {formatDate(org.created_at)}
                             </span>
                         </div>
+                        <p className="mt-1.5 text-xs text-slate-600">
+                            <span className={plan.has_access ? 'font-medium text-emerald-700' : 'font-medium text-red-600'}>
+                                {plan.has_access ? 'Has access' : 'No access'}
+                            </span>
+                            {' · '}
+                            {describeState(plan.state, plan.key_date, plan.discount_label, plan.has_access)}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -211,33 +219,43 @@ export default function AdminOrgAccountPage() {
                         </div>
                     </Section>
 
-                    <Section
-                        title="Billing"
-                        description={
-                            plan.source === 'admin'
-                                ? 'Granted by an admin — no payment attached.'
-                                : plan.source === 'code'
-                                    ? 'Comped via access code.'
-                                    : undefined
-                        }
-                    >
-                        {plan.source === 'admin' ? (
+                    <Section title="Billing">
+                        {plan.state === 'comped' || plan.state === 'internal' ? (
                             <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                                 <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                                 <div className="text-sm text-amber-900">
-                                    <p className="font-medium">Comped {plan.name}</p>
+                                    <p className="font-medium">
+                                        {plan.state === 'internal' ? 'Internal' : 'Comped'} {plan.name}
+                                    </p>
                                     <p className="text-xs text-amber-800 mt-0.5">
                                         No Stripe subscription. Access continues until an admin changes it.
                                     </p>
                                 </div>
                             </div>
+                        ) : plan.state === 'grace' ? (
+                            <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                                <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-amber-900">
+                                    <p className="font-medium">Grace period, no card on file</p>
+                                    <p className="text-xs text-amber-800 mt-0.5">
+                                        Legacy free account. Locks {formatDate(plan.key_date)} unless they add a card
+                                        from Billing, or you change their plan here to comp them.
+                                    </p>
+                                </div>
+                            </div>
                         ) : !billing ? (
-                            <EmptyState>No billing record — this customer has never started a subscription.</EmptyState>
+                            <EmptyState>
+                                {plan.state === 'no_plan'
+                                    ? 'Signed up but never added a card. No access until they subscribe.'
+                                    : 'No billing record. This customer has never started a subscription.'}
+                            </EmptyState>
                         ) : !billing.available ? (
                             <EmptyState>
                                 {billing.reason === 'stripe_not_configured'
                                     ? 'Stripe is not configured on this environment.'
-                                    : `Could not reach Stripe${billing.message ? `: ${billing.message}` : ''}.`}
+                                    : billing.reason === 'stripe_not_found'
+                                        ? "This subscription isn't in the Stripe account this server uses. Local dev runs on test keys, so live billing only shows on the deployed admin."
+                                        : `Could not reach Stripe${billing.message ? `: ${billing.message}` : ''}.`}
                             </EmptyState>
                         ) : (
                             <dl>

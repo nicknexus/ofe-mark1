@@ -46,8 +46,8 @@ const COPY: Record<Variant, { title: string; subtitle: string; icon: LucideIcon 
         icon: CreditCard,
     },
     payment_failed: {
-        title: 'Your trial has ended',
-        subtitle: "We couldn't charge your card. Update it to keep going. Your data is saved.",
+        title: "Your payment didn't go through",
+        subtitle: "Your trial has ended and we couldn't charge your card. Update your card to continue. Your data is saved.",
         icon: CreditCard,
     },
 }

@@ -257,6 +257,18 @@ export class SubscriptionService {
         return this.deactivateAndUnpublish(userId);
     }
 
+    /** A real charge has settled on this subscription (the $0 trial-start invoice doesn't count). */
+    private static async hasPaidInvoice(subscriptionId: string): Promise<boolean> {
+        if (!stripe) return false;
+        try {
+            const invoices = await stripe.invoices.list({ subscription: subscriptionId, status: 'paid', limit: 10 });
+            return invoices.data.some((inv: any) => (inv.amount_paid ?? 0) > 0);
+        } catch (e) {
+            console.error('[subscription] paid-invoice lookup failed:', (e as Error).message);
+            return false;
+        }
+    }
+
     /**
      * One free trial per card. When a trialing Checkout completes with a card
      * that already started a trial on another account, end the trial now so
@@ -771,9 +783,15 @@ export class SubscriptionService {
 
         const existing = await this.getByUserId(userId);
         const markTrialUsed = !!(opts?.markTrialUsed || status === 'trial') && !existing?.trial_used_at;
-        // Stripe only reports 'active' once an invoice is settled. The `in`
-        // check keeps this a no-op until the column is migrated.
-        const markFirstPaid = status === 'active' && !!existing && 'first_paid_at' in existing && !existing.first_paid_at;
+        // A trial flips to 'active' the moment it ends, about an hour BEFORE
+        // Stripe attempts the charge, so status alone doesn't prove payment.
+        // The `in` check keeps this a no-op until the column is migrated.
+        const markFirstPaid =
+            (status === 'active' || status === 'past_due') &&
+            !!existing &&
+            'first_paid_at' in existing &&
+            !existing.first_paid_at &&
+            (await this.hasPaidInvoice(stripeSub.id));
 
         const updated = await this.updateFromStripe(userId, {
             stripe_subscription_id: stripeSub.id,

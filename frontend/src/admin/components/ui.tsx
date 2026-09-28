@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { AlertTriangle, Check, Infinity as InfinityIcon } from 'lucide-react'
-import type { PlanSource } from '../../services/adminApi'
+import type { AccountState } from '../../services/adminApi'
 
 /**
  * Shared admin console primitives.
@@ -123,56 +123,91 @@ const TIER_STYLES: Record<string, string> = {
     pro: 'bg-violet-50 text-violet-700 ring-violet-200',
 }
 
-const SOURCE_LABEL: Record<PlanSource, string> = {
-    stripe: 'Paying',
-    admin: 'Comped',
-    code: 'Code',
-    free: 'Free plan',
-    none: 'No plan',
+const POSITIVE = 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+const INFO = 'bg-sky-50 text-sky-700 ring-sky-200'
+const WARN = 'bg-amber-50 text-amber-700 ring-amber-200'
+const DANGER = 'bg-red-50 text-red-700 ring-red-200'
+const MUTED = 'bg-slate-100 text-slate-600 ring-slate-200'
+
+export const STATE_META: Record<AccountState, { label: string; style: string }> = {
+    paying: { label: 'Paying', style: POSITIVE },
+    discounted: { label: 'Coupon', style: INFO },
+    past_due: { label: 'Past due', style: DANGER },
+    trialing: { label: 'Trial', style: INFO },
+    trial_cancelling: { label: 'Trial cancelled', style: WARN },
+    grace: { label: 'Grace, no card', style: WARN },
+    comped: { label: 'Comped', style: WARN },
+    internal: { label: 'Internal', style: MUTED },
+    ended: { label: 'Ended', style: MUTED },
+    no_plan: { label: 'No plan', style: MUTED },
+}
+
+const HAS_PLAN: AccountState[] = ['paying', 'discounted', 'past_due', 'trialing', 'trial_cancelling', 'grace', 'comped', 'internal']
+
+/** One line explaining the state and the date that matters for it. */
+export function describeState(
+    state: AccountState,
+    keyDate: string | null,
+    discountLabel?: string | null,
+    hasAccess = true
+): string {
+    const d = formatDate(keyDate)
+    const has = keyDate ? d : null
+    switch (state) {
+        case 'paying':
+            return [has ? `Renews ${has}` : 'Billing through Stripe', discountLabel].filter(Boolean).join(' · ')
+        case 'discounted':
+            return discountLabel ? `$0 now · ${discountLabel}` : '$0 now via coupon'
+        case 'past_due':
+            return hasAccess
+                ? 'Payment failed · Stripe is retrying'
+                : 'First charge failed · Stripe is retrying · locked until card is updated'
+        case 'trialing':
+            return has ? `Card on file · converts ${has}` : 'Card on file'
+        case 'trial_cancelling':
+            return has ? `Access ends ${has} · will not be billed` : 'Will not be billed'
+        case 'grace':
+            return has ? `Locks ${has} unless they add a card` : 'Locks at end of grace'
+        case 'comped':
+            return 'Granted by an admin · no billing'
+        case 'internal':
+            return 'Nexus team account'
+        case 'ended':
+            return has ? `No access since ${has}` : 'No access'
+        case 'no_plan':
+            return 'Signed up, never added a card'
+    }
 }
 
 /**
- * Plan tier + how it's funded. The source matters as much as the tier during
- * support — "Pro" tells you nothing about whether money is involved.
+ * Plan tier + what the account actually is. The state matters as much as the
+ * tier during support: "Pro" tells you nothing about whether money is involved.
  */
 export function PlanBadge({
     tier,
-    source,
-    status,
+    state,
     size = 'md',
 }: {
     tier?: string | null
-    source?: PlanSource
-    status?: string | null
+    state: AccountState
     size?: 'sm' | 'md'
 }) {
     const normalised = (tier || 'free').toLowerCase()
     const tierStyle = TIER_STYLES[normalised] ?? 'bg-slate-100 text-slate-700 ring-slate-200'
     const pad = size === 'sm' ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-0.5 text-xs'
-    const isProblem = status === 'past_due' || status === 'expired' || status === 'cancelled'
+    const meta = STATE_META[state]
 
     return (
-        <span className="inline-flex items-center gap-1">
-            <span className={`inline-flex items-center rounded-md ring-1 ring-inset font-semibold capitalize ${tierStyle} ${pad}`}>
-                {source === 'none' ? 'No plan' : normalised}
+        <span className="inline-flex items-center gap-1 flex-wrap">
+            {HAS_PLAN.includes(state) && normalised !== 'free' && (
+                <span className={`inline-flex items-center rounded-md ring-1 ring-inset font-semibold capitalize ${tierStyle} ${pad}`}>
+                    {normalised}
+                </span>
+            )}
+            <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset ${meta.style}`}>
+                {state === 'past_due' && <AlertTriangle className="w-3 h-3" />}
+                {meta.label}
             </span>
-            {source && source !== 'none' && source !== 'free' && (
-                <span
-                    className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset ${
-                        source === 'stripe'
-                            ? 'bg-sky-50 text-sky-700 ring-sky-200'
-                            : 'bg-amber-50 text-amber-700 ring-amber-200'
-                    }`}
-                >
-                    {SOURCE_LABEL[source]}
-                </span>
-            )}
-            {isProblem && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700 ring-1 ring-inset ring-red-200">
-                    <AlertTriangle className="w-3 h-3" />
-                    {status === 'past_due' ? 'Past due' : status}
-                </span>
-            )}
         </span>
     )
 }

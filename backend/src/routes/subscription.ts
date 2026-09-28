@@ -421,18 +421,17 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
             case 'invoice.payment_failed': {
                 const invoice = event.data.object as any;
-                const subscriptionId = invoice.subscription as string;
+                // Newer API versions moved this under parent.subscription_details.
+                const subscriptionId: string | undefined =
+                    invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
 
                 if (subscriptionId) {
                     const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
                     const userId = stripeSubscription.metadata?.user_id;
 
                     if (userId) {
-                        await SubscriptionService.updateFromStripe(userId, {
-                            status: 'past_due',
-                        });
-
-                        console.log(`⚠️ Payment failed for user ${userId}`);
+                        await SubscriptionService.applyStripeSubscription(userId, stripeSubscription);
+                        console.log(`⚠️ Payment failed for user ${userId} (stripe status ${stripeSubscription.status})`);
                     }
                 }
                 break;
