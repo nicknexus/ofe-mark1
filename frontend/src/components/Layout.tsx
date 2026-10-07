@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { User } from '../types'
 import AppSidebar from './AppSidebar'
 
@@ -20,21 +20,12 @@ function PageFade({ children, content }: { children: ReactNode; content: boolean
   const { pathname } = useLocation()
   const reduce = useReducedMotion()
   const key = pageKey(pathname)
+  // CSS enter, not AnimatePresence. A zero-length presence exit never signals
+  // completion, and mode="wait" then leaves the next page unmounted.
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={key}
-        initial={reduce || content ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.16, ease: PAGE_EASE } }}
-        transition={content
-          ? { duration: 0 }
-          : { duration: 0.32, delay: reduce ? 0 : 0.2, ease: PAGE_EASE }}
-        className="min-h-screen"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div key={key} className={reduce || content ? 'min-h-screen' : 'min-h-screen app-page-enter'}>
+      {children}
+    </div>
   )
 }
 
