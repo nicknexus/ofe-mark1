@@ -47,6 +47,8 @@ export interface SubscriptionAccessResult {
     subscription: Subscription;
     isInherited?: boolean;
     inheritedFromOrgId?: string;
+    /** Set when the requested org is locked but another org the user belongs to isn't. */
+    fallbackOrgId?: string;
 }
 
 export class SubscriptionService {
@@ -165,7 +167,26 @@ export class SubscriptionService {
      * so it's safe on every request. /subscription/status still does the full
      * self-healing sync; this only reads rows.
      */
-    static async checkAccessReadOnly(userId: string): Promise<{ hasAccess: boolean; reason: string; status: string }> {
+    static async checkAccessReadOnly(
+        userId: string,
+        orgId?: string
+    ): Promise<{ hasAccess: boolean; reason: string; status: string }> {
+        if (orgId) {
+            const rel = await this.orgRole(userId, orgId);
+            if (rel?.role === 'member') {
+                const ownerSub = await this.getByUserId(rel.ownerId);
+                return this.subGrantsAccess(ownerSub)
+                    ? { hasAccess: true, reason: 'inherited_access', status: ownerSub!.status }
+                    : { hasAccess: false, reason: 'org_plan_ended', status: ownerSub?.status ?? 'none' };
+            }
+            if (rel?.role === 'owner') {
+                const own = await this.getByUserId(userId);
+                return this.subGrantsAccess(own)
+                    ? { hasAccess: true, reason: 'own_subscription', status: own!.status }
+                    : { hasAccess: false, reason: own ? this.lockedReason(own) : 'no_subscription', status: own?.status ?? 'none' };
+            }
+        }
+
         const sub = await this.getByUserId(userId);
         // Any 'active' row passes: hasAccess trusts Stripe's 'active' even with a
         // stale period end, and the gate must never be stricter than the
@@ -253,7 +274,15 @@ export class SubscriptionService {
      * that date arrives; an ended subscription with time left means someone
      * chose "cancel immediately" in Stripe.
      */
-    static async handleStripeCancellation(userId: string, _stripeSub: any): Promise<Subscription> {
+    static async handleStripeCancellation(userId: string, stripeSub: any): Promise<Subscription> {
+        // Only the subscription the row points at can lock it. A late event for
+        // an old subscription (Stripe retries for days) must not undo a comp or
+        // a newer subscription.
+        const existing = await this.getByUserId(userId);
+        if (existing && stripeSub?.id && existing.stripe_subscription_id !== stripeSub.id) {
+            console.log(`[subscription] ignoring cancellation of ${stripeSub.id} for ${userId}: row is on ${existing.stripe_subscription_id ?? 'no Stripe subscription'}`);
+            return existing;
+        }
         return this.deactivateAndUnpublish(userId);
     }
 
@@ -311,7 +340,8 @@ export class SubscriptionService {
     static isLiveForPublic(sub: Subscription | null | undefined): boolean {
         // Paying rows stay live even with a stale period end: a paying org's
         // public page must never drop because a renewal webhook was missed.
-        if (sub?.status === 'active' || sub?.status === 'past_due') return true;
+        // past_due goes through evaluate(): live only if they've paid before.
+        if (sub?.status === 'active') return true;
         return this.evaluate(sub);
     }
 
@@ -336,7 +366,7 @@ export class SubscriptionService {
         if (ownerIds.length > 0) {
             const { data: subs } = await supabase
                 .from('subscriptions')
-                .select('user_id, status, trial_ends_at, current_period_end')
+                .select('user_id, status, trial_ends_at, current_period_end, first_paid_at')
                 .in('user_id', ownerIds);
             for (const s of subs || []) subByOwner.set(s.user_id, s as Subscription);
         }
@@ -378,7 +408,10 @@ export class SubscriptionService {
      * Check if user has active access to the app
      * Checks own subscription first, then inherited access from team membership
      */
-    static async hasAccess(userId: string): Promise<SubscriptionAccessResult> {
+    static async hasAccess(
+        userId: string,
+        opts?: { allowInherited?: boolean }
+    ): Promise<SubscriptionAccessResult> {
         let subscription = await this.getOrCreate(userId);
 
         if (this.evaluate(subscription)) {
@@ -399,7 +432,9 @@ export class SubscriptionService {
         }
 
         // Check for inherited access from team membership
-        const inheritedAccess = await this.checkInheritedAccess(userId);
+        const inheritedAccess = opts?.allowInherited === false
+            ? { hasAccess: false as const }
+            : await this.checkInheritedAccess(userId);
         if (inheritedAccess.hasAccess) {
             return {
                 hasAccess: true,
@@ -432,7 +467,8 @@ export class SubscriptionService {
         // platform admin can ever be in support mode — so gate the extra
         // ownership/membership lookups behind one small indexed check that
         // returns false immediately for every normal user.
-        if (requestedOrgId && (await PlatformAdminService.isAdmin(userId))) {
+        const isAdmin = !!requestedOrgId && (await PlatformAdminService.isAdmin(userId));
+        if (isAdmin) {
             const { subscription, isSupportMode } = await this.resolveActiveOrg(userId, requestedOrgId);
             if (isSupportMode) {
                 return {
@@ -444,7 +480,80 @@ export class SubscriptionService {
             }
         }
 
+        // Inside a specific org, that org's owner decides. Platform admins are
+        // exempt so staff can still work in locked customer accounts.
+        if (requestedOrgId && !isAdmin) {
+            const rel = await this.orgRole(userId, requestedOrgId);
+            if (rel?.role === 'member') {
+                let ownerSub = await this.getByUserId(rel.ownerId);
+                if (!this.subGrantsAccess(ownerSub) && ownerSub?.stripe_subscription_id && ownerSub.status !== 'none') {
+                    ownerSub = await this.syncFromStripeDirectly(rel.ownerId, ownerSub.stripe_subscription_id);
+                }
+                const own = await this.getOrCreate(userId);
+                if (this.subGrantsAccess(ownerSub)) {
+                    return {
+                        hasAccess: true,
+                        reason: 'inherited_access',
+                        subscription: own,
+                        isInherited: true,
+                        inheritedFromOrgId: requestedOrgId,
+                        isSupportMode: false,
+                    };
+                }
+                return {
+                    hasAccess: false,
+                    reason: 'org_plan_ended',
+                    subscription: own,
+                    fallbackOrgId: (await this.findUsableOrg(userId, requestedOrgId)) ?? undefined,
+                    isSupportMode: false,
+                };
+            }
+            if (rel?.role === 'owner') {
+                const result = await this.hasAccess(userId, { allowInherited: false });
+                if (result.hasAccess) return { ...result, isSupportMode: false };
+                return {
+                    ...result,
+                    fallbackOrgId: (await this.findUsableOrg(userId, requestedOrgId)) ?? undefined,
+                    isSupportMode: false,
+                };
+            }
+        }
+
         return { ...(await this.hasAccess(userId)), isSupportMode: false };
+    }
+
+    /** The access rule the gate applies to any subscription row. */
+    static subGrantsAccess(sub: Subscription | null | undefined): boolean {
+        return sub?.status === 'active' || this.evaluate(sub, { activeGraceDays: 7 });
+    }
+
+    /**
+     * How the caller relates to an org. Access inside an org comes from its
+     * owner's plan; a member's own plan never unlocks someone else's org.
+     */
+    static async orgRole(
+        userId: string,
+        orgId: string
+    ): Promise<{ role: 'owner' } | { role: 'member'; ownerId: string } | null> {
+        if (await TeamService.isUserOwnerOfOrganization(userId, orgId)) return { role: 'owner' };
+        const membership = await TeamService.getUserTeamMembership(userId, orgId);
+        if (!membership) return null;
+        const ownerId = await TeamService.getOrganizationOwnerId(orgId);
+        return ownerId ? { role: 'member', ownerId } : null;
+    }
+
+    /** Another org this user can work in right now (their own first). */
+    static async findUsableOrg(userId: string, excludeOrgId: string): Promise<string | null> {
+        const owned = await TeamService.getUserOwnedOrganization(userId);
+        if (owned && owned.id !== excludeOrgId && this.subGrantsAccess(await this.getByUserId(userId))) {
+            return owned.id;
+        }
+        for (const m of await TeamService.getUserTeamMemberships(userId)) {
+            if (m.organization_id === excludeOrgId) continue;
+            const ownerId = await TeamService.getOrganizationOwnerId(m.organization_id);
+            if (ownerId && this.subGrantsAccess(await this.getByUserId(ownerId))) return m.organization_id;
+        }
+        return null;
     }
 
     /**
@@ -782,6 +891,10 @@ export class SubscriptionService {
             : undefined;
 
         const existing = await this.getByUserId(userId);
+        if (status === 'past_due' && existing && existing.stripe_subscription_id !== stripeSub.id) {
+            console.log(`[subscription] ignoring past_due ${stripeSub.id} for ${userId}: row is on ${existing.stripe_subscription_id ?? 'no Stripe subscription'}`);
+            return existing;
+        }
         const markTrialUsed = !!(opts?.markTrialUsed || status === 'trial') && !existing?.trial_used_at;
         // A trial flips to 'active' the moment it ends, about an hour BEFORE
         // Stripe attempts the charge, so status alone doesn't prove payment.
@@ -821,7 +934,9 @@ export class SubscriptionService {
             const tier: PlanTier = fromPrice?.tier
                 || (metaTier === 'pro' || metaTier === 'growth' ? metaTier : null)
                 || (normaliseTier(metaTier) === 'free' ? 'growth' : normaliseTier(metaTier));
-            if (tier === 'growth' || tier === 'pro') {
+            // Only on an actual tier change: every sync lands here, and re-applying
+            // the catalog would wipe limits an admin set on this account.
+            if ((tier === 'growth' || tier === 'pro') && existing?.plan_tier !== tier) {
                 await this.applyPlan(userId, tier);
             }
         }

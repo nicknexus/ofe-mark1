@@ -9,18 +9,26 @@ import {
     ContentChannelVersion,
     ContentCopy,
     ContentDraftStatus,
+    ContentJourney,
+    ContentJourneyStatus,
     ContentMaster,
+    ContentMediaItem,
     ContentOverlay,
     ContentPackage,
     ContentPost,
     ContentPostFormat,
     ContentPostKind,
     ContentSource,
+    ContentSourceRef,
     ContentSourceType,
     ContentStoryType,
     ContentUsageFilter,
     GraphicLayout,
 } from '../types'
+
+const MAX_MEDIA = 10
+
+type JourneyStat = { count: number; published: number; last: string | null; cover: string | null }
 
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'gif']
 const SOURCE_PAGE = 21
@@ -237,6 +245,22 @@ function sourceKey(source: Pick<ContentSource, 'source_type' | 'source_id'>): st
     return `${source.source_type}:${source.source_id}`
 }
 
+function extrasFacts(extras: ContentSource[]): string {
+    if (extras.length === 0) return ''
+    const lines = extras.map(s => {
+        const desc = s.description?.trim() ? `: ${trimText(s.description, 160)}` : ''
+        return `- ${s.title}${desc} (${s.initiative_title}, ${s.date_represented})`
+    })
+    return `Other photos in this carousel post (the first photo above is the cover):\n${lines.join('\n')}`
+}
+
+function asSourceRefs(value: unknown): ContentSourceRef[] {
+    if (!Array.isArray(value)) return []
+    return value
+        .filter((row: any) => (row?.source_type === 'evidence' || row?.source_type === 'story') && typeof row?.source_id === 'string')
+        .map((row: any) => ({ source_type: row.source_type, source_id: row.source_id }))
+}
+
 function isMissingRelation(error: { code?: string; message?: string } | null | undefined): boolean {
     const message = error?.message || ''
     return error?.code === '42P01' || /does not exist/i.test(message) || /schema cache/i.test(message)
@@ -245,7 +269,7 @@ function isMissingRelation(error: { code?: string; message?: string } | null | u
 function schemaMissing(table: string): Error {
     return httpError(
         503,
-        `Content library is missing ${table}. Run database/migrations/add_content_posts.sql then add_content_engine_v1.sql.`,
+        `Content library is missing ${table}. Run database/migrations/add_content_posts.sql, add_content_engine_v1.sql, add_content_journeys.sql, then add_content_publishing.sql.`,
         'SCHEMA_MISSING'
     )
 }
@@ -319,10 +343,12 @@ export class ContentService {
             startDate?: string
             endDate?: string
             usage?: ContentUsageFilter
+            initiativeId?: string
         }
     ): Promise<{ sources: ContentSource[]; has_more: boolean }> {
         const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
-        const initiativeIds = await OrgAccessService.getAccessibleInitiativeIds(userId, requestedOrgId)
+        let initiativeIds = await OrgAccessService.getAccessibleInitiativeIds(userId, requestedOrgId)
+        if (opts?.initiativeId) initiativeIds = initiativeIds.filter(id => id === opts.initiativeId)
         if (initiativeIds.length === 0) return { sources: [], has_more: false }
 
         const offset = Math.max(0, opts?.offset || 0)
@@ -901,7 +927,8 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 .maybeSingle()
             if (error) throw new Error(`Failed to load evidence: ${error.message}`)
             if (!data || data.type !== 'visual_proof') return null
-            if (data.approval_status === 'pending') return null
+            // Pending stays out of the photo library. A photo just logged from
+            // content can still be drafted by id until it is approved.
             if (!initiativeIds.includes(data.initiative_id)) return null
             const files = ((data as any).evidence_files || [])
                 .slice()
@@ -997,12 +1024,16 @@ email_body: donor-email depth, line breaks, no emojis.`,
         sourceId: string,
         storyType: ContentStoryType,
         why?: string,
-        requestedOrgId?: string
+        requestedOrgId?: string,
+        opts?: { journeyId?: string | null; packageId?: string | null; extras?: ContentSourceRef[]; ideaId?: string | null }
     ): Promise<ContentMaster> {
         const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
         this.assertOpenAi()
         await this.assertQuota(userId, requestedOrgId)
-        storyType = 'moment'
+        const journeyId = opts?.journeyId || null
+        storyType = journeyId ? 'journey' : 'moment'
+        const journeyFacts = journeyId ? await this.loadJourneyFacts(organizationId, journeyId, opts?.packageId || undefined) : ''
+        const extras = await this.loadExtras(userId, opts?.extras, { source_type: sourceType, source_id: sourceId }, requestedOrgId)
 
         const source = await this.loadSource(userId, sourceType, sourceId, requestedOrgId)
         if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
@@ -1015,7 +1046,8 @@ email_body: donor-email depth, line breaks, no emojis.`,
         source.overlay = overlay
         source.location = location
 
-        const facts = await this.loadCopyFacts(source, org)
+        const ideaFacts = opts?.ideaId ? await this.loadIdeaFacts(organizationId, opts.ideaId) : ''
+        const facts = [await this.loadCopyFacts(source, org), extrasFacts(extras), journeyFacts, ideaFacts].filter(Boolean).join('\n\n')
         const completion = await openai!.chat.completions.create({
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
@@ -1044,6 +1076,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
             why: (why || '').trim(),
             layout: defaultLayout(storyType),
             source,
+            extras,
         }
     }
 
@@ -1059,6 +1092,9 @@ email_body: donor-email depth, line breaks, no emojis.`,
             cta?: string
             context: string
             why?: string
+            journey_id?: string | null
+            package_id?: string | null
+            extras?: ContentSourceRef[]
         },
         requestedOrgId?: string
     ): Promise<ContentMaster> {
@@ -1067,6 +1103,10 @@ email_body: donor-email depth, line breaks, no emojis.`,
         await this.assertQuota(userId, requestedOrgId)
         const context = String(input.context || '').trim()
         if (!context) throw httpError(400, 'Add context first')
+        const storyType: ContentStoryType = input.journey_id ? 'journey' : 'moment'
+        const journeyFacts = input.journey_id
+            ? await this.loadJourneyFacts(organizationId, input.journey_id, input.package_id || undefined)
+            : ''
 
         const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
         if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
@@ -1078,8 +1118,9 @@ email_body: donor-email depth, line breaks, no emojis.`,
         ])
         source.overlay = overlay
         source.location = location
+        const extras = await this.loadExtras(userId, input.extras, source, requestedOrgId)
 
-        const facts = await this.loadCopyFacts(source, org)
+        const facts = [await this.loadCopyFacts(source, org), extrasFacts(extras), journeyFacts].filter(Boolean).join('\n\n')
         const draft = [
             `HOOK: ${input.hook}`,
             `BODY: ${input.body}`,
@@ -1103,14 +1144,15 @@ email_body: donor-email depth, line breaks, no emojis.`,
         if (organizationId) await SubscriptionService.logAiReport(organizationId, userId)
 
         return {
-            story_type: 'moment',
+            story_type: storyType,
             hook,
             body,
             evidence_line: input.evidence_line || '',
             cta: String(input.cta || 'Learn more about our work.').trim(),
             why: (input.why || '').trim(),
-            layout: defaultLayout('moment'),
+            layout: defaultLayout(storyType),
             source,
+            extras,
         }
     }
 
@@ -1126,6 +1168,9 @@ email_body: donor-email depth, line breaks, no emojis.`,
             cta?: string
             context?: string
             channels: ContentChannel[]
+            journey_id?: string | null
+            package_id?: string | null
+            extras?: ContentSourceRef[]
         },
         requestedOrgId?: string
     ): Promise<ContentChannelVersion[]> {
@@ -1137,7 +1182,11 @@ email_body: donor-email depth, line breaks, no emojis.`,
 
         const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
         if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
-        const facts = await this.loadCopyFacts(source, org)
+        const journeyFacts = input.journey_id
+            ? await this.loadJourneyFacts(organizationId, input.journey_id, input.package_id || undefined)
+            : ''
+        const extras = await this.loadExtras(userId, input.extras, source, requestedOrgId)
+        const facts = [await this.loadCopyFacts(source, org), extrasFacts(extras), journeyFacts].filter(Boolean).join('\n\n')
         const extra = String(input.context || '').trim()
         const master = [
             `HOOK: ${input.hook}`,
@@ -1195,13 +1244,21 @@ email_body: donor-email depth, line breaks, no emojis.`,
         return versions
     }
 
-    static async listPackages(userId: string, requestedOrgId?: string): Promise<ContentPackage[]> {
+    static async listPackages(
+        userId: string,
+        requestedOrgId?: string,
+        opts?: { journeyId?: string | 'none'; packageId?: string }
+    ): Promise<ContentPackage[]> {
         const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
-        const { data, error } = await supabase
+        let query = supabase
             .from('content_packages')
             .select('*')
             .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
+        if (opts?.journeyId === 'none') query = query.is('journey_id', null)
+        else if (opts?.journeyId) query = query.eq('journey_id', opts.journeyId)
+        if (opts?.packageId) query = query.eq('id', opts.packageId)
+        const { data, error } = await query
         if (error) {
             if (isMissingRelation(error)) throw schemaMissing('content_packages')
             throw new Error(`Failed to load packages: ${error.message}`)
@@ -1224,60 +1281,200 @@ email_body: donor-email depth, line breaks, no emojis.`,
             list.push(post)
             byPackage.set(post.package_id, list)
         }
-        return packages.map(pkg => ({
-            ...pkg,
-            image_url: pkg.image_url || byPackage.get(pkg.id)?.[0]?.image_url || null,
-            versions: byPackage.get(pkg.id) || [],
-        }))
+        return packages.map(pkg => {
+            const versions = byPackage.get(pkg.id) || []
+            const image_url = pkg.image_url || versions[0]?.image_url || null
+            const media = Array.isArray(pkg.media) && pkg.media.length
+                ? pkg.media
+                : pkg.visual_source_type && pkg.visual_source_id && image_url
+                    ? [{ source_type: pkg.visual_source_type, source_id: pkg.visual_source_id, image_url, title: pkg.hook || 'Photo' }]
+                    : []
+            const newestVersion = versions.reduce((max, v) => (v.created_at > max ? v.created_at : max), '')
+            const channels_stale = !!(versions.length && pkg.edited_at && newestVersion &&
+                new Date(pkg.edited_at).getTime() > new Date(newestVersion).getTime())
+            return { ...pkg, image_url: media[0]?.image_url || image_url, media, versions, channels_stale }
+        })
     }
 
+    /** Saves the master only (the public-page post). Channel versions are separate. */
     static async savePackage(
         userId: string,
         input: {
-            story_type: ContentStoryType
+            id?: string | null
             hook: string
             body: string
             evidence_line?: string
             cta?: string
             why?: string
             layout?: GraphicLayout
-            status?: ContentDraftStatus
             source_type: ContentSourceType
             source_id: string
-            versions: ContentChannelVersion[]
+            extras?: ContentSourceRef[]
+            journey_id?: string | null
+            idea_id?: string | null
+            publish?: boolean
         },
         requestedOrgId?: string
     ): Promise<ContentPackage> {
-        const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const hook = String(input.hook || '').trim()
+        const body = String(input.body || '').trim()
+        if (!hook || !body) throw httpError(400, 'Add a headline and a body first')
         const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
         if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
-        const status: ContentDraftStatus = input.status === 'ready' ? 'ready' : 'draft'
-        const layout = input.layout || defaultLayout(input.story_type)
 
-        const { data: pkg, error } = await supabase
-            .from('content_packages')
-            .insert([{
-                organization_id: organizationId,
-                story_type: input.story_type,
-                hook: input.hook.trim(),
-                body: input.body.trim(),
-                evidence_line: input.evidence_line?.trim() || null,
-                cta: input.cta?.trim() || null,
-                why: input.why?.trim() || null,
-                visual_source_type: source.source_type,
-                visual_source_id: source.source_id,
-                layout,
-                status,
-                created_by: userId,
-            }])
-            .select('*')
-            .single()
+        const existing = input.id ? await this.loadPackageRow(organizationId, input.id) : null
+        const journeyId = existing ? existing.journey_id : (input.journey_id || null)
+        if (journeyId) await this.assertJourney(organizationId, journeyId)
+        const storyType: ContentStoryType = journeyId ? 'journey' : 'moment'
+        const layout = input.layout || existing?.layout || defaultLayout(storyType)
+
+        const extras = await this.loadExtras(userId, input.extras, source, requestedOrgId)
+        const ideaId = !existing && input.idea_id ? await this.checkIdea(organizationId, input.idea_id) : null
+        const media: ContentMediaItem[] = [source, ...extras].map(s => ({
+            source_type: s.source_type,
+            source_id: s.source_id,
+            image_url: s.image_url,
+            title: s.title,
+        }))
+
+        const now = new Date().toISOString()
+        const fields: Record<string, unknown> = {
+            story_type: storyType,
+            hook,
+            body,
+            evidence_line: input.evidence_line?.trim() || null,
+            cta: input.cta?.trim() || null,
+            why: input.why?.trim() || null,
+            visual_source_type: source.source_type,
+            visual_source_id: source.source_id,
+            media,
+            layout,
+            edited_at: now,
+        }
+        if (input.publish === true) fields.published_at = existing?.published_at || now
+        else if (input.publish === false) fields.published_at = null
+
+        const { data: pkg, error } = existing
+            ? await supabase
+                .from('content_packages')
+                .update(fields)
+                .eq('id', existing.id)
+                .eq('organization_id', organizationId)
+                .select('id')
+                .single()
+            : await supabase
+                .from('content_packages')
+                .insert([{ ...fields, organization_id: organizationId, journey_id: journeyId, created_by: userId, ...(ideaId ? { idea_id: ideaId } : {}) }])
+                .select('id')
+                .single()
         if (error) {
-            if (isMissingRelation(error)) throw schemaMissing('content_packages')
-            throw new Error(`Failed to save story: ${error.message}`)
+            if (isMissingRelation(error) || /journey_id|media|published_at|edited_at/.test(error.message)) {
+                throw schemaMissing('content_packages publishing columns')
+            }
+            throw new Error(`Failed to save: ${error.message}`)
         }
 
-        const rows = (input.versions || []).map(version => {
+        if (journeyId) {
+            await this.touchJourney(organizationId, journeyId)
+            if (fields.published_at) await this.publishJourneyIfDraft(organizationId, journeyId)
+        }
+        if (ideaId) {
+            await supabase
+                .from('content_ideas')
+                .update({
+                    status: 'posted',
+                    package_id: pkg.id,
+                    story_id: source.source_type === 'story' ? source.source_id : null,
+                    acted_at: now,
+                    acted_by: userId,
+                })
+                .eq('id', ideaId)
+                .eq('organization_id', organizationId)
+        }
+        return this.getPackage(userId, pkg.id, requestedOrgId)
+    }
+
+    static async setPackagePublished(
+        userId: string,
+        packageId: string,
+        published: boolean,
+        requestedOrgId?: string
+    ): Promise<ContentPackage> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const existing = await this.loadPackageRow(organizationId, packageId)
+        const { error } = await supabase
+            .from('content_packages')
+            .update({ published_at: published ? existing.published_at || new Date().toISOString() : null })
+            .eq('id', packageId)
+            .eq('organization_id', organizationId)
+        if (error) throw new Error(`Failed to update: ${error.message}`)
+        if (published && existing.journey_id) await this.publishJourneyIfDraft(organizationId, existing.journey_id)
+        return this.getPackage(userId, packageId, requestedOrgId)
+    }
+
+    /** Writes channel versions from the saved master, then stores them. */
+    static async generateChannels(
+        userId: string,
+        packageId: string,
+        input: { channels: ContentChannel[]; context?: string },
+        requestedOrgId?: string
+    ): Promise<ContentPackage> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const pkg = await this.loadPackageRow(organizationId, packageId)
+        const media = (Array.isArray(pkg.media) ? pkg.media : []) as ContentMediaItem[]
+        const cover: ContentSourceRef | null = media[0]
+            || (pkg.visual_source_type && pkg.visual_source_id
+                ? { source_type: pkg.visual_source_type, source_id: pkg.visual_source_id }
+                : null)
+        if (!cover) throw httpError(400, 'This post is missing its photo')
+        const versions = await this.generateVersions(
+            userId,
+            {
+                source_type: cover.source_type,
+                source_id: cover.source_id,
+                story_type: pkg.story_type,
+                hook: pkg.hook || '',
+                body: pkg.body || '',
+                evidence_line: pkg.evidence_line || '',
+                cta: pkg.cta || '',
+                context: input.context,
+                channels: input.channels,
+                journey_id: pkg.journey_id,
+                package_id: pkg.id,
+                extras: media.slice(1),
+            },
+            requestedOrgId
+        )
+        return this.saveChannels(userId, packageId, versions, requestedOrgId)
+    }
+
+    /** Replaces the channel versions on a master. */
+    static async saveChannels(
+        userId: string,
+        packageId: string,
+        versions: ContentChannelVersion[],
+        requestedOrgId?: string
+    ): Promise<ContentPackage> {
+        const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
+        const pkg = await this.loadPackageRow(organizationId, packageId)
+        const media = (Array.isArray(pkg.media) ? pkg.media : []) as ContentMediaItem[]
+        const coverType = media[0]?.source_type || pkg.visual_source_type
+        const coverId = media[0]?.source_id || pkg.visual_source_id
+        if (!coverType || !coverId) throw httpError(400, 'This post is missing its photo')
+        const source = await this.loadSource(userId, coverType, coverId, requestedOrgId)
+        if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
+        source.overlay = await this.loadOverlay(source)
+
+        const valid = (versions || []).filter(v => CHANNELS.includes(v?.channel))
+        const { error: clearError } = await supabase
+            .from('content_posts')
+            .delete()
+            .eq('package_id', packageId)
+            .eq('organization_id', organizationId)
+        if (clearError) throw new Error(`Failed to replace versions: ${clearError.message}`)
+
+        const rows = valid.map(version => {
             const { kind, format } = channelKind(version.channel)
             const email_subject = version.email_subject?.trim() || null
             const email_body = version.email_body?.trim() || null
@@ -1296,9 +1493,9 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 image_url: source.image_url,
                 overlay: source.overlay || null,
                 created_by: userId,
-                package_id: pkg.id,
+                package_id: packageId,
                 channel: version.channel,
-                status,
+                status: 'ready' as ContentDraftStatus,
             }
         })
         if (rows.length) {
@@ -1308,52 +1505,246 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 throw new Error(`Failed to save versions: ${postError.message}`)
             }
         }
-        const match = (await this.listPackages(userId, requestedOrgId)).find(p => p.id === pkg.id)
-        return match || { ...pkg, versions: [] }
-    }
-
-    static async updatePackageStatus(
-        userId: string,
-        packageId: string,
-        status: ContentDraftStatus,
-        requestedOrgId?: string
-    ): Promise<ContentPackage> {
-        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
-        const next = status === 'ready' ? 'ready' : 'draft'
-        const { error } = await supabase
-            .from('content_packages')
-            .update({ status: next })
-            .eq('id', packageId)
-            .eq('organization_id', organizationId)
-        if (error) {
-            if (isMissingRelation(error)) throw schemaMissing('content_packages')
-            throw new Error(`Failed to update story: ${error.message}`)
-        }
-        await supabase
-            .from('content_posts')
-            .update({ status: next })
-            .eq('package_id', packageId)
-            .eq('organization_id', organizationId)
-        const match = (await this.listPackages(userId, requestedOrgId)).find(p => p.id === packageId)
-        if (!match) throw OrgAccessService.accessDenied()
-        return match
+        return this.getPackage(userId, packageId, requestedOrgId)
     }
 
     static async deletePackage(userId: string, packageId: string, requestedOrgId?: string): Promise<void> {
         const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
-        const { data: existing } = await supabase
-            .from('content_packages')
-            .select('id')
-            .eq('id', packageId)
-            .eq('organization_id', organizationId)
-            .maybeSingle()
-        if (!existing) throw OrgAccessService.accessDenied()
+        await this.loadPackageRow(organizationId, packageId)
         const { error } = await supabase
             .from('content_packages')
             .delete()
             .eq('id', packageId)
             .eq('organization_id', organizationId)
-        if (error) throw new Error(`Failed to delete story: ${error.message}`)
+        if (error) throw new Error(`Failed to delete: ${error.message}`)
+    }
+
+    private static async getPackage(userId: string, packageId: string, requestedOrgId?: string): Promise<ContentPackage> {
+        const [match] = await this.listPackages(userId, requestedOrgId, { packageId })
+        if (!match) throw OrgAccessService.accessDenied()
+        return match
+    }
+
+    private static async loadPackageRow(organizationId: string, packageId: string): Promise<any> {
+        const { data, error } = await supabase
+            .from('content_packages')
+            .select('*')
+            .eq('id', packageId)
+            .eq('organization_id', organizationId)
+            .maybeSingle()
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_packages')
+            throw new Error(`Failed to load post: ${error.message}`)
+        }
+        if (!data) throw OrgAccessService.accessDenied()
+        return data
+    }
+
+    static async listJourneys(userId: string, requestedOrgId?: string): Promise<ContentJourney[]> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const { data, error } = await supabase
+            .from('content_journeys')
+            .select('*, initiatives(title)')
+            .eq('organization_id', organizationId)
+            .order('updated_at', { ascending: false })
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_journeys')
+            throw new Error(`Failed to load journeys: ${error.message}`)
+        }
+        const rows = data || []
+        if (rows.length === 0) return []
+
+        const { data: updates, error: updatesError } = await supabase
+            .from('content_packages')
+            .select('id, journey_id, created_at, media, published_at')
+            .eq('organization_id', organizationId)
+            .in('journey_id', rows.map(r => r.id))
+            .order('created_at', { ascending: false })
+        if (updatesError) throw new Error(`Failed to load updates: ${updatesError.message}`)
+
+        const stats = new Map<string, JourneyStat>()
+        for (const row of updates || []) {
+            const prev = stats.get(row.journey_id) || { count: 0, published: 0, last: null, cover: null }
+            const media = Array.isArray(row.media) ? row.media as ContentMediaItem[] : []
+            stats.set(row.journey_id, {
+                count: prev.count + 1,
+                published: prev.published + (row.published_at ? 1 : 0),
+                last: prev.last || row.created_at,
+                cover: prev.cover || media[0]?.image_url || null,
+            })
+        }
+        return rows.map(row => this.toJourney(row, stats.get(row.id)))
+    }
+
+    static async createJourney(
+        userId: string,
+        input: { title: string; description?: string | null; initiative_id?: string | null },
+        requestedOrgId?: string
+    ): Promise<ContentJourney> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const title = String(input.title || '').trim()
+        if (!title) throw httpError(400, 'Give the journey a name')
+        const initiativeId = await this.checkInitiative(userId, input.initiative_id, requestedOrgId)
+        const { data, error } = await supabase
+            .from('content_journeys')
+            .insert([{
+                organization_id: organizationId,
+                title: title.slice(0, 120),
+                description: String(input.description || '').trim().slice(0, 1000) || null,
+                initiative_id: initiativeId,
+                status: 'ongoing',
+                created_by: userId,
+            }])
+            .select('*, initiatives(title)')
+            .single()
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_journeys')
+            throw new Error(`Failed to create journey: ${error.message}`)
+        }
+        return this.toJourney(data)
+    }
+
+    static async updateJourney(
+        userId: string,
+        journeyId: string,
+        patch: {
+            title?: string
+            description?: string | null
+            initiative_id?: string | null
+            status?: ContentJourneyStatus
+            published?: boolean
+        },
+        requestedOrgId?: string
+    ): Promise<ContentJourney> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        await this.assertJourney(organizationId, journeyId)
+        const next: Record<string, unknown> = {}
+        if (patch.title !== undefined) {
+            const title = String(patch.title || '').trim()
+            if (!title) throw httpError(400, 'Give the journey a name')
+            next.title = title.slice(0, 120)
+        }
+        if (patch.description !== undefined) next.description = String(patch.description || '').trim().slice(0, 1000) || null
+        if (patch.initiative_id !== undefined) next.initiative_id = await this.checkInitiative(userId, patch.initiative_id, requestedOrgId)
+        if (patch.status !== undefined) next.status = patch.status === 'completed' ? 'completed' : 'ongoing'
+        if (patch.published !== undefined) next.published_at = patch.published ? new Date().toISOString() : null
+        const { error } = await supabase
+            .from('content_journeys')
+            .update(next)
+            .eq('id', journeyId)
+            .eq('organization_id', organizationId)
+        if (error) throw new Error(`Failed to update journey: ${error.message}`)
+        const match = (await this.listJourneys(userId, requestedOrgId)).find(j => j.id === journeyId)
+        if (!match) throw OrgAccessService.accessDenied()
+        return match
+    }
+
+    static async deleteJourney(userId: string, journeyId: string, requestedOrgId?: string): Promise<void> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        await this.assertJourney(organizationId, journeyId)
+        const { error } = await supabase
+            .from('content_journeys')
+            .delete()
+            .eq('id', journeyId)
+            .eq('organization_id', organizationId)
+        if (error) throw new Error(`Failed to delete journey: ${error.message}`)
+    }
+
+    private static toJourney(row: any, stat?: JourneyStat): ContentJourney {
+        const { initiatives, ...rest } = row
+        return {
+            ...rest,
+            status: rest.status === 'completed' || rest.status === 'archived' ? 'completed' : 'ongoing',
+            initiative_title: asObj(initiatives)?.title || null,
+            update_count: stat?.count || 0,
+            published_count: stat?.published || 0,
+            last_update_at: stat?.last || null,
+            cover_url: stat?.cover || null,
+        }
+    }
+
+    private static async publishJourneyIfDraft(organizationId: string, journeyId: string): Promise<void> {
+        await supabase
+            .from('content_journeys')
+            .update({ published_at: new Date().toISOString() })
+            .eq('id', journeyId)
+            .eq('organization_id', organizationId)
+            .is('published_at', null)
+    }
+
+    private static async checkInitiative(userId: string, initiativeId: unknown, requestedOrgId?: string): Promise<string | null> {
+        if (!initiativeId) return null
+        const ids = await OrgAccessService.getAccessibleInitiativeIds(userId, requestedOrgId)
+        if (!ids.includes(String(initiativeId))) throw httpError(404, 'Program not found')
+        return String(initiativeId)
+    }
+
+    private static async assertJourney(organizationId: string, journeyId: string): Promise<{ id: string; title: string; description: string | null; initiative_id: string | null }> {
+        const { data, error } = await supabase
+            .from('content_journeys')
+            .select('id, title, description, initiative_id')
+            .eq('id', journeyId)
+            .eq('organization_id', organizationId)
+            .maybeSingle()
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing('content_journeys')
+            throw new Error(`Failed to load journey: ${error.message}`)
+        }
+        if (!data) throw httpError(404, 'Journey not found')
+        return data
+    }
+
+    private static async touchJourney(organizationId: string, journeyId: string): Promise<void> {
+        await supabase
+            .from('content_journeys')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', journeyId)
+            .eq('organization_id', organizationId)
+    }
+
+    /** Journey brief plus earlier updates, so a new update reads as what changed since last time. */
+    private static async loadJourneyFacts(organizationId: string, journeyId: string, excludePackageId?: string): Promise<string> {
+        const journey = await this.assertJourney(organizationId, journeyId)
+        const { data } = await supabase
+            .from('content_packages')
+            .select('id, hook, body, created_at')
+            .eq('organization_id', organizationId)
+            .eq('journey_id', journeyId)
+            .order('created_at', { ascending: true })
+        const earlier = (data || []).filter(row => row.id !== excludePackageId)
+        const position = excludePackageId
+            ? (data || []).findIndex(row => row.id === excludePackageId) + 1 || earlier.length + 1
+            : earlier.length + 1
+        const recent = earlier.slice(-6).map(row => {
+            const when = String(row.created_at || '').slice(0, 10)
+            return `- ${when}: ${row.hook || ''}. ${trimText(String(row.body || ''), 200)}`
+        })
+        return [
+            `JOURNEY: ${journey.title}`,
+            journey.description?.trim() ? `Following: ${trimText(journey.description, 500)}` : '',
+            `This is update ${position} of this journey.`,
+            recent.length
+                ? `Earlier updates (oldest first). Do not repeat them. Show what is new:\n${recent.join('\n')}`
+                : 'This is the first update. Introduce who or what we are following.',
+        ].filter(Boolean).join('\n')
+    }
+
+    /** Extra carousel photos, validated for access, deduped against the cover, capped. */
+    private static async loadExtras(
+        userId: string,
+        refs: unknown,
+        cover: ContentSourceRef,
+        requestedOrgId?: string
+    ): Promise<ContentSource[]> {
+        const seen = new Set([sourceKey(cover)])
+        const unique = asSourceRefs(refs).filter(ref => {
+            const key = sourceKey(ref)
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+        }).slice(0, MAX_MEDIA - 1)
+        const loaded = await Promise.all(unique.map(ref => this.loadSource(userId, ref.source_type, ref.source_id, requestedOrgId)))
+        return loaded.filter((s): s is ContentSource => !!s)
     }
 
     private static assertOpenAi() {
@@ -1369,6 +1760,37 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 'AI_REPORT_LIMIT_REACHED'
             )
         }
+    }
+
+    /** Returns the idea id when it belongs to the org; null when missing (the post still saves). */
+    private static async checkIdea(organizationId: string, ideaId: string): Promise<string | null> {
+        const { data, error } = await supabase
+            .from('content_ideas')
+            .select('id')
+            .eq('id', ideaId)
+            .eq('organization_id', organizationId)
+            .maybeSingle()
+        if (error || !data) return null
+        return data.id as string
+    }
+
+    private static async loadIdeaFacts(organizationId: string, ideaId: string): Promise<string> {
+        const { data, error } = await supabase
+            .from('content_ideas')
+            .select('card, angle')
+            .eq('id', ideaId)
+            .eq('organization_id', organizationId)
+            .maybeSingle()
+        if (error || !data?.card) return ''
+        const card = data.card as { title?: string; why?: string; who?: string; ask?: string[] }
+        return [
+            'This post comes from a capture idea the team went out and photographed:',
+            card.title ? `- Story: ${card.title}` : '',
+            card.why ? `- Why it matters: ${trimText(card.why, 300)}` : '',
+            card.who ? `- Who: ${trimText(card.who, 160)}` : '',
+            card.ask?.length ? `- Questions they asked: ${card.ask.join(' | ')}` : '',
+            'If the photo description contains their exact words, build the post around that quote and keep it word for word.',
+        ].filter(Boolean).join('\n')
     }
 
     private static parseJson(raw?: string | null): any {
@@ -1388,7 +1810,17 @@ email_body: donor-email depth, line breaks, no emojis.`,
             if (isMissingRelation(error)) return new Set()
             throw new Error(`Failed to load used photos: ${error.message}`)
         }
-        return new Set((data || []).map(row => `${row.source_type}:${row.source_id}`))
+        const keys = new Set((data || []).map(row => `${row.source_type}:${row.source_id}`))
+        const { data: packages } = await supabase
+            .from('content_packages')
+            .select('media')
+            .eq('organization_id', organizationId)
+        for (const row of packages || []) {
+            for (const item of Array.isArray(row.media) ? row.media as ContentMediaItem[] : []) {
+                keys.add(`${item.source_type}:${item.source_id}`)
+            }
+        }
+        return keys
     }
 
     private static async loadRecentStoryTypes(organizationId: string): Promise<ContentStoryType[]> {

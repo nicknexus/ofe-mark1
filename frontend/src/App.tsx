@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParam
 import { AppToaster } from './components/ui'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
-import { apiService, SUBSCRIPTION_REQUIRED_EVENT } from './services/api'
+import { apiService, SUBSCRIPTION_REQUIRED_EVENT, ACTIVE_ORG_CHANGED_EVENT } from './services/api'
 import { notify } from './lib/notify'
 import { useRecheckOnReturn } from './hooks/useRecheckOnReturn'
 import { TeamService, PendingInviteCheck } from './services/team'
@@ -66,6 +66,8 @@ import EmbedPage from './pages/EmbedPage'
 import Layout from './components/Layout'
 import PublicScrollToTop from './components/public/PublicScrollToTop'
 
+const ACTIVE_ORG_KEY = 'nexus-active-org-id'
+
 function RedirectKeepSearch({ to }: { to: string }) {
  const { search } = useLocation()
  return <Navigate to={`${to}${search}`} replace />
@@ -123,6 +125,7 @@ function App() {
  const { updateAvailable, dismiss: dismissUpdate, refresh: refreshApp } = useVersionCheck()
  const checkedUserIdRef = useRef<string | null>(null)
  const subCheckGenRef = useRef(0)
+ const lastCheckedOrgRef = useRef<string | null>(null)
 
  useEffect(() => {
  // Get initial user
@@ -224,11 +227,23 @@ function App() {
  // hit. Keep the loader up and retry instead of flashing Connection Issue.
  const attempts = 3
  let lastError: unknown
+ let switchedOrg = false
  for (let i = 0; i < attempts; i++) {
  if (gen !== subCheckGenRef.current) return
  try {
+ const checkedOrg = localStorage.getItem(ACTIVE_ORG_KEY)
  const status = await SubscriptionService.getStatus()
  if (gen !== subCheckGenRef.current) return
+ // This org is locked but another of theirs isn't: move them there.
+ if (!status.hasAccess && status.fallbackOrgId && !switchedOrg) {
+ switchedOrg = true
+ if (checkedOrg) notify.error("That organization's plan has ended. Switched you back to an active one.")
+ localStorage.setItem(ACTIVE_ORG_KEY, status.fallbackOrgId)
+ apiService.clearCache()
+ i--
+ continue
+ }
+ lastCheckedOrgRef.current = checkedOrg
  setSubscriptionStatus(status)
  if (params.get('checkout') === 'success' && !status.hasAccess && i < attempts - 1) {
  await new Promise(r => setTimeout(r, 600 * (i + 1)))
@@ -285,6 +300,15 @@ function App() {
  }
  window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, onSubscriptionRequired)
  return () => window.removeEventListener(SUBSCRIPTION_REQUIRED_EVENT, onSubscriptionRequired)
+ })
+
+ // Access is per org (the owner's plan decides), so re-check on org switch.
+ useEffect(() => {
+ const onActiveOrgChanged = () => {
+ if (localStorage.getItem(ACTIVE_ORG_KEY) !== lastCheckedOrgRef.current) recheckSubscription()
+ }
+ window.addEventListener(ACTIVE_ORG_CHANGED_EVENT, onActiveOrgChanged)
+ return () => window.removeEventListener(ACTIVE_ORG_CHANGED_EVENT, onActiveOrgChanged)
  })
 
  // Coming back from the billing portal (new tab) or Checkout: pick up
@@ -431,7 +455,11 @@ function App() {
  }
 
  // Gate: No subscription — check for pending invites / trial
- if (subscriptionStatus.subscription.status === 'none' && !subscriptionStatus.hasAccess) {
+ if (
+ subscriptionStatus.subscription.status === 'none' &&
+ !subscriptionStatus.hasAccess &&
+ subscriptionStatus.reason !== 'org_plan_ended'
+ ) {
  if (pendingInvite === null && !checkingPendingInvite) {
  setCheckingPendingInvite(true)
  TeamService.checkMyPendingInvite()
@@ -656,7 +684,7 @@ function App() {
 
  // User has no own subscription (status is 'none') but might have inherited access
  // or a pending team invitation
- if (subscriptionStatus.subscription.status === 'none') {
+ if (subscriptionStatus.subscription.status === 'none' && subscriptionStatus.reason !== 'org_plan_ended') {
  if (subscriptionStatus.hasAccess) {
  // They have inherited access - let them through to the app
  } else {
@@ -856,7 +884,8 @@ function App() {
  <Route path="share/org" element={<ContentOrgPage />} />
  <Route path="share/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
  <Route path="share/embed" element={<ContentEmbedPage />} />
- <Route path="share/create" element={<ContentCreatePage />} />
+ <Route path="share/content/*" element={<ContentCreatePage />} />
+ <Route path="share/create" element={<RedirectKeepSearch to="/share/content" />} />
  <Route path="share/team" element={<ShareTeamPage />} />
  <Route path="share/context" element={<OrgContextPage />} />
  <Route path="context" element={<RedirectKeepSearch to="/share/context" />} />
@@ -865,7 +894,7 @@ function App() {
  <Route path="content/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
  <Route path="content/public" element={<RedirectKeepSearch to="/share/public" />} />
  <Route path="content/embed" element={<RedirectKeepSearch to="/share/embed" />} />
- <Route path="content/create" element={<RedirectKeepSearch to="/share/create" />} />
+ <Route path="content/create" element={<RedirectKeepSearch to="/share/content" />} />
  <Route path="settings/team" element={<TeamSettingsPage />} />
  {user.is_admin && (
  <Route path="admin/demos" element={<AdminDemosPage />} />

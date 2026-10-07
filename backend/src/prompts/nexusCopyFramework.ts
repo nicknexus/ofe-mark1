@@ -144,7 +144,9 @@ Close by naming the org and how to help if the facts support it.`,
 
 function storyTypeBrief(storyType: ContentStoryType): string {
     if (storyType === 'glance') return 'Impact at a Glance. The interesting truthful thing may be a number, a result, or measurable progress. Do not automatically pick the biggest number.'
-    if (storyType === 'journey') return 'Journey. A person, family, class, or community over time. Only claim change the facts demonstrate.'
+    if (storyType === 'journey') return `Journey update. One post in an ongoing series following a person, family, class, or community over time.
+Write for someone already following along. Lead with what is new since the earlier updates listed in the facts. Do not repeat them.
+Only claim change the facts demonstrate. A good CTA is often "Follow the journey."`
     return 'Moment. A milestone, event, testimonial, photo, quote, or update. A single moment can be the story.'
 }
 

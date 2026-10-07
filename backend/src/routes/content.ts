@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { ContentService } from '../services/contentService'
-import { ContentChannel, ContentDraftStatus, ContentPostFormat, ContentPostKind, ContentSourceType, ContentStoryType } from '../types'
+import { ContentIdeasService } from '../services/contentIdeasService'
+import { ContentChannel, ContentJourneyStatus, ContentPostFormat, ContentPostKind, ContentSourceType, ContentStoryType } from '../types'
 
 const router = Router()
 
@@ -34,7 +35,9 @@ router.get('/sources', authenticateUser, async (req: AuthenticatedRequest, res) 
         const singleDate = (req.query.single_date as string | undefined) || undefined
         const startDate = (req.query.start_date as string | undefined) || undefined
         const endDate = (req.query.end_date as string | undefined) || undefined
+        const initiativeId = (req.query.initiative_id as string | undefined) || undefined
         const result = await ContentService.listSources(req.user!.id, requestedOrgId, {
+            initiativeId,
             offset: Number.isFinite(offset) ? offset : 0,
             limit: Number.isFinite(limit) ? limit : 21,
             sourceType: sourceType === 'evidence' || sourceType === 'story' ? sourceType : 'all',
@@ -240,7 +243,7 @@ router.post('/recommend', authenticateUser, async (req: AuthenticatedRequest, re
 router.post('/generate-master', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const { source_type, source_id, story_type, why } = req.body || {}
+        const { source_type, source_id, story_type, why, journey_id, package_id, extras, idea_id } = req.body || {}
         if (source_type !== 'evidence' && source_type !== 'story') {
             res.status(400).json({ error: 'source_type must be evidence or story' })
             return
@@ -259,7 +262,8 @@ router.post('/generate-master', authenticateUser, async (req: AuthenticatedReque
             source_id,
             story_type,
             why,
-            requestedOrgId
+            requestedOrgId,
+            { journeyId: journey_id, packageId: package_id, extras, ideaId: idea_id }
         )
         res.json(master)
     } catch (error) {
@@ -270,7 +274,7 @@ router.post('/generate-master', authenticateUser, async (req: AuthenticatedReque
 router.post('/refine-master', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const { source_type, source_id, story_type, hook, body, evidence_line, cta, context, why } = req.body || {}
+        const { source_type, source_id, story_type, hook, body, evidence_line, cta, context, why, journey_id, package_id, extras } = req.body || {}
         if (source_type !== 'evidence' && source_type !== 'story') {
             res.status(400).json({ error: 'source_type must be evidence or story' })
             return
@@ -281,7 +285,7 @@ router.post('/refine-master', authenticateUser, async (req: AuthenticatedRequest
         }
         const master = await ContentService.refineMaster(
             req.user!.id,
-            { source_type, source_id, story_type, hook, body, evidence_line, cta, context, why },
+            { source_type, source_id, story_type, hook, body, evidence_line, cta, context, why, journey_id, package_id, extras },
             requestedOrgId
         )
         res.json(master)
@@ -293,14 +297,14 @@ router.post('/refine-master', authenticateUser, async (req: AuthenticatedRequest
 router.post('/generate-versions', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const { source_type, source_id, story_type, hook, body, evidence_line, cta, channels, context } = req.body || {}
+        const { source_type, source_id, story_type, hook, body, evidence_line, cta, channels, context, journey_id, package_id, extras } = req.body || {}
         if (!Array.isArray(channels) || channels.some((c: string) => !CHANNELS.has(c))) {
             res.status(400).json({ error: 'channels must be a list of known channels' })
             return
         }
         const versions = await ContentService.generateVersions(
             req.user!.id,
-            { source_type, source_id, story_type, hook, body, evidence_line, cta, channels, context },
+            { source_type, source_id, story_type, hook, body, evidence_line, cta, channels, context, journey_id, package_id, extras },
             requestedOrgId
         )
         res.json({ versions })
@@ -312,8 +316,23 @@ router.post('/generate-versions', authenticateUser, async (req: AuthenticatedReq
 router.get('/packages', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const packages = await ContentService.listPackages(req.user!.id, requestedOrgId)
+        const journeyId = (req.query.journey_id as string | undefined) || undefined
+        const packages = await ContentService.listPackages(req.user!.id, requestedOrgId, { journeyId })
         res.json(packages)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.get('/packages/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const [pkg] = await ContentService.listPackages(req.user!.id, requestedOrgId, { packageId: req.params.id })
+        if (!pkg) {
+            res.status(404).json({ error: 'Post not found' })
+            return
+        }
+        res.json(pkg)
     } catch (error) {
         sendError(res, error)
     }
@@ -322,22 +341,68 @@ router.get('/packages', authenticateUser, async (req: AuthenticatedRequest, res)
 router.post('/packages', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const pkg = await ContentService.savePackage(req.user!.id, req.body || {}, requestedOrgId)
+        const { id: _ignored, ...input } = req.body || {}
+        const pkg = await ContentService.savePackage(req.user!.id, input, requestedOrgId)
         res.status(201).json(pkg)
     } catch (error) {
         sendError(res, error)
     }
 })
 
-router.patch('/packages/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.put('/packages/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const status = req.body?.status as ContentDraftStatus
-        if (status !== 'draft' && status !== 'ready') {
-            res.status(400).json({ error: 'status must be draft or ready' })
+        const pkg = await ContentService.savePackage(req.user!.id, { ...(req.body || {}), id: req.params.id }, requestedOrgId)
+        res.json(pkg)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.patch('/packages/:id/publish', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const published = req.body?.published
+        if (typeof published !== 'boolean') {
+            res.status(400).json({ error: 'published must be true or false' })
             return
         }
-        const pkg = await ContentService.updatePackageStatus(req.user!.id, req.params.id, status, requestedOrgId)
+        const pkg = await ContentService.setPackagePublished(req.user!.id, req.params.id, published, requestedOrgId)
+        res.json(pkg)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/packages/:id/channels/generate', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { channels, context } = req.body || {}
+        if (!Array.isArray(channels) || channels.length === 0 || channels.some((c: string) => !CHANNELS.has(c))) {
+            res.status(400).json({ error: 'channels must be a list of known channels' })
+            return
+        }
+        const pkg = await ContentService.generateChannels(
+            req.user!.id,
+            req.params.id,
+            { channels: channels as ContentChannel[], context: typeof context === 'string' ? context : undefined },
+            requestedOrgId
+        )
+        res.json(pkg)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.put('/packages/:id/channels', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const versions = req.body?.versions
+        if (!Array.isArray(versions) || versions.some((v: any) => !CHANNELS.has(v?.channel))) {
+            res.status(400).json({ error: 'versions must be a list of channel versions' })
+            return
+        }
+        const pkg = await ContentService.saveChannels(req.user!.id, req.params.id, versions, requestedOrgId)
         res.json(pkg)
     } catch (error) {
         sendError(res, error)
@@ -348,6 +413,107 @@ router.delete('/packages/:id', authenticateUser, async (req: AuthenticatedReques
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         await ContentService.deletePackage(req.user!.id, req.params.id, requestedOrgId)
+        res.status(204).end()
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.get('/ideas', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentIdeasService.list(req.user!.id, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/ideas/refresh', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentIdeasService.refresh(req.user!.id, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.get('/ideas/signals', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        res.json(await ContentIdeasService.detectSignals(organizationId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.get('/ideas/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentIdeasService.get(req.user!.id, req.params.id, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.patch('/ideas/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { status, reason, snooze_days } = req.body || {}
+        res.json(await ContentIdeasService.update(req.user!.id, req.params.id, { status, reason, snooze_days }, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.get('/journeys', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentService.listJourneys(req.user!.id, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/journeys', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { title, description, initiative_id } = req.body || {}
+        const journey = await ContentService.createJourney(req.user!.id, { title, description, initiative_id }, requestedOrgId)
+        res.status(201).json(journey)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.patch('/journeys/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { title, description, initiative_id, status, published } = req.body || {}
+        if (status !== undefined && status !== 'ongoing' && status !== 'completed') {
+            res.status(400).json({ error: 'status must be ongoing or completed' })
+            return
+        }
+        if (published !== undefined && typeof published !== 'boolean') {
+            res.status(400).json({ error: 'published must be true or false' })
+            return
+        }
+        const journey = await ContentService.updateJourney(
+            req.user!.id,
+            req.params.id,
+            { title, description, initiative_id, status: status as ContentJourneyStatus | undefined, published },
+            requestedOrgId
+        )
+        res.json(journey)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.delete('/journeys/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        await ContentService.deleteJourney(req.user!.id, req.params.id, requestedOrgId)
         res.status(204).end()
     } catch (error) {
         sendError(res, error)

@@ -103,9 +103,11 @@ export class EntitlementService {
         if (!sub) return OPEN_ENTITLEMENTS; // no subscription row — fail open
 
         const plan = getPlan(sub.plan_tier);
-        // Column value wins (grandfathered/custom limits); fall back to tier default.
-        const initiativesLimit = sub.initiatives_limit ?? plan.initiatives_limit;
-        const locationsLimit = sub.locations_limit ?? plan.locations_limit;
+        // On a plan row the column is authoritative and null means unlimited
+        // (admin "blank = unlimited", same as creation checks). Rows with no
+        // plan_tier fall back to the tier default.
+        const initiativesLimit = sub.plan_tier ? sub.initiatives_limit : plan.initiatives_limit;
+        const locationsLimit = sub.plan_tier ? sub.locations_limit : plan.locations_limit;
 
         const [allowedInitiativeIds, allowedLocationIds] = await Promise.all([
             this.allowedIds('initiatives', orgId, initiativesLimit),

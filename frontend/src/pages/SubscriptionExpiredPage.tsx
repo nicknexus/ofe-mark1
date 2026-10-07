@@ -93,7 +93,9 @@ export default function SubscriptionExpiredPage({ reason, trialAvailable, onRech
         }
     }
 
-    if (checkingPermissions) {
+    const memberView = reason === 'org_plan_ended' || isSharedMember
+
+    if (checkingPermissions && !memberView) {
         return (
             <MarketingPageShell contentClassName="max-w-md w-full">
                 <div className="glass-card p-12 rounded-3xl text-center max-w-md">
@@ -111,7 +113,7 @@ export default function SubscriptionExpiredPage({ reason, trialAvailable, onRech
         )
     }
 
-    if (isSharedMember) {
+    if (memberView) {
         return (
             <MarketingPageShell contentClassName="max-w-lg w-full">
                 <div className="text-center mb-8">

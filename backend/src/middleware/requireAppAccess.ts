@@ -32,17 +32,19 @@ function mode(): Mode {
 const ALLOW_TTL_MS = 60_000;
 const allowCache = new Map<string, number>();
 
-async function isAllowed(userId: string): Promise<{ allowed: boolean; reason: string; status: string }> {
-    const hit = allowCache.get(userId);
+// Keyed per user AND org: access inside an org comes from that org's owner.
+async function isAllowed(userId: string, orgId?: string): Promise<{ allowed: boolean; reason: string; status: string }> {
+    const key = `${userId}:${orgId ?? ''}`;
+    const hit = allowCache.get(key);
     if (hit && hit > Date.now()) return { allowed: true, reason: 'cached', status: 'cached' };
 
     if (await PlatformAdminService.isAdmin(userId)) {
-        allowCache.set(userId, Date.now() + ALLOW_TTL_MS);
+        allowCache.set(key, Date.now() + ALLOW_TTL_MS);
         return { allowed: true, reason: 'platform_admin', status: 'admin' };
     }
 
-    const result = await SubscriptionService.checkAccessReadOnly(userId);
-    if (result.hasAccess) allowCache.set(userId, Date.now() + ALLOW_TTL_MS);
+    const result = await SubscriptionService.checkAccessReadOnly(userId, orgId);
+    if (result.hasAccess) allowCache.set(key, Date.now() + ALLOW_TTL_MS);
     return { allowed: result.hasAccess, reason: result.reason, status: result.status };
 }
 
@@ -61,11 +63,12 @@ export function requireAppAccess(skip?: (req: AuthenticatedRequest) => boolean) 
             const userId = req.user?.id;
             if (!userId) return next();
             try {
-                const { allowed, reason, status } = await isAllowed(userId);
+                const orgId = req.headers['x-organization-id'] as string | undefined;
+                const { allowed, reason, status } = await isAllowed(userId, orgId);
                 if (allowed) return next();
 
                 console.warn(
-                    `[app-access] ${m === 'on' ? 'BLOCKED' : 'would block'} user=${userId} status=${status} reason=${reason} ${req.method} ${req.baseUrl}${req.path}`
+                    `[app-access] ${m === 'on' ? 'BLOCKED' : 'would block'} user=${userId} org=${orgId ?? '-'} status=${status} reason=${reason} ${req.method} ${req.baseUrl}${req.path}`
                 );
                 if (m === 'log') return next();
 

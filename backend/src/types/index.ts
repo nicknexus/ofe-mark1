@@ -457,6 +457,7 @@ export interface ContentMaster {
     why: string;
     layout: GraphicLayout;
     source: ContentSource;
+    extras?: ContentSource[];
 }
 
 export interface ContentChannelVersion {
@@ -483,7 +484,85 @@ export interface ContentPackage {
     created_at: string;
     updated_at: string;
     image_url?: string | null;
+    journey_id?: string | null;
+    media?: ContentMediaItem[];
+    published_at?: string | null;
+    edited_at?: string | null;
+    channels_stale?: boolean;
     versions?: ContentPost[];
+}
+
+export interface ContentMediaItem {
+    source_type: ContentSourceType;
+    source_id: string;
+    image_url: string;
+    title: string;
+}
+
+export interface ContentSourceRef {
+    source_type: ContentSourceType;
+    source_id: string;
+}
+
+export type ContentJourneyStatus = 'ongoing' | 'completed';
+
+export interface ContentJourney {
+    id: string;
+    organization_id: string;
+    initiative_id?: string | null;
+    initiative_title?: string | null;
+    title: string;
+    description?: string | null;
+    status: ContentJourneyStatus;
+    published_at?: string | null;
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+    update_count: number;
+    published_count: number;
+    last_update_at?: string | null;
+    cover_url?: string | null;
+}
+
+export type ContentIdeaStatus = 'suggested' | 'accepted' | 'dismissed' | 'snoozed' | 'posted' | 'expired';
+
+export interface ContentIdeaCard {
+    title: string;
+    why: string;
+    who: string;
+    ask: string[];
+    capture: { quick: string[]; good: string[]; story: string[] };
+    channels: string[];
+    journey_potential: boolean;
+    follow_up: string;
+}
+
+export interface ContentIdea {
+    id: string;
+    organization_id: string;
+    signal_key: string;
+    angle: string;
+    angle_label: string;
+    initiative_id?: string | null;
+    initiative_title?: string | null;
+    kpi_id?: string | null;
+    journey_id?: string | null;
+    journey_title?: string | null;
+    card: ContentIdeaCard;
+    rank: number;
+    status: ContentIdeaStatus;
+    dismiss_reason?: string | null;
+    snoozed_until?: string | null;
+    story_id?: string | null;
+    package_id?: string | null;
+    created_at: string;
+    acted_at?: string | null;
+}
+
+export interface ContentIdeaList {
+    ideas: ContentIdea[];
+    generated_at: string | null;
+    nothing_needed: boolean;
 }
 
 export interface User {

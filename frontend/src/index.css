@@ -471,6 +471,288 @@
         @apply text-sm text-secondary-500 mt-1 max-w-sm;
     }
 
+    /* Content studio: every content screen sits on the landing dark band.
+       Dialogs (.fixed) and social mocks (.channel-preview) stay light. */
+    .content-studio {
+        color: white;
+        color-scheme: dark;
+    }
+
+    .content-studio .app-page-title {
+        @apply text-white;
+    }
+
+    .content-studio .app-page-subtitle {
+        @apply text-white/60;
+    }
+
+    .content-studio .app-card,
+    .content-studio .app-card-interactive,
+    .content-studio .app-card-elevated,
+    .content-studio .app-card-flat,
+    .content-studio .app-card-muted,
+    .content-studio .app-tile,
+    .content-studio .app-tile-static {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: none;
+        color: white;
+    }
+
+    .content-studio .app-card-interactive:hover,
+    .content-studio .app-tile:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.22);
+        box-shadow: none;
+    }
+
+    .content-studio .studio-panel {
+        background: rgba(92, 106, 118, 0.94);
+        border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .content-studio .studio-panel .app-input {
+        background: rgba(0, 0, 0, 0.28);
+        border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .content-studio .app-input {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.14);
+        color: white;
+        box-shadow: none;
+    }
+
+    .content-studio .app-input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .content-studio .app-input:focus {
+        border-color: #97C7CB;
+        --tw-ring-color: rgba(151, 199, 203, 0.25);
+    }
+
+    .content-studio .app-label {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .content-studio .app-help,
+    .content-studio .app-section-title {
+        color: rgba(255, 255, 255, 0.55);
+    }
+
+    .content-studio .app-chip {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .content-studio .app-chip-accent {
+        background: rgba(151, 199, 203, 0.16);
+        color: #d7eef0;
+        border-color: rgba(151, 199, 203, 0.35);
+    }
+
+    .content-studio .app-chip-impact {
+        background: rgba(143, 180, 155, 0.18);
+        color: #dceee3;
+        border-color: rgba(143, 180, 155, 0.35);
+    }
+
+    .content-studio .app-chip-evidence {
+        background: rgba(151, 199, 203, 0.14);
+        color: #d7eef0;
+        border-color: rgba(151, 199, 203, 0.3);
+    }
+
+    .content-studio .app-btn {
+        --tw-ring-offset-color: transparent;
+    }
+
+    .content-studio .app-btn-primary {
+        color: white;
+        box-shadow: 0 10px 18px -6px rgba(192, 223, 161, 0.7);
+    }
+
+    .content-studio .fixed .app-btn-primary {
+        color: white;
+        box-shadow: 0 10px 15px -3px rgba(192, 223, 161, 0.25);
+    }
+
+    .content-studio button[aria-label="Learn more"] + span {
+        background: white;
+        color: #1c242b;
+    }
+
+    .content-studio .app-icon-tile {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .content-studio .app-icon-tile-accent {
+        background: rgba(192, 223, 161, 0.22);
+        color: #e7f5d4;
+    }
+
+    .content-studio .app-btn-secondary {
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+        border-color: rgba(255, 255, 255, 0.14);
+        box-shadow: none;
+    }
+
+    .content-studio .app-btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    .content-studio .app-btn-ghost {
+        color: #fff;
+    }
+
+    .content-studio .app-btn-ghost:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+    }
+
+    .content-studio .app-btn-ghost.is-danger:hover {
+        color: #f87171;
+    }
+
+    .content-studio .app-empty-icon {
+        @apply bg-white/10 text-seafoam;
+    }
+
+    .content-studio .app-empty-title {
+        @apply text-white;
+    }
+
+    .content-studio .app-empty-text {
+        @apply text-white/60;
+    }
+
+    .content-studio .app-segmented {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    .content-studio .app-segmented-item {
+        color: rgba(255, 255, 255, 0.65);
+    }
+
+    .content-studio .app-segmented-item[aria-current="page"] {
+        background: rgba(255, 255, 255, 0.12);
+        color: white;
+    }
+
+    .content-studio .text-primary-800 { color: #97C7CB; }
+    .content-studio .text-impact-700 { color: #c5e0cc; }
+    .content-studio .text-secondary-900 { color: white; }
+    .content-studio .text-secondary-800 { color: rgba(255, 255, 255, 0.9); }
+    .content-studio .text-secondary-700 { color: rgba(255, 255, 255, 0.78); }
+    .content-studio .text-secondary-600 { color: rgba(255, 255, 255, 0.7); }
+    .content-studio .text-secondary-500 { color: rgba(255, 255, 255, 0.55); }
+    .content-studio .text-secondary-400 { color: rgba(255, 255, 255, 0.42); }
+    .content-studio .text-gray-700 { color: rgba(255, 255, 255, 0.82); }
+    .content-studio .text-gray-600 { color: rgba(255, 255, 255, 0.7); }
+    .content-studio .text-gray-500 { color: rgba(255, 255, 255, 0.55); }
+    .content-studio .text-gray-400 { color: rgba(255, 255, 255, 0.62); }
+    .content-studio .text-gray-300 { color: rgba(255, 255, 255, 0.78); }
+    .content-studio .hover\:bg-gray-100:hover { background-color: rgba(255, 255, 255, 0.1); }
+    .content-studio .border-gray-200,
+    .content-studio .border-gray-200\/80,
+    .content-studio .border-gray-300 {
+        border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .content-studio .fixed,
+    .content-studio .channel-preview {
+        color: #1f222b;
+        color-scheme: light;
+    }
+
+    .content-studio .fixed .text-primary-800,
+    .content-studio .channel-preview .text-primary-800 { color: #789a59; }
+    .content-studio .fixed .text-impact-700,
+    .content-studio .channel-preview .text-impact-700 { color: #3f6b4a; }
+    .content-studio .fixed .text-secondary-900,
+    .content-studio .channel-preview .text-secondary-900 { color: #1f222b; }
+    .content-studio .fixed .text-secondary-800,
+    .content-studio .channel-preview .text-secondary-800 { color: #2f3340; }
+    .content-studio .fixed .text-secondary-700,
+    .content-studio .channel-preview .text-secondary-700 { color: #3d4352; }
+    .content-studio .fixed .text-secondary-600,
+    .content-studio .channel-preview .text-secondary-600 { color: #4a5163; }
+    .content-studio .fixed .text-secondary-500,
+    .content-studio .channel-preview .text-secondary-500 { color: #6b7280; }
+    .content-studio .fixed .text-secondary-400,
+    .content-studio .channel-preview .text-secondary-400 { color: #8e94a3; }
+    .content-studio .fixed .text-gray-700,
+    .content-studio .channel-preview .text-gray-700 { color: #374151; }
+    .content-studio .fixed .text-gray-600,
+    .content-studio .channel-preview .text-gray-600 { color: #4b5563; }
+    .content-studio .fixed .text-gray-500,
+    .content-studio .channel-preview .text-gray-500 { color: #6b7280; }
+    .content-studio .fixed .text-gray-400,
+    .content-studio .channel-preview .text-gray-400 { color: #9ca3af; }
+    .content-studio .fixed .text-gray-300,
+    .content-studio .channel-preview .text-gray-300 { color: #d1d5db; }
+    .content-studio .fixed .hover\:bg-gray-100:hover { background-color: #f3f4f6; }
+
+    .content-studio .fixed .app-input,
+    .content-studio .channel-preview .app-input {
+        background: white;
+        border-color: #e5e7eb;
+        color: #1f222b;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .content-studio .fixed .app-icon-tile {
+        background: #f3f4f6;
+        color: #4a5163;
+    }
+
+    .content-studio .fixed .app-icon-tile-accent {
+        background: #f4f9f0;
+        color: #789a59;
+    }
+
+    .content-studio .fixed .app-label { color: #3d4352; }
+    .content-studio .fixed .app-help { color: #6b7280; }
+
+    .content-studio .fixed .app-chip {
+        background: #f3f4f6;
+        color: #4a5163;
+        border-color: transparent;
+    }
+
+    .content-studio .fixed .app-btn-primary {
+        background: #c0dfa1;
+        color: white;
+        box-shadow: 0 10px 15px -3px rgba(192, 223, 161, 0.25);
+    }
+
+    .content-studio .fixed .app-btn-secondary {
+        background: white;
+        color: #3d4352;
+        border-color: #e5e7eb;
+    }
+
+    .content-studio .fixed .app-btn-ghost {
+        color: #4a5163;
+    }
+
+    .content-studio .fixed .app-btn-ghost:hover {
+        background: #f3f4f6;
+        color: #1f222b;
+    }
+
+    .content-studio .fixed .border-gray-200,
+    .content-studio .channel-preview .border-gray-200,
+    .content-studio .fixed .border-gray-200\/80,
+    .content-studio .channel-preview .border-gray-200\/80 {
+        border-color: rgba(229, 231, 235, 0.9);
+    }
+
     /* --- Loader (arc spinner — size via w/h utilities, thickness via border-width) --- */
     @keyframes app-spinner-rotate {
         0% {
@@ -498,6 +780,15 @@
         -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
         mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
         animation: app-spinner-rotate 0.85s linear infinite;
+    }
+
+    .app-spinner.app-spinner-blue {
+        background: conic-gradient(
+            from 0deg,
+            rgba(151, 199, 203, 0.2) 0deg,
+            #97C7CB 300deg,
+            #97C7CB 360deg
+        );
     }
 
     @media (prefers-reduced-motion: reduce) {

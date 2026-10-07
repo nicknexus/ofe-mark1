@@ -77,7 +77,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
         } else if (sub.stripe_customer_id && (sub.status === 'none' || sub.status === 'expired' || sub.status === 'cancelled')) {
             await SubscriptionService.syncFromStripeCustomer(req.user!.id, sub.stripe_customer_id);
         }
-        const { hasAccess, reason, subscription, isSupportMode } =
+        const { hasAccess, reason, subscription, isSupportMode, fallbackOrgId } =
             await SubscriptionService.getAccessForContext(req.user!.id, requestedOrgId);
         const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
 
@@ -88,6 +88,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
             remainingTrialDays,
             trialDurationDays: TRIAL_DURATION_DAYS,
             isSupportMode,
+            ...(fallbackOrgId && { fallbackOrgId }),
         });
     } catch (error) {
         console.error('Error fetching subscription status:', error);

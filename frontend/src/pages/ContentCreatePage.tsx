@@ -4,8 +4,7 @@ import { Lock, Sparkles } from 'lucide-react'
 import UpgradeModal from '../components/UpgradeModal'
 import { useTeam } from '../context/TeamContext'
 import { SubscriptionService } from '../services/subscription'
-import { PageLoader } from '../components/ui'
-import ContentEngine from '../components/content/ContentEngine'
+import ContentEngine, { StudioBoot } from '../components/content/ContentEngine'
 
 export default function ContentCreatePage() {
   const { isOwner, activeOrganization } = useTeam()
@@ -30,7 +29,7 @@ export default function ContentCreatePage() {
     return () => { cancelled = true }
   }, [activeOrganization?.id, activeOrganization?.is_demo])
 
-  if (!featuresLoaded) return <PageLoader />
+  if (!featuresLoaded) return <StudioBoot />
 
   if (gated) {
     return (

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom'
 import { TeamService, UserPermissions, AccessibleOrganization } from '../services/team'
 import type { TeamMemberScope } from '../types/teamPermissions'
-import { apiService } from '../services/api'
+import { apiService, ACTIVE_ORG_CHANGED_EVENT } from '../services/api'
 import PendingInviteModal from '../components/PendingInviteModal'
 
 interface TeamContextType {
@@ -163,6 +163,11 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
  if (!activeOrgId || loading) return
  loadPermissionsForActiveOrg()
  }, [activeOrgId, loading, loadPermissionsForActiveOrg])
+
+ // Access is decided per org (the org owner's plan), so App re-checks it.
+ useEffect(() => {
+ if (activeOrgId) window.dispatchEvent(new Event(ACTIVE_ORG_CHANGED_EVENT))
+ }, [activeOrgId])
 
  // Onboarding writes org fields (logo, brand color, website/donation URLs)
  // straight to the DB. The accessible-orgs list is cached, so refresh it when

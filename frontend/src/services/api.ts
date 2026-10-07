@@ -36,9 +36,14 @@ import {
  ContentCopy,
  ContentChannel,
  ContentChannelVersion,
- ContentDraftStatus,
+ ContentIdea,
+ ContentIdeaGuide,
+ ContentIdeaList,
+ ContentJourney,
+ ContentJourneyStatus,
  ContentMaster,
  ContentPackage,
+ ContentSourceRef,
  ContentPost,
  ContentPostFormat,
  ContentPostKind,
@@ -62,6 +67,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
  * ended" screen instead of letting an error surface.
  */
 export const SUBSCRIPTION_REQUIRED_EVENT = 'nexus:subscription-required'
+export const ACTIVE_ORG_CHANGED_EVENT = 'nexus:active-org-changed'
 
 /**
  * Authenticated mirror of the anonymous widget payload, served by
@@ -1486,8 +1492,10 @@ class ApiService {
  singleDate?: string
  startDate?: string
  endDate?: string
+ initiativeId?: string
  }): Promise<{ sources: ContentSource[]; has_more: boolean }> {
  const params = new URLSearchParams()
+ if (opts?.initiativeId) params.set('initiative_id', opts.initiativeId)
  if (opts?.offset) params.set('offset', String(opts.offset))
  if (opts?.limit) params.set('limit', String(opts.limit))
  if (opts?.source_type && opts.source_type !== 'all') params.set('source_type', opts.source_type)
@@ -1601,6 +1609,10 @@ class ApiService {
  source_id: string
  story_type: ContentStoryType
  why?: string
+ journey_id?: string | null
+ package_id?: string | null
+ extras?: ContentSourceRef[]
+ idea_id?: string | null
  }): Promise<ContentMaster> {
  return this.request<ContentMaster>('/content/generate-master', {
  method: 'POST',
@@ -1618,6 +1630,9 @@ class ApiService {
  cta?: string
  context: string
  why?: string
+ journey_id?: string | null
+ package_id?: string | null
+ extras?: ContentSourceRef[]
  }): Promise<ContentMaster> {
  return this.request<ContentMaster>('/content/refine-master', {
  method: 'POST',
@@ -1635,6 +1650,9 @@ class ApiService {
  cta?: string
  context?: string
  channels: ContentChannel[]
+ journey_id?: string | null
+ package_id?: string | null
+ extras?: ContentSourceRef[]
  }): Promise<ContentChannelVersion[]> {
  const result = await this.request<{ versions: ContentChannelVersion[] }>('/content/generate-versions', {
  method: 'POST',
@@ -1643,33 +1661,103 @@ class ApiService {
  return result.versions
  }
 
- async getContentPackages(): Promise<ContentPackage[]> {
- return this.request<ContentPackage[]>('/content/packages')
+ async getContentPackages(journeyId?: string | 'none'): Promise<ContentPackage[]> {
+ const qs = journeyId ? `?${new URLSearchParams({ journey_id: journeyId })}` : ''
+ return this.request<ContentPackage[]>(`/content/packages${qs}`)
+ }
+
+ async getContentPackage(id: string): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}`)
+ }
+
+ async getContentIdeas(): Promise<ContentIdeaList> {
+ return this.request<ContentIdeaList>('/content/ideas')
+ }
+
+ async refreshContentIdeas(): Promise<ContentIdeaList> {
+ return this.request<ContentIdeaList>('/content/ideas/refresh', { method: 'POST' })
+ }
+
+ async getContentIdea(id: string): Promise<ContentIdea & { guide: ContentIdeaGuide }> {
+ return this.request<ContentIdea & { guide: ContentIdeaGuide }>(`/content/ideas/${id}`)
+ }
+
+ async updateContentIdea(
+ id: string,
+ input: { status: 'accepted' | 'dismissed' | 'snoozed' | 'suggested'; reason?: string; snooze_days?: number }
+ ): Promise<ContentIdea> {
+ return this.request<ContentIdea>(`/content/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+ }
+
+ async getContentIdeaSignals(): Promise<unknown[]> {
+ return this.request<unknown[]>('/content/ideas/signals')
+ }
+
+ async getContentJourneys(): Promise<ContentJourney[]> {
+ return this.request<ContentJourney[]>('/content/journeys')
+ }
+
+ async createContentJourney(input: { title: string; description?: string | null; initiative_id?: string | null }): Promise<ContentJourney> {
+ return this.request<ContentJourney>('/content/journeys', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async updateContentJourney(
+ id: string,
+ patch: { title?: string; description?: string | null; initiative_id?: string | null; status?: ContentJourneyStatus; published?: boolean }
+ ): Promise<ContentJourney> {
+ return this.request<ContentJourney>(`/content/journeys/${id}`, {
+ method: 'PATCH',
+ body: JSON.stringify(patch),
+ })
+ }
+
+ async deleteContentJourney(id: string): Promise<void> {
+ await this.request(`/content/journeys/${id}`, { method: 'DELETE' })
  }
 
  async saveContentPackage(input: {
- story_type: ContentStoryType
+ id?: string | null
+ journey_id?: string | null
+ idea_id?: string | null
+ extras?: ContentSourceRef[]
  hook: string
  body: string
  evidence_line?: string
  cta?: string
  why?: string
  layout?: GraphicLayout
- status?: ContentDraftStatus
  source_type: ContentSourceType
  source_id: string
- versions: ContentChannelVersion[]
+ publish?: boolean
  }): Promise<ContentPackage> {
- return this.request<ContentPackage>('/content/packages', {
+ const { id, ...body } = input
+ return this.request<ContentPackage>(id ? `/content/packages/${id}` : '/content/packages', {
+ method: id ? 'PUT' : 'POST',
+ body: JSON.stringify(body),
+ })
+ }
+
+ async publishContentPackage(id: string, published: boolean): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/publish`, {
+ method: 'PATCH',
+ body: JSON.stringify({ published }),
+ })
+ }
+
+ async generateContentChannels(id: string, input: { channels: ContentChannel[]; context?: string }): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/channels/generate`, {
  method: 'POST',
  body: JSON.stringify(input),
  })
  }
 
- async updateContentPackageStatus(id: string, status: ContentDraftStatus): Promise<ContentPackage> {
- return this.request<ContentPackage>(`/content/packages/${id}`, {
- method: 'PATCH',
- body: JSON.stringify({ status }),
+ async saveContentChannels(id: string, versions: ContentChannelVersion[]): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/channels`, {
+ method: 'PUT',
+ body: JSON.stringify({ versions }),
  })
  }
 
