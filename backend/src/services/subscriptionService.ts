@@ -3,7 +3,6 @@ import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
 import { PlatformAdminService } from './platformAdminService';
 import { stripe, mapStripeSubscriptionStatus, tierFromPriceId } from '../utils/stripe';
-import { sendPaymentFailedEmail } from '../utils/email';
 import { EntitlementService } from './entitlementService';
 import { PlanTier, getPlan, normaliseTier, planLimitColumns } from '../config/planCatalog';
 
@@ -289,84 +288,10 @@ export class SubscriptionService {
     }
 
     /**
-     * Email the customer when a subscription charge fails (trial end, renewal,
-     * insufficient funds, issuer decline). Stripe's revenue-recovery toggle is
-     * not what has been reaching inboxes. One email per invoice attempt.
-     * Radar blocks get a generic decline line, not the fraud reason.
-     */
-    static async notifyFailedInvoicePayment(invoice: Stripe.Invoice): Promise<void> {
-        if (!stripe) return;
-        if ((invoice.amount_due ?? 0) <= 0 && (invoice.amount_remaining ?? 0) <= 0) return;
-
-        const email = invoice.customer_email?.trim();
-        if (!email) {
-            console.warn(`[payment-failed] ${invoice.id} has no customer email`);
-            return;
-        }
-
-        const attempt = String(invoice.attempt_count || 1);
-        if (invoice.metadata?.failed_payment_email_attempt === attempt) return;
-
-        const detail = await this.failedChargeDetail(invoice.id);
-        const amount = invoice.amount_due > 0 ? invoice.amount_due : invoice.amount_remaining;
-        const result = await sendPaymentFailedEmail({
-            to: email,
-            amountLabel: formatChargeAmount(amount, invoice.currency),
-            reason: detail.reason,
-            trialEnded: detail.trialEnded,
-            payUrl: invoice.hosted_invoice_url || `${process.env.APP_URL || process.env.FRONTEND_URL || 'https://nexusimpacts.ai'}/account`,
-        });
-        if (!result.success) {
-            throw new Error(result.error || `Failed to email ${invoice.id}`);
-        }
-
-        await stripe.invoices.update(invoice.id, {
-            metadata: { failed_payment_email_attempt: attempt },
-        });
-        console.log(`[payment-failed] emailed ${invoice.id} attempt ${attempt}`);
-    }
-
-    private static async failedChargeDetail(invoiceId: string): Promise<{ reason: string; trialEnded: boolean }> {
-        const fallback = { reason: 'Your card was declined.', trialEnded: false };
-        if (!stripe) return fallback;
-        try {
-            const payments = await stripe.invoicePayments.list({ invoice: invoiceId, limit: 5 });
-            const match = payments.data.find((payment) => payment.payment.payment_intent || payment.payment.charge);
-            if (!match) return fallback;
-
-            let charge: Stripe.Charge | null = null;
-            let declineMessage: string | null = null;
-            const source = match.payment;
-
-            if (source.type === 'payment_intent' && source.payment_intent) {
-                const piId = typeof source.payment_intent === 'string' ? source.payment_intent : source.payment_intent.id;
-                const pi = await stripe.paymentIntents.retrieve(piId, { expand: ['latest_charge'] });
-                declineMessage = pi.last_payment_error?.message ?? null;
-                if (pi.latest_charge && typeof pi.latest_charge !== 'string') charge = pi.latest_charge;
-                else if (typeof pi.latest_charge === 'string') charge = await stripe.charges.retrieve(pi.latest_charge);
-            } else if (source.charge) {
-                const chargeId = typeof source.charge === 'string' ? source.charge : source.charge.id;
-                charge = await stripe.charges.retrieve(chargeId);
-                declineMessage = charge.failure_message;
-            }
-
-            const suffix = `${charge?.statement_descriptor_suffix || ''} ${charge?.calculated_statement_descriptor || ''}`;
-            return {
-                reason: customerDeclineReason(declineMessage),
-                trialEnded: /TRIAL OVER/i.test(suffix),
-            };
-        } catch (e) {
-            console.error(`[payment-failed] decline lookup failed for ${invoiceId}:`, (e as Error).message);
-            return fallback;
-        }
-    }
-
-    /**
-     * Email a receipt for a paid invoice to the customer email on that invoice.
-     * Billing creates these charges with receipt_email null, so the Dashboard
-     * "Successful payments" toggle never sends. Setting receipt_email on a
-     * live succeeded charge sends the receipt regardless of that toggle.
-     * $0 trial invoices are skipped. Already-sent receipts are left alone.
+     * Ask Stripe to email the receipt. Setting receipt_email on a live
+     * succeeded charge sends it from Stripe and stamps receipt_number, which
+     * is the record that a receipt was sent. $0 trial invoices are skipped.
+     * Already-sent receipts are left alone.
      */
     static async emailReceiptForPaidInvoice(invoice: Stripe.Invoice): Promise<void> {
         if (!stripe) return;
@@ -1147,21 +1072,5 @@ export class SubscriptionService {
 
         return data;
     }
-}
-
-function formatChargeAmount(amount: number, currency: string): string {
-    const code = (currency || 'usd').toUpperCase();
-    try {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount / 100);
-    } catch {
-        return `${(amount / 100).toFixed(2)} ${code}`;
-    }
-}
-
-/** Bank-facing decline text. Hide Radar/fraud wording from the customer. */
-function customerDeclineReason(message: string | null | undefined): string {
-    const raw = (message || '').trim();
-    if (!raw || /fraud|radar|blocked|highest risk/i.test(raw)) return 'Your card was declined.';
-    return /[.!?]$/.test(raw) ? raw : `${raw}.`;
 }
 

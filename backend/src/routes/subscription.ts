@@ -444,7 +444,6 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         console.log(`⚠️ Payment failed for user ${userId} (stripe status ${stripeSubscription.status})`);
                     }
                 }
-                await SubscriptionService.notifyFailedInvoicePayment(invoice);
                 break;
             }
 
