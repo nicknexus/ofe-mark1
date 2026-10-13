@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import Stripe from 'stripe';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { SubscriptionService, Subscription } from '../services/subscriptionService';
 import { stripe, STRIPE_CONFIG, priceIdForTier, tierFromPriceId, BillingInterval } from '../utils/stripe';
@@ -420,11 +421,19 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 break;
             }
 
+            case 'invoice.paid': {
+                await SubscriptionService.emailReceiptForPaidInvoice(event.data.object as Stripe.Invoice);
+                break;
+            }
+
             case 'invoice.payment_failed': {
-                const invoice = event.data.object as any;
+                const invoice = event.data.object as Stripe.Invoice;
                 // Newer API versions moved this under parent.subscription_details.
-                const subscriptionId: string | undefined =
-                    invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
+                const legacySub = (invoice as { subscription?: string | { id?: string } }).subscription;
+                const parentSub = invoice.parent?.subscription_details?.subscription;
+                const subscriptionId =
+                    (typeof legacySub === 'string' ? legacySub : legacySub?.id)
+                    ?? (typeof parentSub === 'string' ? parentSub : parentSub?.id);
 
                 if (subscriptionId) {
                     const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
@@ -435,6 +444,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         console.log(`⚠️ Payment failed for user ${userId} (stripe status ${stripeSubscription.status})`);
                     }
                 }
+                await SubscriptionService.notifyFailedInvoicePayment(invoice);
                 break;
             }
 

@@ -202,3 +202,102 @@ AI-powered impact tracking for nonprofits
         text
     });
 }
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/**
+ * Card on file was declined (trial end, renewal, insufficient funds, etc.).
+ * Link goes to the hosted invoice so they can update the card and pay.
+ */
+export async function sendPaymentFailedEmail(params: {
+    to: string;
+    amountLabel: string;
+    reason: string;
+    trialEnded: boolean;
+    payUrl: string;
+}): Promise<SendEmailResult> {
+    const reason = escapeHtml(params.reason);
+    const payUrl = escapeHtml(params.payUrl);
+    const lead = params.trialEnded
+        ? `Your free trial has ended and we couldn't charge the card on file for your Nexus Impacts subscription (${escapeHtml(params.amountLabel)}).`
+        : `We couldn't charge the card on file for your Nexus Impacts subscription (${escapeHtml(params.amountLabel)}).`;
+    const subject = params.trialEnded
+        ? "Your Nexus trial ended and the payment didn't go through"
+        : "Your Nexus payment didn't go through";
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(subject)}</title>
+</head>
+<body style="font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #465360; margin: 0; padding: 0; background-color: #fafafa;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: linear-gradient(180deg, rgba(192,223,161,0.25) 0%, #fafafa 50%);">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; margin: 0 auto;">
+                    <tr>
+                        <td align="center" style="padding-bottom: 24px;">
+                            <table role="presentation" align="center" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td style="vertical-align: middle; padding-right: 8px;">
+                                        <img src="${APP_URL}/Nexuslogo.png" alt="Nexus" width="40" height="40" style="display: block; border-radius: 8px;" />
+                                    </td>
+                                    <td style="vertical-align: middle;">
+                                        <span style="font-size: 20px; font-weight: 200; color: #465360; letter-spacing: 0.02em;">Nexus Impacts</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(70,83,96,0.08); border: 1px solid rgba(255,255,255,0.8); padding: 28px 24px;">
+                            <h1 style="color: #465360; margin: 0 0 12px; font-size: 22px; font-weight: 600;">Payment didn't go through</h1>
+                            <p style="font-size: 15px; margin: 0 0 12px; color: #465360;">${lead}</p>
+                            <p style="font-size: 15px; margin: 0 0 20px; color: #465360;">${reason}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="padding: 8px 0 20px;">
+                                        <a href="${payUrl}" style="display: inline-block; background: #c0dfa1; color: #465360; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">Update card and pay</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="font-size: 13px; color: #6b7280; margin: 0;">We'll retry the charge automatically. If you already updated your card, you can ignore this email.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding: 24px 16px; font-size: 12px; color: #6b7280;">
+                            <p style="margin: 0;">Nexus Impacts</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+
+    const text = `${params.trialEnded
+        ? `Your free trial has ended and we couldn't charge the card on file for your Nexus Impacts subscription (${params.amountLabel}).`
+        : `We couldn't charge the card on file for your Nexus Impacts subscription (${params.amountLabel}).`}
+
+${params.reason}
+
+Update your card and pay: ${params.payUrl}
+
+We'll retry the charge automatically. If you already updated your card, you can ignore this email.
+
+--
+Nexus Impacts
+`;
+
+    return sendEmail({ to: params.to, subject, html, text });
+}
