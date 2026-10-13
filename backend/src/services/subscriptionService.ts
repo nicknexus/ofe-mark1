@@ -531,9 +531,10 @@ export class SubscriptionService {
             }
         }
 
-        // Inside a specific org, that org's owner decides. Platform admins are
-        // exempt so staff can still work in locked customer accounts.
-        if (requestedOrgId && !isAdmin) {
+        // Inside a specific org, that org's owner decides. A platform admin who
+        // is also a team member follows the same rule. Support mode (admin
+        // inside an org they do not belong to) already returned above.
+        if (requestedOrgId) {
             const rel = await this.orgRole(userId, requestedOrgId);
             if (rel?.role === 'member') {
                 let ownerSub = await this.getByUserId(rel.ownerId);
