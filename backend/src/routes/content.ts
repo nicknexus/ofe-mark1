@@ -447,6 +447,33 @@ router.get('/ideas/signals', authenticateUser, async (req: AuthenticatedRequest,
     }
 })
 
+router.get('/ideas/web', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentIdeasService.web(req.user!.id, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/ideas/for/:stakeholder', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentIdeasService.forStakeholder(req.user!.id, req.params.stakeholder, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/ideas/:id/another', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        res.json(await ContentIdeasService.another(req.user!.id, req.params.id, requestedOrgId))
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
 router.get('/ideas/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
@@ -459,8 +486,8 @@ router.get('/ideas/:id', authenticateUser, async (req: AuthenticatedRequest, res
 router.patch('/ideas/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const { status, reason, snooze_days } = req.body || {}
-        res.json(await ContentIdeasService.update(req.user!.id, req.params.id, { status, reason, snooze_days }, requestedOrgId))
+        const { status, reason, snooze_days, selection } = req.body || {}
+        res.json(await ContentIdeasService.update(req.user!.id, req.params.id, { status, reason, snooze_days, selection }, requestedOrgId))
     } catch (error) {
         sendError(res, error)
     }

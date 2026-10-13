@@ -1,25 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
+  ArrowRight,
+  Bookmark,
   Camera,
   Check,
   ChevronLeft,
-  Clock,
   ExternalLink,
   Image as ImageIcon,
   Lightbulb,
   Link2,
+  Plus,
   RefreshCw,
   Route,
-  Star,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { EmptyState, SectionLoader, Skeleton, Spinner } from '../ui'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
-import type { ContentIdea, ContentIdeaGuide } from '../../types'
-
-type Level = 'quick' | 'good' | 'story'
+import { FILMING_META, FILMING_ORDER, LENS_META, toCardV2 } from './ideaCard'
+import { STAKEHOLDER_ART } from './ContentImpactWeb'
+import type {
+  ContentIdea,
+  ContentIdeaFilmingIdea,
+  ContentIdeaGuide,
+  ContentIdeaSelection,
+  IdeaFilmingCategory,
+} from '../../types'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const DISMISS_REASONS = ['Not relevant', 'Already did this', "Can't get access", 'Other'] as const
@@ -31,7 +39,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   donor_email: 'Donor email',
   sms: 'SMS',
 }
-const LEVEL_TIMES: Record<Level, string> = { quick: '2 to 5 min', good: '10 to 15 min', story: '20 to 30 min' }
+const YES_NO_START = /^(are|is|do|does|did|have|has|can|could|will|would|was|were|should)\b/i
 
 function Where({ idea }: { idea: ContentIdea }) {
   if (idea.journey_title) {
@@ -48,9 +56,9 @@ function Where({ idea }: { idea: ContentIdea }) {
 function DismissReasons({ onPick, onCancel }: { onPick: (reason: string) => void; onCancel: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[12px] text-white/50 mr-1">Why not?</span>
+      <span className="text-[12px] text-secondary-500 mr-1">Why not?</span>
       {DISMISS_REASONS.map(reason => (
-        <button key={reason} type="button" className="app-chip text-[12px] hover:bg-white/10" onClick={() => onPick(reason)}>
+        <button key={reason} type="button" className="app-chip text-[12px]" onClick={() => onPick(reason)}>
           {reason}
         </button>
       ))}
@@ -61,146 +69,108 @@ function DismissReasons({ onPick, onCancel }: { onPick: (reason: string) => void
   )
 }
 
-function orderIdeas(ideas: ContentIdea[]) {
-  return [...ideas.filter(i => i.status === 'suggested'), ...ideas.filter(i => i.status === 'accepted')]
-}
-
-function IdeaActions({
-  idea,
-  featured,
-  onOpen,
-  onLater,
-  onDismiss,
-}: {
-  idea: ContentIdea
-  featured: boolean
-  onOpen: () => void
-  onLater: () => void
-  onDismiss: (reason: string) => void
-}) {
-  const [dismissing, setDismissing] = useState(false)
-  const inProgress = idea.status === 'accepted'
-  if (dismissing) {
-    return <DismissReasons onPick={reason => { setDismissing(false); onDismiss(reason) }} onCancel={() => setDismissing(false)} />
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-1">
-      <button type="button" className={`app-btn app-btn-sm ${featured ? 'app-btn-primary' : 'app-btn-secondary'}`} onClick={onOpen}>
-        <Camera className="w-3.5 h-3.5" /> {inProgress ? 'Open brief' : 'Capture'}
-      </button>
-      <button type="button" className="h-8 px-2.5 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/10" onClick={onLater}>Later</button>
-      <button type="button" className="h-8 px-2.5 rounded-lg text-xs font-medium text-white/50 hover:text-white hover:bg-white/10" onClick={() => setDismissing(true)}>
-        Not useful
-      </button>
-    </div>
-  )
-}
-
 export function CaptureToolbar({
   refreshing,
   unavailable,
+  saved,
   onRefresh,
+  onTodos,
 }: {
   refreshing: boolean
   unavailable?: boolean
+  saved: number
   onRefresh: () => void
+  onTodos: () => void
 }) {
   return (
     <>
       <p className="text-[13px] text-white/50 min-w-0">Stories worth getting, picked from what you already track.</p>
-      <button type="button" className="h-8 px-2.5 rounded-lg text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 inline-flex items-center gap-1.5 disabled:opacity-50" disabled={refreshing || unavailable} onClick={onRefresh}>
+      <button
+        type="button"
+        className="h-8 px-2.5 rounded-lg text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 inline-flex items-center gap-1.5"
+        onClick={onTodos}
+      >
+        <Bookmark className="w-3.5 h-3.5" /> Saved{saved > 0 ? ` (${saved})` : ''}
+      </button>
+      <button
+        type="button"
+        className="h-8 px-2.5 rounded-lg text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 inline-flex items-center gap-1.5 disabled:opacity-50"
+        disabled={refreshing || unavailable}
+        onClick={onRefresh}
+      >
         {refreshing ? <Spinner className="w-3.5 h-3.5" /> : <RefreshCw className="w-3.5 h-3.5" />} New ideas
       </button>
     </>
   )
 }
 
-export function CaptureQueue({
+/** Saved cards, in the short form. Tap one to open the full card. */
+export function CaptureTodos({
   ideas,
   loading,
-  refreshing,
-  unavailable,
   onOpen,
-  onLater,
-  onDismiss,
+  onBack,
 }: {
   ideas: ContentIdea[]
   loading: boolean
-  refreshing: boolean
-  unavailable?: boolean
   onOpen: (idea: ContentIdea) => void
-  onLater: (idea: ContentIdea) => void
-  onDismiss: (idea: ContentIdea, reason: string) => void
+  onBack: () => void
 }) {
-  const ordered = orderIdeas(ideas)
-  const busy = loading || refreshing
-
+  const saved = ideas.filter(i => i.status === 'accepted')
   return (
     <div className="pb-8">
-      {unavailable ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-          <p className="text-[13px] text-white/70">Capture ideas aren't available for this organization yet.</p>
-        </div>
-      ) : busy && ordered.length === 0 ? (
+      <button type="button" className="app-btn app-btn-ghost app-btn-sm mb-4" onClick={onBack}>
+        <ChevronLeft className="w-4 h-4" /> Back to the web
+      </button>
+      {loading && saved.length === 0 ? (
         <div className="space-y-2">
-          {[0, 1, 2].map(i => (
+          {[0, 1].map(i => (
             <div key={i} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 space-y-2">
               <Skeleton className="h-3 w-28" />
               <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-3 w-full" />
             </div>
           ))}
         </div>
-      ) : ordered.length === 0 ? (
+      ) : saved.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 flex items-center gap-3">
-          <Check className="w-4 h-4 text-seafoam flex-shrink-0" />
-          <p className="text-[13px] text-white/70">
-            Nothing urgent to capture right now. Keep tracking, and Nexus will spot the next good story.
-          </p>
+          <Bookmark className="w-4 h-4 text-seafoam flex-shrink-0" />
+          <p className="text-[13px] text-white/70">Nothing saved yet. Open a circle and save the card you want to capture.</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {ordered.map((idea, i) => {
-            const featured = i === 0 && idea.status === 'suggested'
-            const ask = idea.card.ask[0]
+          {saved.map(idea => {
+            const card = toCardV2(idea.card)
+            const art = idea.stakeholder ? STAKEHOLDER_ART[idea.stakeholder] : null
+            const picked = card.selection?.filming_category
+            const filming = picked ? FILMING_META[picked] : null
+            const FilmIcon = filming?.icon
             return (
-              <article key={idea.id} className={`rounded-2xl border px-4 py-3.5 ${featured ? 'border-seafoam/40 bg-white/[0.07]' : 'border-white/10 bg-white/5'}`}>
-                <div className="flex flex-col lg:flex-row lg:items-start gap-3">
-                  <button type="button" className="min-w-0 flex-1 text-left group" onClick={() => onOpen(idea)}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {featured && (
-                        <span className="app-chip app-chip-accent text-[10px] uppercase tracking-wide inline-flex items-center gap-1">
-                          <Star className="w-3 h-3" /> Recommended
-                        </span>
-                      )}
-                      {idea.status === 'accepted' && (
-                        <span className="app-chip app-chip-impact text-[10px] uppercase tracking-wide">In progress</span>
-                      )}
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-seafoam">{idea.angle_label}</span>
-                      <span className="text-[12px] text-white/50 min-w-0"><Where idea={idea} /></span>
-                    </div>
-                    <h3 className="mt-1 text-[15px] font-semibold tracking-tight text-white leading-snug group-hover:text-seafoam">
-                      {idea.card.title}
-                    </h3>
-                    <p className="mt-0.5 text-[13px] text-white/70 leading-snug line-clamp-2">{idea.card.why}</p>
-                    {ask && (
-                      <p className="mt-1.5 text-[13px] italic text-white/80 line-clamp-1">&ldquo;{ask}&rdquo;</p>
-                    )}
-                  </button>
-                  <div className="flex flex-col items-start gap-2 lg:items-end flex-shrink-0">
-                    <span className="inline-flex items-center gap-1 text-[12px] text-white/50">
-                      <Clock className="w-3 h-3" /> {LEVEL_TIMES.quick}
-                    </span>
-                    <IdeaActions
-                      idea={idea}
-                      featured={featured}
-                      onOpen={() => onOpen(idea)}
-                      onLater={() => onLater(idea)}
-                      onDismiss={reason => onDismiss(idea, reason)}
-                    />
-                  </div>
+              <button
+                key={idea.id}
+                type="button"
+                className="w-full text-left rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 hover:border-white/25 group"
+                onClick={() => onOpen(idea)}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`text-[11px] font-semibold uppercase tracking-wide ${art ? art.text : 'text-seafoam'}`}>
+                    {idea.angle_label}
+                  </span>
+                  <span className="text-[12px] text-white/50 min-w-0"><Where idea={idea} /></span>
                 </div>
-              </article>
+                <h3 className="mt-1 text-[15px] font-semibold tracking-tight text-white leading-snug group-hover:text-seafoam">
+                  {card.title}
+                </h3>
+                <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[12px] text-white/50">
+                  {FilmIcon && filming && (
+                    <span className="inline-flex items-center gap-1">
+                      <FilmIcon className="w-3.5 h-3.5" /> {filming.label}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5">
+                    {(card.selection?.questions || card.questions.map(q => q.text)).length} questions
+                  </span>
+                </div>
+              </button>
             )
           })}
         </div>
@@ -209,96 +179,129 @@ export function CaptureQueue({
   )
 }
 
-export function NextCapture({
-  ideas,
-  onOpen,
-  onAll,
+function QuestionRow({
+  text,
+  lens,
+  on,
+  onToggle,
 }: {
-  ideas: ContentIdea[]
-  onOpen: (idea: ContentIdea) => void
-  onAll: () => void
+  text: string
+  lens: keyof typeof LENS_META | null
+  on: boolean
+  onToggle: () => void
 }) {
-  const ordered = orderIdeas(ideas)
-  const idea = ordered[0]
-  if (!idea) return null
-  const more = ordered.length - 1
-  const ask = idea.card.ask[0]
+  const meta = lens ? LENS_META[lens] : null
+  const LensIcon = meta?.icon
   return (
-    <aside className="sticky top-0 space-y-2">
-      <p className="app-section-title">Next to capture</p>
-      <article className="app-card p-4">
-        <div className="flex items-center gap-2 min-w-0">
-          {idea.status === 'suggested' ? (
-            <span className="app-chip app-chip-accent text-[10px] uppercase tracking-wide inline-flex items-center gap-1 flex-shrink-0">
-              <Star className="w-3 h-3" /> Recommended
-            </span>
-          ) : (
-            <span className="app-chip app-chip-impact text-[10px] uppercase tracking-wide flex-shrink-0">In progress</span>
-          )}
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-primary-800 truncate">{idea.angle_label}</span>
-        </div>
-        <button type="button" className="mt-2 text-left group" onClick={() => onOpen(idea)}>
-          <h3 className="text-[15px] font-semibold tracking-tight text-secondary-900 leading-snug group-hover:text-primary-800">
-            {idea.card.title}
-          </h3>
-          <p className="mt-1 text-[13px] text-secondary-600 leading-snug line-clamp-3">{idea.card.why}</p>
-        </button>
-        {ask && (
-          <p className="mt-3 pl-3 border-l-2 border-primary-300 text-[13px] italic text-secondary-800 leading-snug line-clamp-3">
-            &ldquo;{ask}&rdquo;
-          </p>
-        )}
-        <div className="mt-3 flex items-center gap-2 text-[12px] text-secondary-500 min-w-0">
-          <Where idea={idea} />
-          <span className="inline-flex items-center gap-1 flex-shrink-0 ml-auto">
-            <Clock className="w-3 h-3" /> {LEVEL_TIMES.quick}
-          </span>
-        </div>
-        <button type="button" className="app-btn app-btn-primary app-btn-sm mt-4 w-full" onClick={() => onOpen(idea)}>
-          <Camera className="w-3.5 h-3.5" /> Capture this
-        </button>
-      </article>
-      {more > 0 && (
-        <button type="button" className="app-btn app-btn-ghost app-btn-sm w-full" onClick={onAll}>
-          {more} more to capture
-        </button>
-      )}
-    </aside>
+    <div
+      role="checkbox"
+      aria-checked={on}
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={e => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault()
+          onToggle()
+        }
+      }}
+      className="flex gap-3 items-start py-2.5 border-b border-white/10 last:border-b-0 cursor-pointer"
+    >
+      <span
+        className={`w-5 h-5 mt-0.5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+          on ? 'bg-primary-500 border-primary-500 text-white' : 'border-white/30'
+        }`}
+      >
+        {on && <Check className="w-3.5 h-3.5" />}
+      </span>
+      <span className="min-w-0">
+        <span className={`block text-[15px] leading-snug ${on ? 'text-secondary-900' : 'text-secondary-500'}`}>{text}</span>
+        <span className={`app-chip text-[11px] mt-1.5 ${meta ? meta.chip : ''} ${on ? '' : 'opacity-55'}`}>
+          {LensIcon && <LensIcon className="w-3 h-3" />} {meta ? meta.label : 'Your question'}
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function Steps({ steps }: { steps: string[] }) {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
+      {steps.map((step, i) => (
+        <span key={`${step}-${i}`} className="inline-flex items-center gap-1.5">
+          <span className="app-chip text-[12px]">{step}</span>
+          {i < steps.length - 1 && <ArrowRight className="w-3 h-3 text-secondary-400" />}
+        </span>
+      ))}
+    </div>
   )
 }
 
 export function IdeaBrief({
   ideaId,
   onBack,
+  onSave,
   onCapture,
   onUsePhotos,
   onLater,
   onDismiss,
+  onAnother,
   onOpenPost,
 }: {
   ideaId: string
   onBack: () => void
+  onSave: (idea: ContentIdea, selection: ContentIdeaSelection) => Promise<void> | void
   onCapture: (idea: ContentIdea) => void
   onUsePhotos: (idea: ContentIdea) => void
   onLater: (idea: ContentIdea) => void
   onDismiss: (idea: ContentIdea, reason: string) => void
+  onAnother: (idea: ContentIdea) => void
   onOpenPost: (packageId: string) => void
 }) {
   const reduce = useReducedMotion()
   const [idea, setIdea] = useState<(ContentIdea & { guide: ContentIdeaGuide }) | null>(null)
   const [missing, setMissing] = useState(false)
-  const [level, setLevel] = useState<Level>('quick')
   const [dismissing, setDismissing] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const [off, setOff] = useState<Set<number>>(new Set())
+  const [custom, setCustom] = useState<string[]>([])
+  const [customOff, setCustomOff] = useState<Set<number>>(new Set())
+  const [draft, setDraft] = useState('')
+  const [writing, setWriting] = useState(false)
+  const [coach, setCoach] = useState<{ tone: 'nudge' | 'good' | 'error'; text: string } | null>(null)
+  const [category, setCategory] = useState<IdeaFilmingCategory | null>(null)
+  const [pick, setPick] = useState(0)
+  const [ownIdeas, setOwnIdeas] = useState<Record<string, ContentIdeaFilmingIdea[]>>({})
+  const [ownDraft, setOwnDraft] = useState('')
+  const [writingIdea, setWritingIdea] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setIdea(null)
     setMissing(false)
-    apiService.getContentIdea(ideaId)
-      .then(row => { if (!cancelled) setIdea(row) })
-      .catch(() => { if (!cancelled) setMissing(true) })
-    return () => { cancelled = true }
+    setOff(new Set())
+    setCustom([])
+    setCustomOff(new Set())
+    setCategory(null)
+    setPick(0)
+    setOwnIdeas({})
+    setCoach(null)
+    apiService
+      .getContentIdea(ideaId)
+      .then(row => {
+        if (cancelled) return
+        setIdea(row)
+        setCategory(toCardV2(row.card).suggested.category)
+      })
+      .catch(() => {
+        if (!cancelled) setMissing(true)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [ideaId])
+
+  const card = useMemo(() => (idea ? toCardV2(idea.card) : null), [idea])
 
   if (missing) {
     return (
@@ -306,20 +309,79 @@ export function IdeaBrief({
         icon={Lightbulb}
         title="Idea not found"
         description="It may have expired, or it belongs to another organization."
-        action={<button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={onBack}>Back to content</button>}
+        action={
+          <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={onBack}>
+            Back to content
+          </button>
+        }
       />
     )
   }
-  if (!idea) return <SectionLoader />
+  if (!idea || !card) return <SectionLoader />
 
-  const { card, guide } = idea
-  const steps = card.capture[level].length ? card.capture[level] : card.capture.quick
+  const art = idea.stakeholder ? STAKEHOLDER_ART[idea.stakeholder] : null
+  const active = category || card.suggested.category
+  const current = card.filming.find(f => f.category === active)
+  const ideasForCategory = [...(current?.ideas || []), ...(ownIdeas[active] || [])]
+  const chosen = ideasForCategory[pick] || ideasForCategory[0] || null
+  const kept = [
+    ...card.questions.filter((_, i) => !off.has(i)).map(q => q.text),
+    ...custom.filter((_, i) => !customOff.has(i)),
+  ]
   const done = idea.status === 'posted'
   const closed = idea.status === 'dismissed' || idea.status === 'expired'
+  const saved = idea.status === 'accepted'
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(window.location.href)
     notify.success('Link copied. Send it to whoever is on site.')
+  }
+
+  const addQuestion = (force: boolean) => {
+    const text = draft.trim()
+    if (!text) {
+      setCoach({ tone: 'error', text: 'Type a question first.' })
+      return
+    }
+    if (!force && YES_NO_START.test(text)) {
+      setCoach({ tone: 'nudge', text: 'That might just get a "yes." Starting with What, How, or Tell me about gets you a story.' })
+      return
+    }
+    setCustom(prev => [...prev, text])
+    setDraft('')
+    setWriting(false)
+    setCoach({
+      tone: 'good',
+      text: force
+        ? 'Added. If the answer is short, follow up with "Tell me more."'
+        : "Nice. That's open, so you'll get a story, not a one-word answer.",
+    })
+  }
+
+  const addOwnIdea = () => {
+    const name = ownDraft.trim()
+    if (!name) return
+    setOwnIdeas(prev => ({ ...prev, [active]: [...(prev[active] || []), { name, steps: [] }] }))
+    setPick(ideasForCategory.length)
+    setOwnDraft('')
+    setWritingIdea(false)
+  }
+
+  const save = async () => {
+    if (kept.length === 0) {
+      setCoach({ tone: 'error', text: 'Keep at least one question.' })
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave(idea, {
+        questions: kept,
+        filming_category: active,
+        filming_idea: chosen?.name || null,
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -338,107 +400,262 @@ export function IdeaBrief({
         </button>
       </div>
 
-      <section className="app-card p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-primary-800">{idea.angle_label}</span>
-          {done && <span className="app-chip app-chip-impact text-[10px] uppercase tracking-wide">Posted</span>}
-          {closed && <span className="app-chip text-[10px] uppercase tracking-wide">Closed</span>}
-          <span className="text-[12px] text-secondary-500 min-w-0 flex"><Where idea={idea} /></span>
-        </div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-secondary-900 leading-snug">{card.title}</h2>
-        <p className="mt-2 text-[14px] text-secondary-600 leading-relaxed">{card.why}</p>
-        <div className="mt-4 app-card-muted px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-500">Who to find</p>
-          <p className="mt-0.5 text-[14px] text-secondary-900">{card.who}</p>
-        </div>
-      </section>
-
-      <section className="app-card p-5 sm:p-6">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-500">What to ask</p>
-        <ol className="mt-3 space-y-3">
-          {card.ask.map((q, i) => (
-            <li key={q} className="flex gap-3">
-              <span className="inline-flex w-7 h-7 rounded-full items-center justify-center flex-shrink-0 bg-white/10 text-white text-[13px] font-semibold">
-                {i + 1}
-              </span>
-              <p className="text-[17px] sm:text-[18px] font-medium text-secondary-900 leading-snug pt-0.5">&ldquo;{q}&rdquo;</p>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-4 text-[12px] text-secondary-500">Let them finish. Ask one follow-up. Write down their strongest sentence exactly as they said it.</p>
-      </section>
-
-      <section className="app-card p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-500">How to capture it</p>
-          <div className="app-segmented ml-auto">
-            {(['quick', 'good', 'story'] as const).map(id => (
-              <button
-                key={id}
-                type="button"
-                aria-current={level === id ? 'page' : undefined}
-                className="app-segmented-item"
-                onClick={() => setLevel(id)}
-              >
-                {guide.levels[id]?.label || id}
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="mt-2 text-[12px] text-secondary-500 inline-flex items-center gap-1">
-          <Clock className="w-3 h-3" /> {guide.levels[level]?.time || LEVEL_TIMES[level]}
-          {level === 'quick' ? '. Only have five minutes? Do this.' : ''}
-        </p>
-        <ol className="mt-3 space-y-2">
-          {steps.map((step, i) => (
-            <li key={`${level}-${i}`} className="flex gap-3 text-[14px] text-secondary-800 leading-snug">
-              <span className="text-secondary-400 font-medium w-4 flex-shrink-0">{i + 1}.</span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="app-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-impact-700">Do</p>
-          <ul className="mt-2 space-y-1.5">
-            {guide.do.map(line => (
-              <li key={line} className="flex gap-2 text-[13px] text-secondary-700 leading-snug">
-                <Check className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-impact-600" /> {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="app-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-red-700">Don't</p>
-          <ul className="mt-2 space-y-1.5">
-            {guide.dont.map(line => (
-              <li key={line} className="flex gap-2 text-[13px] text-secondary-700 leading-snug">
-                <X className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-red-500" /> {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section className="app-card p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-500">Best for</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {card.channels.map(c => (
-            <span key={c} className="app-chip text-[12px]">{CHANNEL_LABELS[c] || c}</span>
-          ))}
-        </div>
-        {(card.journey_potential || card.follow_up) && (
-          <p className="mt-3 text-[13px] text-secondary-600 flex gap-2">
-            <Route className="w-4 h-4 flex-shrink-0 text-impact-700 mt-0.5" />
-            <span>
-              {card.journey_potential && !idea.journey_id ? 'This could become a journey. ' : ''}
-              {card.follow_up}
+      <section className="app-card overflow-hidden">
+        <div className="p-5 sm:p-6" style={art ? { background: `linear-gradient(160deg, ${art.glow}, transparent 70%)` } : undefined}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-[11px] font-semibold uppercase tracking-wide inline-flex items-center gap-1.5 ${art ? art.text : 'text-primary-800'}`}>
+              <Sparkles className="w-3.5 h-3.5" /> {idea.angle_label}
             </span>
+            {saved && <span className="app-chip app-chip-impact text-[10px] uppercase tracking-wide">Saved</span>}
+            {done && <span className="app-chip app-chip-impact text-[10px] uppercase tracking-wide">Posted</span>}
+            {closed && <span className="app-chip text-[10px] uppercase tracking-wide">Closed</span>}
+            {!closed && !done && (
+              <button type="button" className="app-btn app-btn-secondary app-btn-sm ml-auto" onClick={() => onAnother(idea)}>
+                <RefreshCw className="w-3.5 h-3.5" /> Another idea
+              </button>
+            )}
+          </div>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-secondary-900 leading-snug">{card.title}</h2>
+          <p className="mt-2 text-[15px] text-secondary-700 leading-relaxed">{card.who}</p>
+          <p className="mt-3 flex gap-2.5 items-start text-[14px] text-secondary-600 leading-relaxed">
+            <span className="w-2 h-2 mt-1.5 rounded-full bg-impact-500 flex-shrink-0 idea-live-dot" />
+            <span>{card.why}</span>
           </p>
+          <p className="mt-2 text-[12px] text-secondary-500 flex"><Where idea={idea} /></p>
+        </div>
+      </section>
+
+      <section className="app-card p-5 sm:p-6">
+        <p className="text-[13px] font-semibold text-secondary-900 flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-white/10 text-[11px] inline-flex items-center justify-center font-semibold">1</span>
+          Pick your questions
+        </p>
+        <div className="mt-3">
+          {card.questions.map((question, i) => (
+            <QuestionRow
+              key={`${question.text}-${i}`}
+              text={question.text}
+              lens={question.lens}
+              on={!off.has(i)}
+              onToggle={() =>
+                setOff(prev => {
+                  const next = new Set(prev)
+                  if (next.has(i)) next.delete(i)
+                  else next.add(i)
+                  return next
+                })
+              }
+            />
+          ))}
+          {custom.map((text, i) => (
+            <QuestionRow
+              key={`own-${text}-${i}`}
+              text={text}
+              lens={null}
+              on={!customOff.has(i)}
+              onToggle={() =>
+                setCustomOff(prev => {
+                  const next = new Set(prev)
+                  if (next.has(i)) next.delete(i)
+                  else next.add(i)
+                  return next
+                })
+              }
+            />
+          ))}
+        </div>
+        <div className="mt-3">
+          {writing ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                className="app-input flex-1"
+                placeholder="Write your own question"
+                aria-label="Your own question"
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') addQuestion(false)
+                }}
+              />
+              <button type="button" className="app-btn app-btn-secondary" onClick={() => addQuestion(false)}>
+                Add
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="text-[13.5px] text-primary-800 inline-flex items-center gap-1.5" onClick={() => setWriting(true)}>
+              <Plus className="w-4 h-4" /> Add your own question
+            </button>
+          )}
+        </div>
+        {coach ? (
+          <p className={`mt-2.5 text-[13px] leading-relaxed ${coach.tone === 'error' ? 'text-red-500' : 'text-secondary-600'}`}>
+            {coach.tone !== 'error' && <Sparkles className="w-3.5 h-3.5 inline mr-1.5 text-primary-700" />}
+            {coach.text}
+            {coach.tone === 'nudge' && (
+              <button type="button" className="app-chip text-[12px] ml-2" onClick={() => addQuestion(true)}>
+                Add anyway
+              </button>
+            )}
+          </p>
+        ) : (
+          <p className="mt-2.5 text-[13px] text-secondary-500">Then: "Tell me more about that." And wait.</p>
         )}
       </section>
+
+      <section className="app-card p-5 sm:p-6">
+        <p className="text-[13px] font-semibold text-secondary-900 flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-white/10 text-[11px] inline-flex items-center justify-center font-semibold">2</span>
+          Pick how to film it
+        </p>
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {FILMING_ORDER.filter(c => card.filming.some(f => f.category === c)).map(c => {
+            const meta = FILMING_META[c]
+            const Icon = meta.icon
+            const on = c === active
+            const best = c === card.suggested.category
+            return (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => {
+                  setCategory(c)
+                  setPick(0)
+                  setWritingIdea(false)
+                }}
+                className={`relative rounded-xl border px-2 pt-4 pb-2.5 flex flex-col items-center gap-1 text-center ${
+                  on ? 'border-primary-500 bg-primary-500/10' : 'border-white/15 hover:border-white/30'
+                }`}
+              >
+                {best && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary-500 text-white whitespace-nowrap">
+                    Suggested
+                  </span>
+                )}
+                <Icon className={`w-5 h-5 ${on ? 'text-primary-700' : 'text-secondary-500'}`} />
+                <span className="text-[12.5px] leading-tight text-secondary-900">{meta.label}</span>
+                <span className="text-[10.5px] text-secondary-500">{meta.kind}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {current && (
+          <>
+            <p className="mt-4 text-[14px] text-secondary-700 leading-relaxed">{current.fit}</p>
+            {active === card.suggested.category && (
+              <p className="mt-1.5 text-[12.5px] text-primary-800 inline-flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> Suggested: {card.suggested.reason}
+              </p>
+            )}
+            <p className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-secondary-500">Pick a filming idea</p>
+            <div className="mt-2 space-y-2">
+              {ideasForCategory.map((option, i) => (
+                <div
+                  key={`${option.name}-${i}`}
+                  role="radio"
+                  aria-checked={i === pick}
+                  tabIndex={0}
+                  onClick={() => setPick(i)}
+                  onKeyDown={e => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault()
+                      setPick(i)
+                    }
+                  }}
+                  className={`rounded-xl border px-3.5 py-3 flex gap-3 cursor-pointer ${
+                    i === pick ? 'border-primary-500 bg-primary-500/5' : 'border-white/15 hover:border-white/30'
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 mt-1 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                      i === pick ? 'border-primary-500' : 'border-white/30'
+                    }`}
+                  >
+                    {i === pick && <span className="w-2 h-2 rounded-full bg-primary-500" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold text-secondary-900">{option.name}</span>
+                    {option.steps.length > 0 && <Steps steps={option.steps} />}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3">
+              {writingIdea ? (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    className="app-input flex-1"
+                    placeholder="Describe your own filming idea"
+                    aria-label="Your own filming idea"
+                    value={ownDraft}
+                    onChange={e => setOwnDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') addOwnIdea()
+                    }}
+                  />
+                  <button type="button" className="app-btn app-btn-secondary" onClick={addOwnIdea}>
+                    Add
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="text-[13.5px] text-primary-800 inline-flex items-center gap-1.5"
+                  onClick={() => setWritingIdea(true)}
+                >
+                  <Plus className="w-4 h-4" /> None of these? Write your own idea
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="app-card p-5 sm:p-6">
+        <p className="text-[13px] font-semibold text-secondary-900 flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-white/10 text-[11px] inline-flex items-center justify-center font-semibold">3</span>
+          Save it
+        </p>
+        <p className="mt-2 text-[13px] text-secondary-500">
+          {kept.length} {kept.length === 1 ? 'question' : 'questions'}
+          {chosen ? `, ${FILMING_META[active].label}: ${chosen.name}` : ''}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button type="button" className="app-btn app-btn-primary" disabled={saving} onClick={save}>
+            {saving ? <Spinner className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+            {saved ? 'Update my to-do' : 'Save to my to-dos'}
+          </button>
+          {!closed && !done && (
+            <button type="button" className="app-btn app-btn-ghost ml-auto" onClick={() => onLater(idea)}>
+              Later
+            </button>
+          )}
+        </div>
+      </section>
+
+      {card.channels.length > 0 && (
+        <section className="app-card p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-500">Best for</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {card.channels.map(c => (
+              <span key={c} className="app-chip text-[12px]">{CHANNEL_LABELS[c] || c}</span>
+            ))}
+          </div>
+          {(card.journey_potential || card.follow_up) && (
+            <p className="mt-3 text-[13px] text-secondary-600 flex gap-2">
+              <Route className="w-4 h-4 flex-shrink-0 text-impact-700 mt-0.5" />
+              <span>
+                {card.journey_potential && !idea.journey_id ? 'This could become a journey. ' : ''}
+                {card.follow_up}
+              </span>
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="sticky bottom-4 z-10 app-card-elevated px-4 py-3">
         {done && idea.package_id ? (
@@ -447,7 +664,10 @@ export function IdeaBrief({
           </button>
         ) : dismissing ? (
           <DismissReasons
-            onPick={reason => { setDismissing(false); onDismiss(idea, reason) }}
+            onPick={reason => {
+              setDismissing(false)
+              onDismiss(idea, reason)
+            }}
             onCancel={() => setDismissing(false)}
           />
         ) : (
@@ -459,10 +679,9 @@ export function IdeaBrief({
               <ImageIcon className="w-4 h-4" /> Use photos I have
             </button>
             {!closed && (
-              <>
-                <button type="button" className="app-btn app-btn-ghost ml-auto" onClick={() => onLater(idea)}>Later</button>
-                <button type="button" className="app-btn app-btn-ghost text-secondary-500" onClick={() => setDismissing(true)}>Not useful</button>
-              </>
+              <button type="button" className="app-btn app-btn-ghost ml-auto text-secondary-500" onClick={() => setDismissing(true)}>
+                Not useful
+              </button>
             )}
           </div>
         )}

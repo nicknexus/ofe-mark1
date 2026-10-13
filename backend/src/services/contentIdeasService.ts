@@ -5,14 +5,39 @@ import {
     ANGLES,
     CAPTURE_DO,
     CAPTURE_DONT,
+    FILMING,
+    FILMING_ORDER,
     IDEA_CHANNELS,
+    LENS_ORDER,
     LEVELS,
+    STAKEHOLDERS,
+    STAKEHOLDER_IMPLIED,
+    STAKEHOLDER_LEXICON,
+    STAKEHOLDER_ORDER,
     angleBrief,
+    fallbackCard,
+    filmingBrief,
     ideaWriterPrompt,
     isAngle,
+    isFilmingCategory,
+    isLens,
+    isStakeholder,
+    lensBrief,
+    stakeholderBrief,
+    type FilmingCategory,
+    type Stakeholder,
     type StoryAngle,
+    type WrittenCard,
 } from '../prompts/storyBrain'
-import type { ContentIdea, ContentIdeaCard, ContentIdeaList, ContentIdeaStatus } from '../types'
+import type {
+    ContentIdea,
+    ContentIdeaCard,
+    ContentIdeaCardV2,
+    ContentIdeaList,
+    ContentIdeaStatus,
+    ContentIdeaWeb,
+    ContentIdeaWebNode,
+} from '../types'
 
 const ACTIVE_TARGET = 3
 const REGEN_AFTER_HOURS = 24
@@ -27,12 +52,51 @@ const NEW_DAYS = 30
 const JOURNEY_STALE_DAYS = 30
 const SATURATION_DAYS = 30
 const SATURATION_POSTS = 3
+const TEXT_WINDOW_DAYS = 365
+const TEXT_SCAN_LIMIT = 300
 
 type Facts = Record<string, string | number>
+
+type TextRecord = { kind: string; title: string; text: string; program: string | null }
+
+type StakeholderEvidence = {
+    tier: SignalTier
+    matches: number
+    snippet: string | null
+    program_id: string | null
+    program_title: string | null
+    last_captured: string | null
+}
+
+function wordRegex(word: string): RegExp {
+    return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+}
+
+/** How many records name this group, and the first one that does. */
+function matchRecords(records: TextRecord[], words: string[]): { count: number; kind: string; title: string; word: string; program: string | null } | null {
+    const patterns = words.map(word => ({ word, re: wordRegex(word) }))
+    let count = 0
+    let first: { kind: string; title: string; word: string; program: string | null } | null = null
+    for (const record of records) {
+        const hit = patterns.find(p => p.re.test(record.text))
+        if (!hit) continue
+        count += 1
+        if (!first && record.title) first = { kind: record.kind, title: record.title, word: hit.word, program: record.program }
+    }
+    return first ? { count, ...first } : null
+}
+
+function hasAnyWord(text: string, words: string[]): boolean {
+    return words.some(word => wordRegex(word).test(text))
+}
+
+export type SignalTier = 'evidenced' | 'implied' | 'universal'
 
 export type IdeaSignal = {
     key: string
     angle: StoryAngle
+    stakeholder: Stakeholder
+    tier: SignalTier
     score: number
     initiative_id: string | null
     kpi_id: string | null
@@ -50,6 +114,7 @@ type IdeaRow = {
     journey_id: string | null
     card: any
     facts: any
+    stakeholder: string | null
     rank: number
     status: ContentIdeaStatus
     dismiss_reason: string | null
@@ -81,7 +146,7 @@ function isMissingRelation(error: { code?: string; message?: string } | null | u
 }
 
 function schemaMissing(): Error {
-    return httpError(503, 'Story ideas need database/migrations/add_content_ideas.sql.', 'SCHEMA_MISSING')
+    return httpError(503, 'Story ideas need database/migrations/add_content_ideas.sql and add_content_idea_stakeholders.sql.', 'SCHEMA_MISSING')
 }
 
 function daysSince(iso?: string | null): number {
@@ -128,53 +193,109 @@ function allowedNumbers(facts: Facts): Set<string> {
     return allowed
 }
 
-function cardText(card: ContentIdeaCard): string {
-    return [card.title, card.why, card.who, card.follow_up, ...card.ask, ...card.capture.quick, ...card.capture.good, ...card.capture.story].join(' ')
+function cardText(card: ContentIdeaCardV2): string {
+    return [
+        card.title,
+        card.why,
+        card.who,
+        card.follow_up,
+        card.suggested.reason,
+        ...card.questions.map(q => q.text),
+        ...card.filming.flatMap(f => [f.fit, ...f.ideas.flatMap(i => [i.name, ...i.steps])]),
+    ].join(' ')
 }
 
-function toCard(raw: any): ContentIdeaCard | null {
-    const card: ContentIdeaCard = {
+function toFilmingIdea(raw: any): { name: string; steps: string[] } | null {
+    const name = cleanText(raw?.name, 60)
+    const steps = cleanList(raw?.steps, 3, 90)
+    if (!name || steps.length < 2) return null
+    return { name, steps }
+}
+
+/**
+ * Shape the writer's JSON into a card v2. Anything thin or missing falls back to the
+ * written library for that stakeholder, so every card arrives with four ways to film it.
+ * Returns null when the writer gave too little to trust.
+ */
+function toCard(raw: any, fallback: WrittenCard): ContentIdeaCardV2 | null {
+    const questions = (Array.isArray(raw?.questions) ? raw.questions : [])
+        .map((q: any) => ({ text: cleanText(q?.text, 160), lens: q?.lens }))
+        .filter((q: any): q is { text: string; lens: any } => !!q.text && isLens(q.lens))
+        .slice(0, 4)
+    if (questions.length < 2) return null
+
+    const given = new Map<FilmingCategory, any>()
+    for (const entry of Array.isArray(raw?.filming) ? raw.filming : []) {
+        if (isFilmingCategory(entry?.category) && !given.has(entry.category)) given.set(entry.category, entry)
+    }
+    const filming = FILMING_ORDER.map(category => {
+        const spare = fallback.filming.find(f => f.category === category)
+        const entry = given.get(category)
+        const ideas = (Array.isArray(entry?.ideas) ? entry.ideas : []).map(toFilmingIdea).filter(Boolean).slice(0, 2) as Array<{ name: string; steps: string[] }>
+        return {
+            category,
+            fit: cleanText(entry?.fit, 200) || spare?.fit || FILMING[category].bestFor,
+            ideas: ideas.length ? ideas : (spare?.ideas || []).map(i => ({ name: i.name, steps: [...i.steps] })),
+        }
+    }).filter(f => f.ideas.length > 0)
+    if (filming.length === 0) return null
+
+    const suggestedCategory = isFilmingCategory(raw?.suggested?.category) && filming.some(f => f.category === raw.suggested.category)
+        ? (raw.suggested.category as FilmingCategory)
+        : filming.some(f => f.category === fallback.suggested.category) ? fallback.suggested.category : filming[0].category
+
+    const card: ContentIdeaCardV2 = {
+        v: 2,
         title: cleanText(raw?.title, 90),
         why: cleanText(raw?.why, 320),
         who: cleanText(raw?.who, 200),
-        ask: cleanList(raw?.ask, 2),
-        capture: {
-            quick: cleanList(raw?.capture?.quick, 3, 140),
-            good: cleanList(raw?.capture?.good, 4, 140),
-            story: cleanList(raw?.capture?.story, 5, 140),
+        questions,
+        filming,
+        suggested: {
+            category: suggestedCategory,
+            reason: cleanText(raw?.suggested?.reason, 160) || fallback.suggested.reason,
         },
         channels: ['nexus', ...cleanList(raw?.channels, 6, 20).filter(c => c !== 'nexus' && (IDEA_CHANNELS as readonly string[]).includes(c))].slice(0, 4),
         journey_potential: !!raw?.journey_potential,
         follow_up: cleanText(raw?.follow_up, 200),
     }
-    if (!card.title || !card.why || !card.who || card.ask.length === 0 || card.capture.quick.length === 0) return null
+    if (!card.title || !card.why || !card.who) return null
     return card
+}
+
+/** The written library card, shaped as a card v2 row. */
+function writtenToCard(written: WrittenCard): ContentIdeaCardV2 {
+    return {
+        v: 2,
+        title: written.title,
+        why: written.why,
+        who: written.who,
+        questions: written.questions,
+        filming: written.filming,
+        suggested: written.suggested,
+        channels: written.channels,
+        journey_potential: written.journey_potential,
+        follow_up: written.follow_up,
+    }
 }
 
 const QUIET_ALTERNATES: StoryAngle[] = ['day_in_the_life', 'why_they_care', 'what_changed', 'small_win', 'what_surprised']
 
-/** Highest scores first, but no repeated angle while alternatives exist. Quiet-program signals can swap angles. */
+/** Highest scores first, but rotate the stakeholder, then the angle, while alternatives exist. */
 function diversify(signals: IdeaSignal[], count: number): IdeaSignal[] {
     const picks: IdeaSignal[] = []
-    const used = new Set<StoryAngle>()
+    const usedAngles = new Set<StoryAngle>()
+    const usedGroups = new Set<Stakeholder>()
     const rest = [...signals]
     while (picks.length < count && rest.length) {
-        let index = rest.findIndex(s => !used.has(s.angle))
-        let pick: IdeaSignal
-        if (index >= 0) {
-            pick = rest[index]
-        } else {
-            index = rest.findIndex(s => s.key.startsWith('program_quiet:'))
-            const swap = QUIET_ALTERNATES.find(a => !used.has(a))
-            if (index < 0 || !swap) {
-                index = 0
-                pick = rest[0]
-            } else {
-                pick = { ...rest[index], angle: swap }
-            }
-        }
+        let index = rest.findIndex(s => !usedGroups.has(s.stakeholder) && !usedAngles.has(s.angle))
+        if (index < 0) index = rest.findIndex(s => !usedGroups.has(s.stakeholder))
+        if (index < 0) index = rest.findIndex(s => !usedAngles.has(s.angle))
+        if (index < 0) index = 0
+        const pick = rest[index]
         rest.splice(index, 1)
-        used.add(pick.angle)
+        usedAngles.add(pick.angle)
+        usedGroups.add(pick.stakeholder)
         picks.push(pick)
     }
     return picks
@@ -188,7 +309,7 @@ export class ContentIdeasService {
         const latest = await this.latestCreatedAt(organizationId)
         const suggested = rows.filter(r => r.status === 'suggested').length
         const due = suggested === 0 || daysSince(latest) * 24 >= REGEN_AFTER_HOURS
-        if (suggested < ACTIVE_TARGET && due && isOpenAIConfigured()) {
+        if (suggested < ACTIVE_TARGET && due) {
             try {
                 await this.fill(userId, organizationId, ACTIVE_TARGET - suggested)
                 rows = await this.loadActive(organizationId)
@@ -238,11 +359,16 @@ export class ContentIdeasService {
     static async update(
         userId: string,
         ideaId: string,
-        input: { status: 'accepted' | 'dismissed' | 'snoozed' | 'suggested'; reason?: string | null; snooze_days?: number },
+        input: {
+            status: 'accepted' | 'dismissed' | 'snoozed' | 'suggested'
+            reason?: string | null
+            snooze_days?: number
+            selection?: { questions?: unknown; filming_category?: unknown; filming_idea?: unknown } | null
+        },
         requestedOrgId?: string
     ): Promise<ContentIdea> {
         const { organizationId } = await ContentService.assertStudioAccess(userId, requestedOrgId)
-        await this.loadRow(organizationId, ideaId)
+        const existing = await this.loadRow(organizationId, ideaId)
         const status = input.status
         if (!['accepted', 'dismissed', 'snoozed', 'suggested'].includes(status)) throw httpError(400, 'Invalid status')
         const days = Math.min(60, Math.max(1, Math.round(Number(input.snooze_days) || DEFAULT_SNOOZE_DAYS)))
@@ -252,6 +378,19 @@ export class ContentIdeasService {
             acted_by: userId,
             dismiss_reason: status === 'dismissed' ? cleanText(input.reason, 200) || null : null,
             snoozed_until: status === 'snoozed' ? new Date(Date.now() + days * 86400000).toISOString() : null,
+        }
+        // What the team kept rides along on the card, so the to-do shows their version.
+        if (input.selection && existing.card && (existing.card as ContentIdeaCardV2).v === 2) {
+            const questions = cleanList(input.selection.questions, 12, 200)
+            const category = isFilmingCategory(input.selection.filming_category) ? input.selection.filming_category : null
+            patch.card = {
+                ...(existing.card as ContentIdeaCardV2),
+                selection: {
+                    questions,
+                    filming_category: category,
+                    filming_idea: cleanText(input.selection.filming_idea, 80) || null,
+                },
+            }
         }
         const { data, error } = await supabase
             .from('content_ideas')
@@ -332,7 +471,12 @@ export class ContentIdeasService {
 
             for (const program of programList) {
                 const candidates: IdeaSignal[] = []
-                const base = { initiative_id: program.id, journey_id: null }
+                const base = {
+                    initiative_id: program.id,
+                    journey_id: null,
+                    stakeholder: 'people_served' as Stakeholder,
+                    tier: 'evidenced' as SignalTier,
+                }
                 const programFacts: Facts = { program: program.title }
                 if (program.description?.trim()) programFacts.program_description = cleanText(program.description, 240)
                 const ageDays = daysSince(program.created_at)
@@ -442,6 +586,8 @@ export class ContentIdeasService {
             signals.push({
                 key: `journey_stale:${j.id}`,
                 angle: 'check_back_in',
+                stakeholder: 'people_served',
+                tier: 'evidenced',
                 score: 50 + Math.min(25, since / 4),
                 initiative_id: j.initiative_id,
                 kpi_id: null,
@@ -456,7 +602,253 @@ export class ContentIdeasService {
             })
         }
 
+        const evidence = await this.stakeholderEvidence(organizationId)
+        signals.push(...this.buildStakeholderSignals(evidence, new Set()))
+
         return signals.sort((a, b) => b.score - a.score)
+    }
+
+    /**
+     * What the org's own records say about each stakeholder.
+     * Tier A (evidenced): a lexicon word appears in a log, story, metric or group name.
+     * Tier B (implied): nothing names them, but the shape of the work means they exist.
+     * Tier C (universal): no sign of them at all.
+     * Record text only. The mission statement says "community" almost everywhere, so it
+     * can imply a stakeholder but never evidence one.
+     */
+    static async stakeholderEvidence(organizationId: string): Promise<Record<Stakeholder, StakeholderEvidence>> {
+        const { data: programs } = await supabase
+            .from('initiatives')
+            .select('id, title, description')
+            .eq('organization_id', organizationId)
+        const programList = (programs || []) as Array<{ id: string; title: string; description: string | null }>
+        const programIds = programList.map(p => p.id)
+
+        const [evidence, stories, kpis, groups, donors, acted] = await Promise.all([
+            programIds.length
+                ? supabase.from('evidence').select('title, description, initiative_id').in('initiative_id', programIds).gte('date_represented', dateDaysAgo(TEXT_WINDOW_DAYS)).limit(TEXT_SCAN_LIMIT)
+                : Promise.resolve({ data: [] as any[] }),
+            programIds.length
+                ? supabase.from('stories').select('title, description, initiative_id').in('initiative_id', programIds).gte('date_represented', dateDaysAgo(TEXT_WINDOW_DAYS)).limit(TEXT_SCAN_LIMIT)
+                : Promise.resolve({ data: [] as any[] }),
+            programIds.length
+                ? supabase.from('kpis').select('title, description, category, initiative_id').in('initiative_id', programIds).is('archived_at', null)
+                : Promise.resolve({ data: [] as any[] }),
+            programIds.length
+                ? supabase.from('beneficiary_groups').select('name, initiative_id').in('initiative_id', programIds)
+                : Promise.resolve({ data: [] as any[] }),
+            programIds.length
+                ? supabase.from('donors').select('id', { count: 'exact', head: true }).in('initiative_id', programIds)
+                : Promise.resolve({ count: 0 }),
+            supabase.from('content_ideas').select('stakeholder, acted_at').eq('organization_id', organizationId).in('status', ['accepted', 'posted']),
+        ])
+
+        const records: TextRecord[] = []
+        for (const r of (evidence.data || []) as any[]) {
+            records.push({ kind: 'log', title: cleanText(r.title, 80), text: `${r.title || ''} ${r.description || ''}`, program: r.initiative_id || null })
+        }
+        for (const r of (stories.data || []) as any[]) {
+            records.push({ kind: 'story', title: cleanText(r.title, 80), text: `${r.title || ''} ${r.description || ''}`, program: r.initiative_id || null })
+        }
+        for (const r of (kpis.data || []) as any[]) {
+            records.push({ kind: 'metric', title: cleanText(r.title, 80), text: `${r.title || ''} ${r.description || ''}`, program: r.initiative_id || null })
+        }
+        for (const r of (groups.data || []) as any[]) {
+            records.push({ kind: 'group', title: cleanText(r.name, 80), text: String(r.name || ''), program: r.initiative_id || null })
+        }
+
+        const impliedText = [
+            ...programList.map(p => `${p.title} ${p.description || ''}`),
+            ...((kpis.data || []) as any[]).map(k => `${k.title || ''} ${k.description || ''}`),
+        ].join(' ')
+
+        const lastCaptured = new Map<string, string>()
+        for (const row of (acted.data || []) as Array<{ stakeholder: string | null; acted_at: string | null }>) {
+            if (!row.stakeholder || !row.acted_at) continue
+            const current = lastCaptured.get(row.stakeholder)
+            if (!current || row.acted_at > current) lastCaptured.set(row.stakeholder, row.acted_at)
+        }
+
+        const programTitle = new Map(programList.map(p => [p.id, p.title]))
+        const donorCount = (donors as { count?: number | null }).count || 0
+        const out = {} as Record<Stakeholder, StakeholderEvidence>
+
+        for (const stakeholder of STAKEHOLDER_ORDER) {
+            const hit = matchRecords(records, STAKEHOLDER_LEXICON[stakeholder])
+            const implied = hasAnyWord(impliedText, STAKEHOLDER_IMPLIED[stakeholder])
+            const recorded = stakeholder === 'donors' ? donorCount > 0 : false
+            const program = hit?.program || programList[0]?.id || null
+            out[stakeholder] = {
+                tier: hit || recorded ? 'evidenced' : implied ? 'implied' : 'universal',
+                matches: hit?.count || (recorded ? donorCount : 0),
+                snippet: hit ? `Your ${hit.kind} "${hit.title}" mentions ${hit.word}` : recorded ? `${fmtNumber(donorCount)} supporters are recorded in Nexus` : null,
+                program_id: program,
+                program_title: program ? programTitle.get(program) || null : null,
+                last_captured: lastCaptured.get(stakeholder) || null,
+            }
+        }
+        return out
+    }
+
+    /** One candidate per unused angle for each stakeholder. The count of these is what a node shows. */
+    private static buildStakeholderSignals(
+        evidence: Record<Stakeholder, StakeholderEvidence>,
+        blocked: Set<string>,
+        only?: Stakeholder
+    ): IdeaSignal[] {
+        const signals: IdeaSignal[] = []
+        for (const stakeholder of STAKEHOLDER_ORDER) {
+            if (only && stakeholder !== only) continue
+            const info = evidence[stakeholder]
+            const base = info.tier === 'evidenced' ? 58 : info.tier === 'implied' ? 34 : 16
+            STAKEHOLDERS[stakeholder].angles.forEach((angle, index) => {
+                const key = `stakeholder:${stakeholder}:${angle}`
+                if (blocked.has(key)) return
+                const facts: Facts = {
+                    stakeholder_group: STAKEHOLDERS[stakeholder].label,
+                    their_stance: STAKEHOLDERS[stakeholder].stance,
+                }
+                if (info.program_title) facts.program = info.program_title
+                if (info.tier === 'evidenced' && info.snippet) {
+                    facts.mention = info.snippet
+                    if (info.matches > 1) facts.records_mentioning_them = info.matches
+                    facts.gap = info.last_captured
+                        ? 'These people show up in your records, and it has been a while since one of them was featured.'
+                        : 'These people show up in your records, but none of them has ever been featured.'
+                } else if (info.tier === 'implied') {
+                    facts.signal = 'No record names these people yet. The shape of the work means they are there.'
+                    facts.note = 'Do not state as fact that these people exist. Write it as a story worth going to get.'
+                    facts.gap = 'Nobody from this group has been featured.'
+                } else {
+                    facts.signal = 'Nothing in the data names these people yet.'
+                    facts.note = 'Do not state as fact that these people exist. Write it as a story worth going to get.'
+                    facts.gap = 'Nobody from this group has been featured.'
+                }
+                signals.push({
+                    key,
+                    angle,
+                    stakeholder,
+                    tier: info.tier,
+                    score: base + Math.min(14, info.matches * 3) - index * 2,
+                    initiative_id: info.program_id,
+                    kpi_id: null,
+                    journey_id: null,
+                    facts,
+                })
+            })
+        }
+        return signals.sort((a, b) => b.score - a.score)
+    }
+
+    /** The Impact Web: the org at the centre, one node per stakeholder, plus the featured card. */
+    static async web(userId: string, requestedOrgId?: string): Promise<ContentIdeaWeb> {
+        const { organizationId } = await ContentService.assertStudioAccess(userId, requestedOrgId)
+        await this.expireStale(organizationId)
+        const [org, evidence, blocked, rows] = await Promise.all([
+            supabase.from('organizations').select('name, statement, logo_url').eq('id', organizationId).maybeSingle(),
+            this.stakeholderEvidence(organizationId),
+            this.blockedKeys(organizationId),
+            this.loadActive(organizationId),
+        ])
+        const open = this.buildStakeholderSignals(evidence, blocked)
+        const ready = new Map<string, number>()
+        for (const row of rows) {
+            if (row.status !== 'suggested' || !row.stakeholder) continue
+            ready.set(row.stakeholder, (ready.get(row.stakeholder) || 0) + 1)
+        }
+        const nodes: ContentIdeaWebNode[] = STAKEHOLDER_ORDER.map(stakeholder => {
+            const waiting = ready.get(stakeholder) || 0
+            return {
+                stakeholder,
+                label: STAKEHOLDERS[stakeholder].label,
+                short: STAKEHOLDERS[stakeholder].short,
+                available: open.filter(s => s.stakeholder === stakeholder).length + waiting,
+                ready: waiting,
+                evidenced: evidence[stakeholder].tier === 'evidenced',
+                last_captured: evidence[stakeholder].last_captured,
+            }
+        })
+        const featured = rows.find(r => r.status === 'suggested') || rows[0] || null
+        return {
+            organization: { name: org.data?.name || 'Your charity', statement: org.data?.statement || null, logo_url: org.data?.logo_url || null },
+            nodes,
+            featured: featured ? (await this.hydrate(organizationId, [featured]))[0] : null,
+            generated_at: await this.latestCreatedAt(organizationId),
+        }
+    }
+
+    /** Open a node: return the waiting card for that stakeholder, or write one now. */
+    static async forStakeholder(userId: string, stakeholder: string, requestedOrgId?: string): Promise<ContentIdea> {
+        if (!isStakeholder(stakeholder)) throw httpError(400, 'Unknown stakeholder')
+        const { organizationId } = await ContentService.assertStudioAccess(userId, requestedOrgId)
+        await this.expireStale(organizationId)
+        const waiting = (await this.loadActive(organizationId)).find(r => r.stakeholder === stakeholder && r.status === 'suggested')
+        if (waiting) return (await this.hydrate(organizationId, [waiting]))[0]
+
+        const [evidence, blocked] = await Promise.all([
+            this.stakeholderEvidence(organizationId),
+            this.blockedKeys(organizationId),
+        ])
+        const signal = this.buildStakeholderSignals(evidence, blocked, stakeholder)[0]
+        if (!signal) throw httpError(409, 'No fresh angle left for this group right now. Try another circle.', 'NO_SIGNAL')
+        const row = await this.insertFromSignal(userId, organizationId, signal)
+        return (await this.hydrate(organizationId, [row]))[0]
+    }
+
+    /** "Another idea": put this one aside for a week and write the next one for the same group. */
+    static async another(userId: string, ideaId: string, requestedOrgId?: string): Promise<ContentIdea> {
+        const { organizationId } = await ContentService.assertStudioAccess(userId, requestedOrgId)
+        const row = await this.loadRow(organizationId, ideaId)
+        await supabase
+            .from('content_ideas')
+            .update({
+                status: 'snoozed',
+                snoozed_until: new Date(Date.now() + DEFAULT_SNOOZE_DAYS * 86400000).toISOString(),
+                acted_at: new Date().toISOString(),
+                acted_by: userId,
+            })
+            .eq('organization_id', organizationId)
+            .eq('id', ideaId)
+        const stakeholder = isStakeholder(row.stakeholder) ? row.stakeholder : 'people_served'
+        return this.forStakeholder(userId, stakeholder, requestedOrgId)
+    }
+
+    /** Write one card for one signal and save it. Falls back to the written library without a key. */
+    private static async insertFromSignal(userId: string, organizationId: string, signal: IdeaSignal): Promise<IdeaRow> {
+        const written = fallbackCard(signal.stakeholder, (signal.facts.program as string) || null)
+        let card: ContentIdeaCardV2 = writtenToCard(written)
+        if (isOpenAIConfigured()) {
+            try {
+                const cards = await this.writeCards(organizationId, [signal])
+                const made = cards.get('s1')
+                if (made) card = made.card
+            } catch (error) {
+                console.error('[content-ideas] writer failed, using the written card', error)
+            }
+        }
+        const { data, error } = await supabase
+            .from('content_ideas')
+            .insert({
+                organization_id: organizationId,
+                signal_key: signal.key,
+                angle: signal.angle,
+                stakeholder: signal.stakeholder,
+                initiative_id: signal.initiative_id,
+                kpi_id: signal.kpi_id,
+                journey_id: signal.journey_id,
+                card,
+                facts: signal.facts,
+                rank: await this.nextRank(organizationId),
+                status: 'suggested',
+                created_by: userId,
+            })
+            .select('*')
+            .single()
+        if (error) {
+            if (isMissingRelation(error)) throw schemaMissing()
+            throw new Error(`Failed to save idea: ${error.message}`)
+        }
+        return data as IdeaRow
     }
 
     private static async fill(userId: string, organizationId: string, count: number, deprioritize?: Set<string>): Promise<number> {
@@ -477,7 +869,7 @@ export class ContentIdeasService {
             const cards = await this.writeCards(organizationId, picks)
             const rows = picks
                 .map((signal, i) => ({ signal, card: cards.get(`s${i + 1}`) }))
-                .filter((r): r is { signal: IdeaSignal; card: { card: ContentIdeaCard; angle: StoryAngle } } => !!r.card)
+                .filter((r): r is { signal: IdeaSignal; card: { card: ContentIdeaCardV2; angle: StoryAngle } } => !!r.card)
             if (rows.length === 0) return
             const startRank = await this.nextRank(organizationId)
             const { error } = await supabase.from('content_ideas').insert(rows.map((r, i) => ({
@@ -487,6 +879,7 @@ export class ContentIdeasService {
                 initiative_id: r.signal.initiative_id,
                 kpi_id: r.signal.kpi_id,
                 journey_id: r.signal.journey_id,
+                stakeholder: r.signal.stakeholder,
                 card: r.card.card,
                 facts: r.signal.facts,
                 rank: startRank + i,
@@ -508,8 +901,11 @@ export class ContentIdeasService {
         return added
     }
 
-    private static async writeCards(organizationId: string, signals: IdeaSignal[]): Promise<Map<string, { card: ContentIdeaCard; angle: StoryAngle }>> {
-        if (!isOpenAIConfigured() || !openai) throw httpError(500, 'OpenAI API key not configured')
+    private static async writeCards(organizationId: string, signals: IdeaSignal[]): Promise<Map<string, { card: ContentIdeaCardV2; angle: StoryAngle }>> {
+        const written = (signal: IdeaSignal) => fallbackCard(signal.stakeholder, (signal.facts.program as string) || null)
+        if (!isOpenAIConfigured() || !openai) {
+            return new Map(signals.map((signal, i) => [`s${i + 1}`, { card: writtenToCard(written(signal)), angle: signal.angle }]))
+        }
         const [orgContext, org] = await Promise.all([
             supabase.from('organization_context').select('problem_statement, theory_of_change').eq('organization_id', organizationId).maybeSingle(),
             supabase.from('organizations').select('name, statement').eq('id', organizationId).maybeSingle(),
@@ -523,6 +919,7 @@ export class ContentIdeasService {
 
         const blocks = signals.map((s, i) => [
             `### Signal s${i + 1}`,
+            stakeholderBrief(s.stakeholder),
             angleBrief(s.angle),
             'FACTS:',
             ...Object.entries(s.facts).map(([k, v]) => `- ${k}: ${v}`),
@@ -532,10 +929,13 @@ export class ContentIdeasService {
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
             temperature: 0.6,
-            max_tokens: 1800,
+            max_tokens: 4000,
             messages: [
                 { role: 'system', content: ideaWriterPrompt() },
-                { role: 'user', content: [about, ...blocks].filter(Boolean).join('\n\n') },
+                {
+                    role: 'user',
+                    content: [about, `THE FOUR LENSES\n${lensBrief()}`, `THE FOUR WAYS TO FILM IT\n${filmingBrief()}`, ...blocks].filter(Boolean).join('\n\n'),
+                },
             ],
         })
 
@@ -545,13 +945,13 @@ export class ContentIdeasService {
         } catch {
             parsed = {}
         }
-        const out = new Map<string, { card: ContentIdeaCard; angle: StoryAngle }>()
+        const out = new Map<string, { card: ContentIdeaCardV2; angle: StoryAngle }>()
         for (const raw of Array.isArray(parsed.ideas) ? parsed.ideas : []) {
             const id = String(raw?.signal_id || '')
             const index = Number(id.replace(/^s/, '')) - 1
             const signal = signals[index]
             if (!signal || out.has(id)) continue
-            const card = toCard(raw)
+            const card = toCard(raw, written(signal))
             if (!card) continue
             const allowed = allowedNumbers(signal.facts)
             if (numbersIn(cardText(card)).some(n => !allowed.has(n))) {
@@ -560,6 +960,11 @@ export class ContentIdeasService {
             }
             out.set(id, { card, angle: isAngle(raw?.angle) ? raw.angle : signal.angle })
         }
+        // Anything the writer skipped or got wrong still ships, from the written library.
+        signals.forEach((signal, i) => {
+            const id = `s${i + 1}`
+            if (!out.has(id)) out.set(id, { card: writtenToCard(written(signal)), angle: signal.angle })
+        })
         return out
     }
 
@@ -752,6 +1157,7 @@ export class ContentIdeasService {
             journey_id: row.journey_id,
             journey_title: row.journey_id ? journeyTitle.get(row.journey_id) || null : null,
             card: row.card as ContentIdeaCard,
+            stakeholder: isStakeholder(row.stakeholder) ? row.stakeholder : null,
             rank: row.rank,
             status: row.status,
             dismiss_reason: row.dismiss_reason,

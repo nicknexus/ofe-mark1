@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { BarChart3, Camera, ChevronDown, Image as ImageIcon, Plus, Route, Search, X } from 'lucide-react'
+import { BarChart3, Camera, ChevronDown, Image as ImageIcon, LayoutGrid, Plus, Route, Search, Sparkles, X } from 'lucide-react'
 import { EmptyState, PageHelpTip, SectionLoader } from '../ui'
 import { formatDate } from '../../utils'
 import { PublishBadge, SocialCount } from './ContentJourneys'
@@ -103,6 +103,26 @@ const LIBRARY_VIEWS: { id: 'all' | 'moments' | 'journeys'; label: string }[] = [
   { id: 'journeys', label: 'Journeys' },
 ]
 
+const MODES = [
+  {
+    id: 'create' as const,
+    label: 'Create Content',
+    hint: 'Posts, moments and journeys',
+    icon: LayoutGrid,
+    fill: 'bg-primary-500',
+    glow: 'rgba(192,223,161,0.5)',
+  },
+  {
+    id: 'ideas' as const,
+    label: 'Content Ideas',
+    hint: 'Find a story worth telling',
+    icon: Sparkles,
+    fill: 'bg-seafoam',
+    glow: 'rgba(151,199,203,0.5)',
+    ai: true,
+  },
+]
+
 export function StudioBar({
   mode,
   view,
@@ -122,38 +142,54 @@ export function StudioBar({
 }) {
   return (
     <div className="relative z-20 shrink-0 pb-5 space-y-4">
-      <div className="relative flex items-center justify-center min-h-12">
+      <div className="relative flex items-center justify-center min-h-16">
         {help && (
           <span className="absolute left-0 top-1/2 -translate-y-1/2">
             <PageHelpTip label="Content">{help}</PageHelpTip>
           </span>
         )}
-        <div className="inline-flex items-center gap-2" role="tablist" aria-label="Content">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'create'}
-            onClick={() => onMode('create')}
-            className={`h-14 px-6 rounded-xl text-[15px] font-semibold tracking-tight bg-primary-500 text-white transition-opacity ${
-              mode === 'create' ? 'shadow-[0_10px_18px_-6px_rgba(192,223,161,0.8)]' : 'opacity-80 hover:opacity-100'
-            }`}
-          >
-            Create Content
-          </button>
-          <span className="relative">
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              className="h-14 px-6 rounded-xl bg-seafoam text-white text-[15px] font-semibold tracking-tight leading-tight cursor-not-allowed"
-            >
-              Content Ideas
-              <span className="block text-[10px] font-medium tracking-normal text-white/80">Coming soon</span>
-            </button>
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 h-5 px-1.5 rounded-md bg-[#3d8fd4] text-[10px] font-bold tracking-wide text-white shadow-sm pointer-events-none">
-              AI
-            </span>
-          </span>
+        <div
+          className="inline-flex items-center gap-1 p-1.5 rounded-2xl border border-white/10 bg-black/25"
+          role="tablist"
+          aria-label="Content"
+        >
+          {MODES.map(item => {
+            const Icon = item.icon
+            const active = mode === item.id
+            return (
+              <span key={item.id} className="relative">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onMode(item.id)}
+                  className={`h-[62px] pl-3.5 pr-5 rounded-xl flex items-center gap-3 transition-colors ${
+                    active ? `${item.fill} text-[#1C242B]` : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                  }`}
+                  style={active ? { boxShadow: `0 12px 26px -12px ${item.glow}` } : undefined}
+                >
+                  <span
+                    className={`w-9 h-9 rounded-lg inline-flex items-center justify-center flex-shrink-0 ${
+                      active ? 'bg-[#1C242B]/10' : 'bg-white/[0.07]'
+                    }`}
+                  >
+                    <Icon className="w-[18px] h-[18px]" />
+                  </span>
+                  <span className="text-left">
+                    <span className="block text-[14.5px] font-semibold tracking-tight leading-tight">{item.label}</span>
+                    <span className={`block text-[11.5px] leading-tight mt-0.5 ${active ? 'text-[#1C242B]/65' : 'text-white/40'}`}>
+                      {item.hint}
+                    </span>
+                  </span>
+                </button>
+                {item.ai && (
+                  <span className="absolute -top-1.5 right-2.5 h-5 px-1.5 rounded-md bg-[#3d8fd4] text-[10px] font-bold tracking-wide text-white shadow-sm pointer-events-none inline-flex items-center">
+                    AI
+                  </span>
+                )}
+              </span>
+            )
+          })}
         </div>
         <div className="absolute right-0 top-1/2 -translate-y-1/2">{actions}</div>
       </div>

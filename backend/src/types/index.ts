@@ -526,7 +526,9 @@ export interface ContentJourney {
 
 export type ContentIdeaStatus = 'suggested' | 'accepted' | 'dismissed' | 'snoozed' | 'posted' | 'expired';
 
-export interface ContentIdeaCard {
+/** Card v1: one or two questions plus a quick/good/story photo ladder. Still on older rows. */
+export interface ContentIdeaCardV1 {
+    v?: 1;
     title: string;
     why: string;
     who: string;
@@ -535,6 +537,69 @@ export interface ContentIdeaCard {
     channels: string[];
     journey_potential: boolean;
     follow_up: string;
+}
+
+export type IdeaLens = 'back' | 'now' | 'surprise' | 'ahead';
+export type IdeaFilmingCategory = 'in_action' | 'sit_down' | 'on_location' | 'photo_quote';
+
+export interface ContentIdeaQuestion {
+    text: string;
+    lens: IdeaLens;
+}
+
+export interface ContentIdeaFilmingIdea {
+    name: string;
+    steps: string[];
+}
+
+export interface ContentIdeaFilming {
+    category: IdeaFilmingCategory;
+    fit: string;
+    ideas: ContentIdeaFilmingIdea[];
+}
+
+/** What the team kept when they saved the card. Written on accept. */
+export interface ContentIdeaSelection {
+    questions: string[];
+    filming_category?: IdeaFilmingCategory | null;
+    filming_idea?: string | null;
+}
+
+/** Card v2: four lensed questions, four ways to film it, one suggested. */
+export interface ContentIdeaCardV2 {
+    v: 2;
+    title: string;
+    why: string;
+    who: string;
+    questions: ContentIdeaQuestion[];
+    filming: ContentIdeaFilming[];
+    suggested: { category: IdeaFilmingCategory; reason: string };
+    channels: string[];
+    journey_potential: boolean;
+    follow_up: string;
+    selection?: ContentIdeaSelection;
+}
+
+export type ContentIdeaCard = ContentIdeaCardV1 | ContentIdeaCardV2;
+
+export type ContentIdeaStakeholder = 'people_served' | 'staff' | 'volunteers' | 'community' | 'donors';
+
+/** One circle on the Impact Web. */
+export interface ContentIdeaWebNode {
+    stakeholder: ContentIdeaStakeholder;
+    label: string;
+    short: string;
+    available: number;
+    ready: number;
+    evidenced: boolean;
+    last_captured: string | null;
+}
+
+export interface ContentIdeaWeb {
+    organization: { name: string; statement: string | null; logo_url: string | null };
+    nodes: ContentIdeaWebNode[];
+    featured: ContentIdea | null;
+    generated_at: string | null;
 }
 
 export interface ContentIdea {
@@ -549,6 +614,7 @@ export interface ContentIdea {
     journey_id?: string | null;
     journey_title?: string | null;
     card: ContentIdeaCard;
+    stakeholder?: ContentIdeaStakeholder | null;
     rank: number;
     status: ContentIdeaStatus;
     dismiss_reason?: string | null;

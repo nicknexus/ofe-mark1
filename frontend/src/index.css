@@ -476,6 +476,18 @@
         color-scheme: dark;
     }
 
+    .impact-web {
+        font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+        color: #eaf6ff;
+    }
+
+    .impact-web text {
+        font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+        paint-order: stroke;
+        stroke: rgba(3, 10, 16, 0.6);
+        stroke-width: 3px;
+    }
+
     .content-studio .app-page-title {
         @apply text-white;
     }
@@ -704,6 +716,90 @@
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
+    /* Impact Web: HUD dots clumped into circles, particles drifting inward. */
+    .iw-node {
+        cursor: pointer;
+    }
+
+    .iw-node:focus-visible {
+        outline: none;
+    }
+
+    .iw-cloud {
+        transition: opacity 0.45s ease;
+    }
+
+    .iw-node:hover .iw-cloud,
+    .iw-node:focus-visible .iw-cloud {
+        opacity: 1;
+    }
+
+    .iw-puff {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation-name: iw-drift-move;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+    }
+
+    @keyframes iw-drift-move {
+        0%,
+        100% {
+            transform: translate(0, 0) scale(1);
+        }
+        50% {
+            transform: translate(14px, -12px) scale(1.12);
+        }
+    }
+
+    .iw-filament {
+        animation: iw-filament-glow 5.5s ease-in-out infinite;
+    }
+
+    @keyframes iw-filament-glow {
+        0%,
+        100% {
+            opacity: 0.65;
+        }
+        50% {
+            opacity: 1;
+        }
+    }
+
+    .iw-breathe {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: iw-breathe-pulse 7s ease-in-out infinite;
+    }
+
+    @keyframes iw-breathe-pulse {
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 0.85;
+        }
+        50% {
+            transform: scale(1.05);
+            opacity: 1;
+        }
+    }
+
+    .iw-spin {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: iw-spin-rotate 0.9s linear infinite;
+    }
+
+    @keyframes iw-spin-rotate {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .idea-live-dot {
+        animation: iw-breathe-pulse 2.4s ease-in-out infinite;
+    }
+
     .content-studio .fixed .app-icon-tile {
         background: #f3f4f6;
         color: #4a5163;
@@ -808,6 +904,14 @@
     @media (prefers-reduced-motion: reduce) {
         .app-spinner {
             animation-duration: 1.8s;
+        }
+
+        .iw-breathe,
+        .iw-filament,
+        .iw-puff,
+        .iw-spin,
+        .idea-live-dot {
+            animation: none;
         }
     }
 

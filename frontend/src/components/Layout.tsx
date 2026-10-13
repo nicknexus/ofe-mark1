@@ -37,6 +37,7 @@ export default function Layout({ user, children }: LayoutProps) {
   const { pathname } = useLocation()
   const reduce = useReducedMotion()
   const content = pathname.startsWith('/share/content')
+  const ideas = pathname.startsWith('/share/content/capture')
   // The org sidebar stays on every authenticated page, program workspace
   // included, so the rest of the app is always one click away.
   return (
@@ -45,7 +46,7 @@ export default function Layout({ user, children }: LayoutProps) {
       <motion.main
         className="relative min-h-screen ml-56 desktop-main-offset overflow-x-hidden"
         initial={false}
-        animate={{ backgroundColor: content ? '#42505B' : '#F7F8FA' }}
+        animate={{ backgroundColor: ideas ? '#1a2228' : content ? '#42505B' : '#F7F8FA' }}
         transition={{ duration: reduce ? 0 : content ? 0.8 : 0.55, ease: PAGE_EASE }}
       >
         <PageFade content={content}>

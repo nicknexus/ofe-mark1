@@ -39,6 +39,9 @@ import {
  ContentIdea,
  ContentIdeaGuide,
  ContentIdeaList,
+ ContentIdeaSelection,
+ ContentIdeaStakeholder,
+ ContentIdeaWeb,
  ContentJourney,
  ContentJourneyStatus,
  ContentMaster,
@@ -1731,9 +1734,26 @@ class ApiService {
 
  async updateContentIdea(
  id: string,
- input: { status: 'accepted' | 'dismissed' | 'snoozed' | 'suggested'; reason?: string; snooze_days?: number }
+ input: {
+ status: 'accepted' | 'dismissed' | 'snoozed' | 'suggested'
+ reason?: string
+ snooze_days?: number
+ selection?: ContentIdeaSelection
+ }
  ): Promise<ContentIdea> {
  return this.request<ContentIdea>(`/content/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+ }
+
+ async getContentIdeaWeb(): Promise<ContentIdeaWeb> {
+ return this.request<ContentIdeaWeb>('/content/ideas/web')
+ }
+
+ async generateIdeaForStakeholder(stakeholder: ContentIdeaStakeholder): Promise<ContentIdea> {
+ return this.request<ContentIdea>(`/content/ideas/for/${stakeholder}`, { method: 'POST' })
+ }
+
+ async anotherContentIdea(id: string): Promise<ContentIdea> {
+ return this.request<ContentIdea>(`/content/ideas/${id}/another`, { method: 'POST' })
  }
 
  async getContentIdeaSignals(): Promise<unknown[]> {

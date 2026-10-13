@@ -35,7 +35,8 @@ import {
 } from 'lucide-react'
 import ConfirmDialog from '../ConfirmDialog'
 import ContentUploadModal from './ContentUploadModal'
-import { CaptureQueue, CaptureToolbar, IdeaBrief } from './ContentIdeas'
+import { CaptureTodos, CaptureToolbar, IdeaBrief } from './ContentIdeas'
+import { ContentImpactWeb } from './ContentImpactWeb'
 import { JourneyDetail, JourneyFilters, JourneyGrid, JourneyModal, PublishBadge, PublishSoon, usePrograms, type JourneyFilter } from './ContentJourneys'
 import { ContentWorkspace, NewMenu, PostToolbar, StudioBar, filterPosts, type KindFilter, type LibraryView, type SocialFilter, type StatusFilter } from './ContentWorkspace'
 import { useTeam } from '../../context/TeamContext'
@@ -67,9 +68,12 @@ import type {
   GraphicLayout,
   Initiative,
   ContentIdea,
+  ContentIdeaSelection,
+  ContentIdeaStakeholder,
+  ContentIdeaWeb,
 } from '../../types'
 
-type Step = 'home' | 'moment' | 'journeys' | 'journey' | 'idea' | 'capture' | 'material' | 'working' | 'master' | 'post'
+type Step = 'home' | 'moment' | 'journeys' | 'journey' | 'idea' | 'capture' | 'todos' | 'material' | 'working' | 'master' | 'post'
 type TypeFilter = 'all' | ContentSource['source_type']
 type View =
   | { view: 'home' }
@@ -80,6 +84,7 @@ type View =
   | { view: 'post'; postId: string }
   | { view: 'idea'; ideaId: string }
   | { view: 'capture' }
+  | { view: 'todos' }
 
 const BASE = '/share/content'
 const FLOW_STEPS: Step[] = ['moment', 'material', 'working', 'master']
@@ -93,6 +98,7 @@ function parseView(pathname: string): View {
   if (head === 'post' && id) return { view: 'post', postId: id }
   if (head === 'idea' && id) return { view: 'idea', ideaId: id }
   if (head === 'capture') return { view: 'capture' }
+  if (head === 'todos') return { view: 'todos' }
   return { view: 'home' }
 }
 
@@ -438,6 +444,10 @@ export default function ContentEngine() {
   const [journeyFilter, setJourneyFilter] = useState<JourneyFilter>('all')
   const [ideas, setIdeas] = useState<ContentIdea[]>([])
   const [ideasState, setIdeasState] = useState<'loading' | 'ready' | 'refreshing' | 'off'>('loading')
+  const [web, setWeb] = useState<ContentIdeaWeb | null>(null)
+  const [webLoading, setWebLoading] = useState(false)
+  const [busyStakeholder, setBusyStakeholder] = useState<ContentIdeaStakeholder | null>(null)
+  const [swapping, setSwapping] = useState(false)
   const [draftIdea, setDraftIdea] = useState<ContentIdea | null>(null)
   const [captureIdea, setCaptureIdea] = useState<ContentIdea | null>(null)
 
@@ -550,6 +560,11 @@ export default function ContentEngine() {
     }
   }, [activeOrganization?.id])
 
+  useEffect(() => {
+    if (step !== 'capture' || web || webLoading) return
+    loadWeb()
+  }, [step, web, webLoading])
+
   const captureRedirect = useRef({ org: '', armed: false })
 
   useEffect(() => {
@@ -560,6 +575,7 @@ export default function ContentEngine() {
     setPackages([])
     setIdeas([])
     setIdeasState('loading')
+    setWeb(null)
     loadJourneys()
     loadPackages()
     loadIdeas()
@@ -642,9 +658,55 @@ export default function ContentEngine() {
 
   const openIdea = (idea: ContentIdea) => {
     go(`${BASE}/idea/${idea.id}`)
-    if (idea.status !== 'suggested') return
-    setIdeas(prev => prev.map(i => (i.id === idea.id ? { ...i, status: 'accepted' } : i)))
-    apiService.updateContentIdea(idea.id, { status: 'accepted' }).catch(() => undefined)
+  }
+
+  const loadWeb = async () => {
+    setWebLoading(true)
+    try {
+      setWeb(await apiService.getContentIdeaWeb())
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'SCHEMA_MISSING') fail(error, 'Could not load your impact web')
+    } finally {
+      setWebLoading(false)
+    }
+  }
+
+  const openStakeholder = async (stakeholder: ContentIdeaStakeholder) => {
+    setBusyStakeholder(stakeholder)
+    try {
+      const idea = await apiService.generateIdeaForStakeholder(stakeholder)
+      setIdeas(prev => (prev.some(i => i.id === idea.id) ? prev : [...prev, idea]))
+      go(`${BASE}/idea/${idea.id}`)
+    } catch (error) {
+      fail(error, 'Could not find a story for that group')
+    } finally {
+      setBusyStakeholder(null)
+    }
+  }
+
+  const anotherIdea = async (idea: ContentIdea) => {
+    setSwapping(true)
+    try {
+      const next = await apiService.anotherContentIdea(idea.id)
+      setIdeas(prev => [...prev.filter(i => i.id !== idea.id), next])
+      setWeb(prev => (prev ? { ...prev, featured: next } : prev))
+      if (stepRef.current === 'idea') navigate(`${BASE}/idea/${next.id}`, { replace: true })
+    } catch (error) {
+      fail(error, 'Could not find another idea')
+    } finally {
+      setSwapping(false)
+    }
+  }
+
+  const saveIdea = async (idea: ContentIdea, selection: ContentIdeaSelection) => {
+    try {
+      const saved = await apiService.updateContentIdea(idea.id, { status: 'accepted', selection })
+      setIdeas(prev => [...prev.filter(i => i.id !== saved.id), saved])
+      notify.success('Saved to your to-dos.')
+      go(`${BASE}/todos`)
+    } catch (error) {
+      fail(error, 'Could not save the card')
+    }
   }
 
   const snoozeIdea = async (idea: ContentIdea) => {
@@ -673,6 +735,7 @@ export default function ContentEngine() {
     setIdeasState('refreshing')
     try {
       setIdeas((await apiService.refreshContentIdeas()).ideas)
+      await loadWeb()
     } catch (error) {
       fail(error, 'Could not find new ideas')
     } finally {
@@ -692,7 +755,7 @@ export default function ContentEngine() {
 
   useEffect(() => {
     const current = stepRef.current
-    if (route.view === 'home' || route.view === 'journeys' || route.view === 'journey' || route.view === 'idea' || route.view === 'capture') {
+    if (route.view === 'home' || route.view === 'journeys' || route.view === 'journey' || route.view === 'idea' || route.view === 'capture' || route.view === 'todos') {
       resetDraft()
       setStep(route.view)
       return
@@ -1055,7 +1118,7 @@ export default function ContentEngine() {
               : 'Moments and journeys, saved as drafts. Social posts when you want them.'
 
   const chooser = step === 'moment' || step === 'working'
-  const library = step === 'home' || step === 'journeys' || step === 'capture'
+  const library = step === 'home' || step === 'journeys' || step === 'capture' || step === 'todos'
   const libraryView: LibraryView = step === 'journeys' ? 'journeys' : postKind === 'moments' ? 'moments' : 'all'
   const createViewRef = useRef<LibraryView>('all')
   if (step === 'home' || step === 'journeys') createViewRef.current = libraryView
@@ -1118,17 +1181,19 @@ export default function ContentEngine() {
       >
         {library ? (
           <StudioBar
-            mode={step === 'capture' ? 'ideas' : 'create'}
+            mode={step === 'capture' || step === 'todos' ? 'ideas' : 'create'}
             view={libraryView}
             onMode={next => (next === 'ideas' ? openStudio('capture') : openCreate())}
             onView={setLibraryView}
             help={<Help />}
             actions={<NewMenu onMoment={startMoment} onJourney={newJourney} />}
-            toolbar={step === 'capture' ? (
+            toolbar={step === 'capture' || step === 'todos' ? (
               <CaptureToolbar
                 refreshing={ideasState === 'refreshing'}
                 unavailable={ideasState === 'off'}
+                saved={ideas.filter(i => i.status === 'accepted').length}
                 onRefresh={refreshIdeas}
+                onTodos={() => go(`${BASE}/todos`)}
               />
             ) : step === 'journeys' && journeys.length > 0 ? (
               <JourneyFilters value={journeyFilter} onChange={setJourneyFilter} />
@@ -1170,7 +1235,7 @@ export default function ContentEngine() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.38, ease: EASE }}
-              className={chooser ? 'w-full h-full overflow-hidden flex items-center justify-center' : `w-full h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] ${step === 'master' || step === 'post' || step === 'journey' ? 'pr-8' : ''}`}
+              className={step === 'capture' ? 'w-full h-full overflow-hidden' : chooser ? 'w-full h-full overflow-hidden flex items-center justify-center' : `w-full h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] ${step === 'master' || step === 'post' || step === 'journey' ? 'pr-8' : ''}`}
             >
           {step === 'home' && (
             <ContentWorkspace
@@ -1189,25 +1254,38 @@ export default function ContentEngine() {
           )}
 
           {step === 'capture' && (
-            <CaptureQueue
+            <ContentImpactWeb
+              web={web}
+              ideas={ideas}
+              loading={webLoading || ideasState === 'loading'}
+              busyStakeholder={busyStakeholder}
+              logoUrl={activeOrganization?.logo_url}
+              swapping={swapping}
+              onOpenStakeholder={openStakeholder}
+              onOpenIdea={openIdea}
+              onAnother={anotherIdea}
+            />
+          )}
+
+          {step === 'todos' && (
+            <CaptureTodos
               ideas={ideas}
               loading={ideasState === 'loading'}
-              refreshing={ideasState === 'refreshing'}
-              unavailable={ideasState === 'off'}
               onOpen={openIdea}
-              onLater={snoozeIdea}
-              onDismiss={dismissIdea}
+              onBack={() => go(`${BASE}/capture`)}
             />
           )}
 
           {step === 'idea' && route.view === 'idea' && (
             <IdeaBrief
               ideaId={route.ideaId}
-              onBack={() => goBack(BASE)}
+              onBack={() => goBack(`${BASE}/capture`)}
+              onSave={saveIdea}
               onCapture={captureFromIdea}
               onUsePhotos={idea => startFromIdea(idea)}
               onLater={snoozeIdea}
               onDismiss={dismissIdea}
+              onAnother={anotherIdea}
               onOpenPost={id => go(`${BASE}/post/${id}`)}
             />
           )}
