@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   LayoutDashboard,
   Activity,
+  BarChart3,
   MapPin,
   Users,
   BookOpen,
@@ -17,8 +18,9 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ activeTab, onTabChange, alerts }: MobileBottomNavProps) {
   const tabs = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'logs', label: 'Logs', icon: Activity },
-    { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
+    { id: 'metrics', label: 'Metrics', icon: BarChart3 },
     { id: 'location', label: 'Locations', icon: MapPin },
  { id: 'beneficiaries', label: 'People', icon: Users },
  { id: 'stories', label: 'Stories', icon: BookOpen },

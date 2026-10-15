@@ -13,6 +13,10 @@ const PAGE_EASE = [0.22, 1, 0.36, 1] as const
 
 function pageKey(pathname: string) {
   if (pathname.startsWith('/share/content')) return '/share/content'
+  // Opening a metric stays inside the program. A new key here remounts the
+  // whole workspace and replays the page-enter animation on the header.
+  const program = pathname.match(/^\/programs\/[^/]+/)
+  if (program) return program[0]
   return pathname
 }
 

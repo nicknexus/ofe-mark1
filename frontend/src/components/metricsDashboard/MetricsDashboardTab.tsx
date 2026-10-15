@@ -20,18 +20,18 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { Plus, GripVertical, ChevronDown, ChevronRight, Check, MapPin, Users, Tag as TagIcon, Filter, X, LineChart, BarChart3, TrendingUp, Link2, Unlink, FileText } from 'lucide-react'
+import { Plus, GripVertical, ChevronDown, ChevronRight, Check, MapPin, Users, Tag as TagIcon, Filter, X, LineChart } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
-import { BeneficiaryGroup, Location, MetricTag, TimelineStats } from '../../types'
+import { BeneficiaryGroup, Location } from '../../types'
 import { getLocalDateString } from '../../utils'
 import { tagsOnProgramMetrics } from '../../utils/programTags'
 import { getKPIColor } from './metricColorPalette'
 import { generateMetricsDashboardChartData } from './generateMetricsDashboardChartData'
 import { filterDashboardKpiUpdates, computeFilteredTotals } from './filterDashboardKpiUpdates'
 import { type TimeFrameKey } from '../expandableKpiCard/generateKpiChartData'
-import { fadeUp, dropdownPop, staggerContainer, viewSwap } from '../timeline/motion'
+import { fadeUp, dropdownPop, staggerContainer } from '../timeline/motion'
 import LocationMap from '../LocationMap'
 import DateRangePicker from '../DateRangePicker'
 import FiltersToggle from '../shared/FiltersToggle'
@@ -59,6 +59,10 @@ interface MetricsDashboardTabProps {
   onOpenLocations?: () => void
   onStoryClick?: (storyId: string) => void
   onRefresh?: () => void
+  /** `manage` is the Metrics tab (cards, then chart and map). `overview` is
+   * just the cards, at natural height, so the program Overview tab can
+   * scroll the log list in underneath. */
+  variant?: 'manage' | 'overview'
 }
 
 /** White pill + portal dropdown with animated open, matching the Logs filter bar. */
@@ -262,12 +266,12 @@ export default function MetricsDashboardTab({
   onOpenLocations,
   onStoryClick,
   onRefresh,
+  variant = 'manage',
 }: MetricsDashboardTabProps) {
   const navigate = useNavigate()
   const { canEditMetrics } = useTeam()
-  const [subView, setSubView] = useState<'metrics' | 'overview'>('metrics')
+  const overview = variant === 'overview'
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [timelineStats, setTimelineStats] = useState<TimelineStats | null>(null)
   const [isCumulative, setIsCumulative] = useState(true)
   const [timeFrame, setTimeFrame] = useState<TimeFrameKey>('all')
 
@@ -307,13 +311,6 @@ export default function MetricsDashboardTab({
     setVisibleKPIs(kpis.map(k => k.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kpiIdKey])
-
-  useEffect(() => {
-    if (!initiativeId) return
-    apiService.getInitiativeTimeline(initiativeId)
-      .then(t => setTimelineStats(t.stats))
-      .catch(() => setTimelineStats(null))
-  }, [initiativeId])
 
   useEffect(() => {
     if (!initiativeId) return
@@ -430,11 +427,9 @@ export default function MetricsDashboardTab({
 
   const metricOptions: FilterOption[] = orderedKPIs.map(k => ({ id: k.id, name: k.title, color: colorByKpi[k.id] }))
 
-  // Chart + map are shared by the Metrics view (below the cards) and the
-  // Overview view. Only one view renders at a time (AnimatePresence mode="wait"),
-  // so reusing the same element is safe. They fill their parent's height, so the
-  // caller supplies the height (fixed in the scrollable Metrics view, flex in
-  // the locked Overview view).
+  // Chart + map fill whatever height the caller gives them. The Metrics tab
+  // pins a height under the cards; Overview pins the same height so the page
+  // can keep scrolling into logs.
   const renderChartPanel = () => (
     <motion.div variants={fadeUp} className="h-full min-h-0 flex flex-col rounded-3xl bg-gradient-to-b from-white to-primary-50/20 border border-gray-200/60 shadow-card p-5 sm:p-6">
       <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -588,33 +583,66 @@ export default function MetricsDashboardTab({
     </motion.div>
   )
 
-  return (
-    <div className="h-full overflow-hidden flex flex-col bg-gray-50">
-      <div className="px-4 sm:px-6 pt-2.5 pb-2 border-b border-gray-100 bg-white space-y-2 flex-shrink-0">
-        <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
-          <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100/90 p-0.5 flex-shrink-0" role="tablist" aria-label="Metrics view">
-            {([
-              { id: 'metrics', label: 'Metrics' },
-              { id: 'overview', label: 'Overview' },
-            ] as const).map(v => {
-              const active = subView === v.id
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setSubView(v.id)}
-                  className={`inline-flex items-center justify-center h-8 px-3 rounded-md border text-xs md:text-sm font-semibold transition-colors ${
-                    active ? 'border-gray-200 bg-white text-gray-900 shadow-card' : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-white/70'
-                  }`}
-                >
-                  {v.label}
-                </button>
-              )
-            })}
-          </div>
+  const metricGrid = (
+    <>
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">All metrics</h3>
+        <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{orderedKPIs.length}</span>
+      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={orderedKPIs.map(k => k.id)} strategy={rectSortingStrategy}>
+        <motion.div
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          {orderedKPIs.map(kpi => (
+            <motion.div key={kpi.id} variants={fadeUp} className={METRIC_CARD_H_CLASS}>
+            <MetricCard
+              kpi={kpi}
+              color={colorByKpi[kpi.id]}
+              total={filteredTotals[kpi.id] ?? 0}
+              canReorder={canEditMetrics}
+              onOpen={() => (onMetricDetailClick ? onMetricDetailClick(kpi.id) : openLogsForMetric(kpi.id))}
+              tagNames={((kpi.tag_ids || []) as string[]).map(tid => tagNameById.get(tid)).filter(Boolean) as string[]}
+            />
+            </motion.div>
+          ))}
+          {onAddKPI && (
+            <motion.div variants={fadeUp} className={METRIC_CARD_H_CLASS}>
+            <button
+              type="button"
+              onClick={onAddKPI}
+              className="w-full h-full rounded-2xl border-2 border-dashed border-gray-200 hover:border-primary-400 hover:bg-primary-50/30 transition-colors flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:text-primary-700"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="text-xs font-medium">Add metric</span>
+            </button>
+            </motion.div>
+          )}
+        </motion.div>
+      </SortableContext>
+      </DndContext>
+    </>
+  )
 
+  const chartRow = (
+    <motion.div
+      className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+    >
+      <div className="lg:col-span-2 h-[360px] lg:h-[440px]">{renderChartPanel()}</div>
+      <div className="lg:col-span-1 h-[300px] lg:h-[440px]">{renderMapPanel()}</div>
+    </motion.div>
+  )
+
+  return (
+    <div className={overview ? 'flex flex-col bg-gray-50' : 'h-full overflow-hidden flex flex-col bg-gray-50'}>
+      {!overview && <div className="px-4 sm:px-6 pt-2.5 pb-2 border-b border-gray-100 bg-white space-y-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
             <FiltersToggle
               open={filtersOpen}
@@ -700,130 +728,22 @@ export default function MetricsDashboardTab({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </div>}
 
-      <div className="flex-1 min-h-0 px-4 sm:px-6 pt-2.5 pb-4 overflow-hidden">
-      <motion.div
-        className="h-full flex flex-col max-w-[1800px] mx-auto w-full"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-
-        <AnimatePresence mode="wait">
-        {subView === 'metrics' ? (
-        <motion.section
-          key="metrics-grid"
-          className="flex-1 min-h-0 overflow-y-auto -mr-2 pr-2"
-          initial={viewSwap.initial}
-          animate={viewSwap.animate}
-          exit={viewSwap.exit}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">All metrics</h3>
-            <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{orderedKPIs.length}</span>
-          </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={orderedKPIs.map(k => k.id)} strategy={rectSortingStrategy}>
-            <motion.div
-              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3"
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-            >
-              {orderedKPIs.map(kpi => (
-                <motion.div key={kpi.id} variants={fadeUp} className={METRIC_CARD_H_CLASS}>
-                <MetricCard
-                  kpi={kpi}
-                  color={colorByKpi[kpi.id]}
-                  total={filteredTotals[kpi.id] ?? 0}
-                  canReorder={canEditMetrics}
-                  onOpen={() => (onMetricDetailClick ? onMetricDetailClick(kpi.id) : openLogsForMetric(kpi.id))}
-                  tagNames={((kpi.tag_ids || []) as string[]).map(tid => tagNameById.get(tid)).filter(Boolean) as string[]}
-                />
-                </motion.div>
-              ))}
-              {onAddKPI && (
-                <motion.div variants={fadeUp} className={METRIC_CARD_H_CLASS}>
-                <button
-                  type="button"
-                  onClick={onAddKPI}
-                  className="w-full h-full rounded-2xl border-2 border-dashed border-gray-200 hover:border-primary-400 hover:bg-primary-50/30 transition-colors flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:text-primary-700"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span className="text-xs font-medium">Add metric</span>
-                </button>
-                </motion.div>
-              )}
-            </motion.div>
-          </SortableContext>
-          </DndContext>
-
-          {/* Trends & places — pushed below the cards, so more metrics just
-              push these further down and the whole column scrolls. */}
-          <div className="flex items-center gap-2 mt-8 mb-3">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Trends &amp; places</h3>
-          </div>
-          <motion.div
-            className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-2"
-            variants={staggerContainer}
-            initial="hidden"
-            animate="visible"
-          >
-            <div className="lg:col-span-2 h-[360px] lg:h-[440px]">{renderChartPanel()}</div>
-            <div className="lg:col-span-1 h-[300px] lg:h-[440px]">{renderMapPanel()}</div>
-          </motion.div>
-        </motion.section>
-        ) : (
-        <motion.div
-          key="metrics-overview"
-          className="flex-1 min-h-0 flex flex-col gap-4"
-          initial={viewSwap.initial}
-          animate={viewSwap.animate}
-          exit={viewSwap.exit}
-        >
-        {/* Overview stats */}
-        <motion.section
-          className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          {[
-            { key: 'metrics', label: 'Metrics', value: kpis.length, icon: BarChart3, accent: 'text-primary-600', tint: 'bg-primary-50' },
-            { key: 'claims', label: 'Claims', value: timelineStats?.claims_total ?? 0, icon: TrendingUp, accent: 'text-primary-600', tint: 'bg-primary-50' },
-            { key: 'evidence', label: 'Evidence', value: timelineStats?.evidence_total ?? 0, icon: FileText, accent: 'text-evidence-600', tint: 'bg-evidence-50' },
-            { key: 'connected', label: 'Connected', value: timelineStats?.connected ?? 0, icon: Link2, accent: 'text-impact-600', tint: 'bg-impact-50' },
-            { key: 'unconnected', label: 'Unconnected', value: timelineStats?.not_connected ?? 0, icon: Unlink, accent: 'text-red-500', tint: 'bg-red-50' },
-          ].map(s => (
-            <motion.div key={s.key} variants={fadeUp} className="rounded-2xl bg-white border border-gray-200/60 shadow-card p-4 flex items-center gap-3">
-              <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${s.tint}`}>
-                <s.icon className={`w-4 h-4 ${s.accent}`} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xl font-semibold text-gray-900 tabular-nums leading-none">{s.value.toLocaleString()}</p>
-                <p className="text-xs text-gray-500 mt-1 truncate">{s.label}</p>
+      <div className={overview ? 'px-4 sm:px-6 pt-2.5 pb-2' : 'flex-1 min-h-0 px-4 sm:px-6 pt-2.5 pb-4 overflow-hidden'}>
+      <div className={overview ? 'max-w-[1800px] mx-auto w-full flex flex-col gap-4' : 'h-full flex flex-col max-w-[1800px] mx-auto w-full'}>
+        <section className={overview ? '' : 'flex-1 min-h-0 overflow-y-auto -mr-2 pr-2'}>
+          {metricGrid}
+          {!overview && (
+            <>
+              <div className="flex items-center gap-2 mt-8 mb-3">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Trends &amp; places</h3>
               </div>
-            </motion.div>
-          ))}
-        </motion.section>
-
-        {/* Insights — trends and places, filling the rest of the locked page */}
-        <section className="flex-1 min-h-0 flex flex-col">
-          <motion.div
-            className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4"
-            variants={staggerContainer}
-            initial="hidden"
-            animate="visible"
-          >
-            <div className="lg:col-span-2 min-h-0">{renderChartPanel()}</div>
-            <div className="lg:col-span-1 min-h-0">{renderMapPanel()}</div>
-          </motion.div>
+              <div className="pb-2">{chartRow}</div>
+            </>
+          )}
         </section>
-        </motion.div>
-        )}
-        </AnimatePresence>
-      </motion.div>
+      </div>
       </div>
     </div>
   )

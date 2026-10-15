@@ -36,11 +36,12 @@ import { notify } from '../lib/notify'
 import { Button, PageLoader, SectionLoader, InlineAlert } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
 
-type ProgramTab = 'metrics' | 'logs' | 'location' | 'beneficiaries' | 'stories'
+type ProgramTab = 'overview' | 'logs' | 'metrics' | 'location' | 'beneficiaries' | 'stories'
 
 const TABS: { id: ProgramTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'logs', label: 'Logs', icon: Activity },
-  { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
+  { id: 'metrics', label: 'Metrics', icon: BarChart3 },
   { id: 'location', label: 'Locations', icon: MapPin },
   { id: 'beneficiaries', label: 'People', icon: Users },
   { id: 'stories', label: 'Stories', icon: BookOpen },
@@ -48,8 +49,9 @@ const TABS: { id: ProgramTab; label: string; icon: React.ComponentType<{ classNa
 
 /**
  * Program workspace. One compact header row (back, title, section switcher,
- * Report / Quick setup / Add log), one body. Logs is the default section: the
- * page is a logging workspace first, metrics management lives one tab over.
+ * Report / Quick setup / Add log), one body. Overview is the default: the
+ * metric cards, then the log list. Logs and Metrics stay as their own
+ * sections. The chart and map live on Metrics.
  *
  * Perceived speed: the header paints immediately from the initiative passed
  * via router state (dashboard card click) or the sessionStorage SWR cache
@@ -59,7 +61,10 @@ const TABS: { id: ProgramTab; label: string; icon: React.ComponentType<{ classNa
  */
 export default function InitiativePage() {
   const { canAddImpactClaims, canAddEvidence, canAddMetrics, canEditMetrics, canDelete, canEditInitiatives, activeOrganization } = useTeam()
-  const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
+  const { id, '*': splat } = useParams<{ id: string; '*': string }>()
+  // Same route as the program page (`programs/:id/*`), so opening a metric
+  // does not remount the header. `/metrics/:kpiId` is just the splat.
+  const kpiId = splat?.startsWith('metrics/') ? decodeURIComponent(splat.slice('metrics/'.length).split('/')[0]) : undefined
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -81,7 +86,7 @@ export default function InitiativePage() {
     if (tab && (TABS as { id: string }[]).some(t => t.id === tab)) return tab as ProgramTab
     if (kpiId || tab === 'home') return 'metrics'
     if (tab === 'timeline' || tab === 'evidence') return 'logs'
-    return 'logs'
+    return 'overview'
   })
   const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
 
@@ -117,11 +122,6 @@ export default function InitiativePage() {
     if (id) loadDashboard()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
-
-  // A metric URL always shows the Metrics section.
-  useEffect(() => {
-    if (kpiId && dashboard) setActiveTab('metrics')
-  }, [kpiId, dashboard])
 
   // A program with no metrics yet has nothing to log against: land on the
   // Metrics section's setup call-to-action instead of an empty Logs list.
@@ -268,7 +268,7 @@ export default function InitiativePage() {
   const handleAddLog = () => {
     // On Logs, hand off to the tab's own wizard (it has the Advanced paths and
     // refreshes itself). Elsewhere, use the self-fetching launcher.
-    if (activeTab === 'logs' && !kpiId) setAddLogSignal(s => s + 1)
+    if ((activeTab === 'logs' || activeTab === 'overview') && !kpiId) setAddLogSignal(s => s + 1)
     else setAddLogOpen(true)
   }
 
@@ -337,10 +337,72 @@ export default function InitiativePage() {
     )
   }
 
+  const renderLogs = (embedded = false) => (
+    <TimelineTab
+      initiativeId={id!}
+      onRefresh={loadDashboard}
+      openAddLogSignal={addLogSignal}
+      hideHeader
+      embedded={embedded}
+      onQuickSetup={canEditInitiatives ? () => setSetupOpen(true) : undefined}
+      knownMetricCount={dashboard?.kpis.length}
+      knownLocationCount={locationCount}
+    />
+  )
+
+  const renderMetricDetail = () => {
+    if (!dashboard) return <SectionLoader className="h-64" />
+    const detailKpi = (dashboard.kpis || []).find(k => k.id === kpiId)
+    if (!detailKpi) return null
+    return (
+      <MetricDetailTab
+        initiativeId={id!}
+        kpi={detailKpi}
+        kpis={dashboard.kpis || []}
+        kpiTotal={kpiTotals[detailKpi.id!] || 0}
+        kpiUpdates={allKPIUpdates}
+        onBack={() => navigate(`/programs/${id}?tab=${activeTab}`)}
+        onEdit={canEditMetrics ? () => openEditModal(detailKpi) : undefined}
+        onRefresh={loadDashboard}
+        onStoryClick={openStory}
+      />
+    )
+  }
+
   const renderActiveTab = () => {
+    // Drill into the metric on top of whichever section you clicked from.
+    // The header and its tab stay put.
+    if (kpiId) {
+      const detail = renderMetricDetail()
+      if (detail) return detail
+    }
     switch (activeTab) {
+      case 'overview': {
+        if (!dashboard) return <SectionLoader className="h-64" />
+        if (dashboard.kpis.length === 0) return renderMetricsContent()
+        return (
+          <div className="h-full overflow-y-auto mobile-content-padding bg-gray-50">
+            <MetricsDashboardTab
+              variant="overview"
+              initiativeId={id!}
+              kpis={dashboard.kpis}
+              kpiTotals={kpiTotals}
+              kpiUpdates={allKPIUpdates}
+              onAddKPI={canAddMetrics ? () => setIsKPIModalOpen(true) : undefined}
+              onMetricDetailClick={handleMetricCardClick}
+              onOpenLocations={() => handleTabChange('location')}
+              onRefresh={refreshAfterChange}
+              onStoryClick={openStory}
+            />
+            <div className="max-w-[1800px] mx-auto w-full px-4 sm:px-6 pt-2 pb-1">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Logs</h3>
+            </div>
+            {renderLogs(true)}
+          </div>
+        )
+      }
       case 'logs':
-        return <TimelineTab initiativeId={id!} onRefresh={loadDashboard} openAddLogSignal={addLogSignal} hideHeader onQuickSetup={canEditInitiatives ? () => setSetupOpen(true) : undefined} knownMetricCount={dashboard?.kpis.length} knownLocationCount={locationCount} />
+        return renderLogs()
       case 'location':
         return <LocationTab onStoryClick={openStory} onMetricClick={handleMetricCardClick} onCount={setLocationCount} />
       case 'beneficiaries':
@@ -348,26 +410,8 @@ export default function InitiativePage() {
       case 'stories':
         return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
       case 'metrics':
-      default: {
-        const detailKpi = kpiId ? (dashboard?.kpis || []).find(k => k.id === kpiId) : null
-        if (kpiId && !dashboard) return <SectionLoader className="h-64" />
-        if (detailKpi) {
-          return (
-            <MetricDetailTab
-              initiativeId={id!}
-              kpi={detailKpi}
-              kpis={dashboard?.kpis || []}
-              kpiTotal={kpiTotals[detailKpi.id!] || 0}
-              kpiUpdates={allKPIUpdates}
-              onBack={() => navigate(`/programs/${id}`)}
-              onEdit={canEditMetrics ? () => openEditModal(detailKpi) : undefined}
-              onRefresh={loadDashboard}
-              onStoryClick={openStory}
-            />
-          )
-        }
+      default:
         return <HomeTab>{renderMetricsContent()}</HomeTab>
-      }
     }
   }
 
@@ -446,7 +490,7 @@ export default function InitiativePage() {
           <div className="flex items-end gap-1 pl-10 overflow-x-auto scrollbar-hide">
             {TABS.map(t => {
               const Icon = t.icon
-              const active = activeTab === t.id && !(t.id !== 'metrics' && kpiId)
+              const active = activeTab === t.id
               const count = t.id === 'metrics' ? (dashboard?.kpis.length ?? 0) : t.id === 'logs' ? allKPIUpdates.length : null
               const missing = (t.id === 'metrics' && dashboard != null && dashboard.kpis.length === 0)
                 || (t.id === 'location' && locationCount === 0)

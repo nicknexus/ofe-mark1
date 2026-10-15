@@ -870,8 +870,8 @@ function App() {
  <Route path="tracking" element={<RedirectKeepSearch to="/tracking/programs" />} />
  <Route path="tracking/programs" element={<Dashboard />} />
  <Route path="tracking/initiatives" element={<RedirectKeepSearch to="/tracking/programs" />} />
- <Route path="programs/:id" element={<InitiativePage />} />
- <Route path="programs/:id/metrics/:kpiId" element={<InitiativePage />} />
+ {/* One route so /metrics/:kpiId does not remount the program page. */}
+ <Route path="programs/:id/*" element={<InitiativePage />} />
  <Route path="initiatives/:id" element={<RedirectInitiativeToProgram />} />
  <Route path="initiatives/:id/metrics/:kpiId" element={<RedirectInitiativeToProgram />} />
  <Route path="metrics" element={<AllMetricsPage />} />
