@@ -13,6 +13,7 @@ import {
     formatMoney,
     formatRelative,
     describeState,
+    stripeStatusDrift,
 } from '../components/ui'
 import type { AccountState } from '../../services/adminApi'
 
@@ -40,7 +41,7 @@ function needsAttention(org: AdminOrg): boolean {
     )
 }
 
-/** Past due but never paid: locked, so it belongs with Locked, not Paying. */
+/** Past due is locked immediately, so it belongs with Locked, not Paying. */
 const lockedPastDue = (org: AdminOrg) => org.state === 'past_due' && !org.has_access
 
 function matchesFilter(org: AdminOrg, filter: Filter): boolean {
@@ -291,6 +292,9 @@ export default function AdminOrgsPage() {
                                                     {!org.is_public && (
                                                         <span className="ml-1.5 text-slate-300">· private</span>
                                                     )}
+                                                    {org.is_public && !org.public_live && (
+                                                        <span className="ml-1.5 text-amber-600">· page hidden</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -304,9 +308,14 @@ export default function AdminOrgsPage() {
                                     <td className="px-4 py-3">
                                         <PlanBadge tier={org.subscription?.plan_tier} state={org.state} size="sm" />
                                         <div className="mt-1 text-[11px] text-slate-500 truncate max-w-[240px]">
-                                            {describeState(org.state, org.key_date, org.discount_label, org.has_access)}
+                                            {describeState(org.state, org.key_date, org.discount_label, org.has_access, org.paid_before)}
                                             {org.mrr_cents ? ` · ${formatMoney(org.mrr_cents, 'usd')}/mo` : ''}
                                         </div>
+                                        {stripeStatusDrift(org.subscription?.status, org.stripe_status) && (
+                                            <div className="mt-1 text-[11px] text-amber-600">
+                                                Stripe says {stripeStatusDrift(org.subscription?.status, org.stripe_status)}
+                                            </div>
+                                        )}
                                         {org.limits_overridden && (
                                             <div className="mt-1 text-[11px] text-amber-600">Custom limits</div>
                                         )}

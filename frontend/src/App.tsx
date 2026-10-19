@@ -237,7 +237,13 @@ function App() {
  // This org is locked but another of theirs isn't: move them there.
  if (!status.hasAccess && status.fallbackOrgId && !switchedOrg) {
  switchedOrg = true
- if (checkedOrg) notify.error("That organization's plan has ended. Switched you back to an active one.")
+ if (checkedOrg) {
+ notify.error(
+ status.reason === 'org_payment_failed' || status.reason === 'payment_past_due'
+ ? "That organization's payment didn't go through. Switched you back to an active one."
+ : "That organization's plan has ended. Switched you back to an active one."
+ )
+ }
  localStorage.setItem(ACTIVE_ORG_KEY, status.fallbackOrgId)
  apiService.clearCache()
  i--
@@ -458,7 +464,8 @@ function App() {
  if (
  subscriptionStatus.subscription.status === 'none' &&
  !subscriptionStatus.hasAccess &&
- subscriptionStatus.reason !== 'org_plan_ended'
+ subscriptionStatus.reason !== 'org_plan_ended' &&
+ subscriptionStatus.reason !== 'org_payment_failed'
  ) {
  if (pendingInvite === null && !checkingPendingInvite) {
  setCheckingPendingInvite(true)
@@ -684,7 +691,7 @@ function App() {
 
  // User has no own subscription (status is 'none') but might have inherited access
  // or a pending team invitation
- if (subscriptionStatus.subscription.status === 'none' && subscriptionStatus.reason !== 'org_plan_ended') {
+ if (subscriptionStatus.subscription.status === 'none' && subscriptionStatus.reason !== 'org_plan_ended' && subscriptionStatus.reason !== 'org_payment_failed') {
  if (subscriptionStatus.hasAccess) {
  // They have inherited access - let them through to the app
  } else {

@@ -137,10 +137,10 @@ export class SubscriptionService {
                 // No Stripe sub behind it = admin comp; no period to check.
                 return !sub.stripe_subscription_id || after(sub.current_period_end, opts?.activeGraceDays ?? 0);
             case 'past_due':
-                // Renewal failed for someone who has paid before: keep access
-                // while Stripe retries. A failed FIRST charge after the trial
-                // locks. `undefined` means the column isn't migrated yet.
-                return sub.first_paid_at !== null;
+                // Any failed charge locks immediately. Stripe keeps retrying
+                // and emailing; access and the public page come back when the
+                // invoice is paid and the status returns to active.
+                return false;
             case 'cancelled':
                 return after(sub.current_period_end);
             default:
@@ -153,7 +153,7 @@ export class SubscriptionService {
         const hasPaid = !!sub.first_paid_at;
         switch (sub.status) {
             case 'past_due':
-                return 'trial_payment_failed';
+                return hasPaid ? 'payment_past_due' : 'trial_payment_failed';
             case 'trial':
             case 'expired':
             case 'cancelled':
@@ -161,6 +161,11 @@ export class SubscriptionService {
             default:
                 return 'no_subscription';
         }
+    }
+
+    /** What a team member sees when the org owner's plan does not grant access. */
+    static memberLockReason(ownerSub: Subscription | null | undefined): string {
+        return ownerSub?.status === 'past_due' ? 'org_payment_failed' : 'org_plan_ended';
     }
 
     /**
@@ -178,7 +183,7 @@ export class SubscriptionService {
                 const ownerSub = await this.getByUserId(rel.ownerId);
                 return this.subGrantsAccess(ownerSub)
                     ? { hasAccess: true, reason: 'inherited_access', status: ownerSub!.status }
-                    : { hasAccess: false, reason: 'org_plan_ended', status: ownerSub?.status ?? 'none' };
+                    : { hasAccess: false, reason: this.memberLockReason(ownerSub), status: ownerSub?.status ?? 'none' };
             }
             if (rel?.role === 'owner') {
                 const own = await this.getByUserId(userId);
@@ -391,15 +396,16 @@ export class SubscriptionService {
     static isLiveForPublic(sub: Subscription | null | undefined): boolean {
         // Paying rows stay live even with a stale period end: a paying org's
         // public page must never drop because a renewal webhook was missed.
-        // past_due goes through evaluate(): live only if they've paid before.
+        // past_due is not live. The page returns when Stripe marks them active.
         if (sub?.status === 'active') return true;
         return this.evaluate(sub);
     }
 
     /**
-     * Org ids whose owner currently has live access (trial/active/past_due/free,
-     * or cancelled-but-still-in-period). Demo orgs always pass. Used as a
-     * read-time belt so a missed webhook cannot leave a lapsed page up.
+     * Org ids whose owner currently has live access (trial/active/free, or
+     * cancelled-but-still-in-period). past_due is not live. Demo orgs always
+     * pass. Used as a read-time belt so a missed webhook cannot leave a
+     * lapsed page up.
      */
     static async orgIdsWithLiveAccess(orgIds: string[]): Promise<Set<string>> {
         const unique = [...new Set(orgIds.filter(Boolean))];
@@ -554,7 +560,7 @@ export class SubscriptionService {
                 }
                 return {
                     hasAccess: false,
-                    reason: 'org_plan_ended',
+                    reason: this.memberLockReason(ownerSub),
                     subscription: own,
                     fallbackOrgId: (await this.findUsableOrg(userId, requestedOrgId)) ?? undefined,
                     isSupportMode: false,

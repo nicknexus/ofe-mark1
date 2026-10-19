@@ -30,6 +30,7 @@ import {
     formatRelative,
     formatMoney,
     describeState,
+    stripeStatusDrift,
 } from '../components/ui'
 
 /** Human summary of a Stripe discount: "SAVE20 · 20% off, forever". */
@@ -143,7 +144,7 @@ export default function AdminOrgAccountPage() {
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <PlanBadge tier={plan.tier} state={plan.state} size="sm" />
                             <span className="text-xs text-slate-400">
-                                /{org.slug} · {org.is_public ? 'Public' : 'Private'} · Joined {formatDate(org.created_at)}
+                                /{org.slug} · {org.public_live ? 'Public, live' : org.is_public ? 'Flagged public, page hidden' : 'Private'} · Joined {formatDate(org.created_at)}
                             </span>
                         </div>
                         <p className="mt-1.5 text-xs text-slate-600">
@@ -151,7 +152,7 @@ export default function AdminOrgAccountPage() {
                                 {plan.has_access ? 'Has access' : 'No access'}
                             </span>
                             {' · '}
-                            {describeState(plan.state, plan.key_date, plan.discount_label, plan.has_access)}
+                            {describeState(plan.state, plan.key_date, plan.discount_label, plan.has_access, plan.paid_before)}
                         </p>
                     </div>
                 </div>
@@ -263,6 +264,11 @@ export default function AdminOrgAccountPage() {
                                     <span className="capitalize">{billing.status || '—'}</span>
                                     {billing.cancel_at_period_end && (
                                         <span className="ml-2 text-xs text-amber-600">cancels at period end</span>
+                                    )}
+                                    {stripeStatusDrift(plan.status, billing.status) && (
+                                        <span className="ml-2 text-xs text-amber-600">
+                                            app record says {plan.status}
+                                        </span>
                                     )}
                                 </Field>
                                 <Field label="Price">
@@ -410,14 +416,16 @@ export default function AdminOrgAccountPage() {
                     <Section title="Organization">
                         <dl>
                             <Field label="Visibility">
-                                {org.is_public ? (
-                                    <span className="text-emerald-600">Public</span>
+                                {org.public_live ? (
+                                    <span className="text-emerald-600">Public, live</span>
+                                ) : org.is_public ? (
+                                    <span className="text-amber-600">Flagged public, page is hidden</span>
                                 ) : (
                                     <span className="text-slate-500">Private</span>
                                 )}
                             </Field>
                             <Field label="Public page">
-                                {org.is_public ? (
+                                {org.public_live ? (
                                     <a
                                         href={`/org/${org.slug}`}
                                         target="_blank"
@@ -426,6 +434,10 @@ export default function AdminOrgAccountPage() {
                                     >
                                         /org/{org.slug} <ExternalLink className="w-3 h-3" />
                                     </a>
+                                ) : org.is_public ? (
+                                    <span className="text-amber-700">
+                                        Not served. /org/{org.slug} returns not found until the plan is live.
+                                    </span>
                                 ) : (
                                     '—'
                                 )}

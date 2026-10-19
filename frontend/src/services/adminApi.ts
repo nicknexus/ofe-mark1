@@ -87,6 +87,9 @@ export interface AdminOrg {
  name: string
  slug: string
  is_public: boolean
+ public_live: boolean
+ paid_before: boolean
+ stripe_status: string | null
  created_at: string
  logo_url: string | null
  brand_color: string | null
@@ -144,6 +147,7 @@ export interface AdminAccount {
  slug: string
  description?: string | null
  is_public: boolean
+ public_live: boolean
  is_demo: boolean
  created_at: string
  logo_url?: string | null
@@ -165,6 +169,7 @@ export interface AdminAccount {
  status: string
  state: AccountState
  has_access: boolean
+ paid_before: boolean
  key_date: string | null
  discount_label: string | null
  trial_ends_at: string | null

@@ -19,15 +19,16 @@ interface Props {
     onRecheck: () => void
 }
 
-type Variant = 'trial_ended' | 'subscription_ended' | 'payment_failed'
+type Variant = 'trial_ended' | 'subscription_ended' | 'payment_failed' | 'payment_past_due'
 
 function variantFor(reason: string): Variant {
     switch (reason) {
         case 'trial_payment_failed':
             return 'payment_failed'
+        case 'payment_past_due':
+            return 'payment_past_due'
         case 'subscription_ended':
         case 'subscription_cancelled':
-        case 'payment_past_due':
             return 'subscription_ended'
         default:
             return 'trial_ended'
@@ -48,6 +49,11 @@ const COPY: Record<Variant, { title: string; subtitle: string; icon: LucideIcon 
     payment_failed: {
         title: "Your payment didn't go through",
         subtitle: "Your trial has ended and we couldn't charge your card. Update your card to continue. Your data is saved.",
+        icon: CreditCard,
+    },
+    payment_past_due: {
+        title: "Your latest payment didn't go through",
+        subtitle: "Your account is paused until the card works. Update your payment method to continue. Your programs and data are saved.",
         icon: CreditCard,
     },
 }
@@ -93,7 +99,8 @@ export default function SubscriptionExpiredPage({ reason, trialAvailable, onRech
         }
     }
 
-    const memberView = reason === 'org_plan_ended' || isSharedMember
+    const memberView = reason === 'org_plan_ended' || reason === 'org_payment_failed' || isSharedMember
+    const orgPaymentFailed = reason === 'org_payment_failed'
 
     if (checkingPermissions && !memberView) {
         return (
@@ -123,9 +130,13 @@ export default function SubscriptionExpiredPage({ reason, trialAvailable, onRech
                     <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary-500/40 shadow-md bg-primary-500/30">
                         <Users className="w-8 h-8 text-gray-800" />
                     </div>
-                    <h1 className="text-2xl font-semibold text-foreground mb-2">Your organization's plan has ended</h1>
+                    <h1 className="text-2xl font-semibold text-foreground mb-2">
+                        {orgPaymentFailed ? "Your organization's payment didn't go through" : "Your organization's plan has ended"}
+                    </h1>
                     <p className="text-muted-foreground mb-8">
-                        Ask your organization owner to renew. You'll get access back automatically as soon as they do.
+                        {orgPaymentFailed
+                            ? "Ask the owner to update the card. You'll get access back as soon as the payment goes through."
+                            : "Ask your organization owner to renew. You'll get access back automatically as soon as they do."}
                     </p>
                     <button
                         onClick={handleSignOut}
@@ -158,7 +169,7 @@ export default function SubscriptionExpiredPage({ reason, trialAvailable, onRech
                 <h1 className="text-2xl font-semibold text-foreground mb-2">{title}</h1>
                 <p className="text-muted-foreground mb-8">{subtitle}</p>
 
-                {variant === 'payment_failed' ? (
+                {variant === 'payment_failed' || variant === 'payment_past_due' ? (
                     <button
                         onClick={handleUpdateCard}
                         disabled={!!busy}

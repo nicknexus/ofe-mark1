@@ -42,6 +42,7 @@ interface StripeFacts {
     fully_discounted: boolean;
     discount_label: string | null;
     current_period_end: string | null;
+    status: string;
 }
 
 export interface OrgUsage {
@@ -63,6 +64,12 @@ export interface AdminOrgRow {
     subscription: Partial<Subscription> | null;
     state: AccountState;
     has_access: boolean;
+    /** True when the public page is actually served, not just flagged public. */
+    public_live: boolean;
+    /** Owner has a successful charge on file. Distinguishes a failed renewal from a failed first charge. */
+    paid_before: boolean;
+    /** Live Stripe subscription status, when this server can see the subscription. */
+    stripe_status: string | null;
     /** The date that matters for this state: converts, locks, renews, or ended. */
     key_date: string | null;
     /** Monthly recurring revenue in cents after discounts; null when unknown. */
@@ -127,10 +134,17 @@ export function bustUserDirectory(): void {
 
 // ─── Derivations ─────────────────────────────────────────────────────────────
 
-/** Same rule the app-access gate uses for an owner's own subscription. */
+/** Same rule the app-access gate uses: past_due is locked, active comps and live Stripe rows are not. */
 function hasAccessNow(sub: Partial<Subscription> | null | undefined): boolean {
     if (!sub) return false;
-    return sub.status === 'active' || SubscriptionService.evaluate(sub as Subscription, { activeGraceDays: 7 });
+    return SubscriptionService.subGrantsAccess(sub as Subscription);
+}
+
+/** Public page is served only when the org is flagged public AND the plan is live. */
+function publicPageLive(isPublic: boolean, isDemo: boolean, sub: Partial<Subscription> | null | undefined): boolean {
+    if (!isPublic) return false;
+    if (isDemo) return true;
+    return SubscriptionService.isLiveForPublic(sub as Subscription);
 }
 
 /**
@@ -146,8 +160,7 @@ export function deriveAccountState(
 ): AccountState {
     if (ownerEmail?.toLowerCase().endsWith(INTERNAL_EMAIL_DOMAIN)) return 'internal';
     if (!sub || !sub.status || sub.status === 'none') return 'no_plan';
-    // Stripe is still retrying, so this is a billing problem, not an ending;
-    // has_access says whether they're locked meanwhile (never paid → locked).
+    // Stripe is still retrying. The app and the public page are locked until it clears.
     if (sub.stripe_subscription_id && sub.status === 'past_due') return 'past_due';
     if (!hasAccessNow(sub)) return 'ended';
     if (sub.stripe_subscription_id) {
@@ -239,6 +252,7 @@ function factsFor(s: any): StripeFacts {
         fully_discounted: invoiceAmount > 0 && discounted <= 0,
         discount_label: discountLabel,
         current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+        status: s.status,
     };
 }
 
@@ -257,7 +271,7 @@ async function getStripeFacts(): Promise<Map<string, StripeFacts> | null> {
         try {
             const map = new Map<string, StripeFacts>();
             for await (const s of stripe.subscriptions.list({ status: 'all', limit: 100, expand }) as any) {
-                if (!['active', 'past_due', 'trialing', 'unpaid'].includes(s.status)) continue;
+                if (!['active', 'past_due', 'trialing', 'unpaid', 'canceled'].includes(s.status)) continue;
                 map.set(s.id, factsFor(s));
             }
             stripeCache = { expires: Date.now() + STRIPE_TTL_MS, map };
@@ -372,6 +386,9 @@ export class AdminAccountService {
                 name: org.name,
                 slug: org.slug,
                 is_public: org.is_public,
+                public_live: publicPageLive(!!org.is_public, false, sub),
+                paid_before: !!sub?.first_paid_at,
+                stripe_status: facts?.status ?? null,
                 created_at: org.created_at,
                 logo_url: org.logo_url ?? null,
                 brand_color: org.brand_color ?? null,
@@ -467,6 +484,7 @@ export class AdminAccountService {
                 slug: org.slug,
                 description: org.description,
                 is_public: org.is_public,
+                public_live: publicPageLive(!!org.is_public, !!org.is_demo, subscription),
                 is_demo: org.is_demo,
                 created_at: org.created_at,
                 logo_url: org.logo_url,
@@ -488,6 +506,7 @@ export class AdminAccountService {
                 status: subscription?.status ?? 'none',
                 state,
                 has_access: hasAccessNow(subscription),
+                paid_before: !!subscription?.first_paid_at,
                 key_date: deriveKeyDate(state, subscription, facts),
                 discount_label: facts?.discount_label ?? null,
                 trial_ends_at: subscription?.trial_ends_at ?? null,

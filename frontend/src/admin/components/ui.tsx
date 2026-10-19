@@ -144,12 +144,27 @@ export const STATE_META: Record<AccountState, { label: string; style: string }> 
 
 const HAS_PLAN: AccountState[] = ['paying', 'discounted', 'past_due', 'trialing', 'trial_cancelling', 'grace', 'comped', 'internal']
 
+/** Stripe uses trialing/canceled. The app stores trial/cancelled. */
+export function stripeStatusDrift(appStatus: string | null | undefined, stripeStatus: string | null | undefined): string | null {
+    if (!appStatus || !stripeStatus) return null
+    const norm = (s: string) => {
+        if (s === 'trial' || s === 'trialing') return 'trialing'
+        if (s === 'cancelled' || s === 'canceled') return 'canceled'
+        return s
+    }
+    if (norm(appStatus) === norm(stripeStatus)) return null
+    const terminal = new Set(['cancelled', 'canceled', 'expired', 'incomplete_expired', 'none', 'unpaid'])
+    if (terminal.has(norm(appStatus)) && terminal.has(norm(stripeStatus))) return null
+    return stripeStatus
+}
+
 /** One line explaining the state and the date that matters for it. */
 export function describeState(
     state: AccountState,
     keyDate: string | null,
     discountLabel?: string | null,
-    hasAccess = true
+    hasAccess = true,
+    paidBefore?: boolean
 ): string {
     const d = formatDate(keyDate)
     const has = keyDate ? d : null
@@ -159,9 +174,13 @@ export function describeState(
         case 'discounted':
             return discountLabel ? `$0 now · ${discountLabel}` : '$0 now via coupon'
         case 'past_due':
-            return hasAccess
-                ? 'Payment failed · Stripe is retrying'
-                : 'First charge failed · Stripe is retrying · locked until card is updated'
+            if (paidBefore === false) {
+                return 'First charge failed. Locked until the card works. Stripe is retrying.'
+            }
+            if (paidBefore === true) {
+                return 'Latest charge failed. Locked until the card works. Stripe is retrying.'
+            }
+            return 'Payment failed. Locked until the card works. Stripe is retrying.'
         case 'trialing':
             return has ? `Card on file · converts ${has}` : 'Card on file'
         case 'trial_cancelling':
