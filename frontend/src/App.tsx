@@ -7,6 +7,7 @@ import { SubscriptionService } from './services/subscription'
 import { apiService, SUBSCRIPTION_REQUIRED_EVENT, ACTIVE_ORG_CHANGED_EVENT } from './services/api'
 import { notify } from './lib/notify'
 import { useRecheckOnReturn } from './hooks/useRecheckOnReturn'
+import { TRIAL_DURATION_DAYS } from './config/trial'
 import { TeamService, PendingInviteCheck } from './services/team'
 import { User, SubscriptionStatus } from './types'
 import { TutorialProvider } from './context/TutorialContext'
@@ -277,7 +278,7 @@ function App() {
  updated_at: ''
  },
  remainingTrialDays: null,
- trialDurationDays: 10,
+ trialDurationDays: TRIAL_DURATION_DAYS,
  })
  } finally {
  if (showLoader && gen === subCheckGenRef.current) {

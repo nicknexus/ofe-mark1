@@ -19,7 +19,7 @@ export type PlanTier = 'free' | 'growth' | 'pro';
  */
 export const TRIAL_DURATION_DAYS = Math.max(
     1,
-    parseInt(process.env.TRIAL_DURATION_DAYS || '10', 10) || 10
+    parseInt(process.env.TRIAL_DURATION_DAYS || '7', 10) || 7
 );
 
 const GB = 1024 ** 3;
