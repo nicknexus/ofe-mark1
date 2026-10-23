@@ -1,10 +1,14 @@
 import { Evidence } from '../../types'
+import { buildLogPlan, validateLogDraft } from './logDraft'
+import type { LogMetricRow } from './logDraft'
 
 export type WizardKind = 'evidence' | 'claim' | 'both'
 
 export type WizardStepId = 'entry' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
 
 export interface WizardFile {
+ /** Undefined follows every metric card; an empty array saves unassigned. */
+ rowIds?: string[]
  /** uploadId from the upload manager. */
  id: string
  name: string
@@ -34,6 +38,8 @@ export interface ClaimEntry {
 }
 
 export interface WizardState {
+ /** Unified capture workspace. Absent for legacy record editing. */
+ logRows?: LogMetricRow[]
  kind: WizardKind | null
  /** New logs infer their contents from the form; editing keeps its fixed kind. */
  entryMode?: boolean
@@ -167,6 +173,7 @@ export function filledClaimEntries(
 }
 
 export function wizardHasClaims(state: WizardState): boolean {
+ if (state.logRows) return buildLogPlan(state).claims.length > 0
  return state.entryMode ? filledClaimEntries(state).length > 0 : includesClaim(state.kind)
 }
 
@@ -175,6 +182,7 @@ export function wizardHasEvidence(state: WizardState): boolean {
 }
 
 export function wizardClaims(state: WizardState) {
+ if (state.logRows) return buildLogPlan(state).claims.map(c => ({ key: c.key, kpiId: c.kpiId, value: String(c.payload.value), label: c.payload.label || '', note: c.payload.note || '' }))
  if (state.entryMode || state.kind === 'both') {
   return filledClaimEntries(state).map(([kpiId, entry]) => ({ kpiId, ...entry }))
  }
@@ -184,6 +192,7 @@ export function wizardClaims(state: WizardState) {
 }
 
 export function wizardEvidenceMetricIds(state: WizardState): string[] {
+ if (state.logRows) return [...new Set(buildLogPlan(state).evidence.flatMap(e => e.payload.kpi_ids || []))]
  if (state.entryMode) return [...new Set([...state.evidenceKpiIds, ...wizardClaims(state).map(c => c.kpiId)])]
  return state.kind === 'both' ? wizardClaims(state).map(c => c.kpiId) : state.evidenceKpiIds
 }
@@ -215,6 +224,7 @@ export function validateAll(
   state: WizardState,
   kpis?: Array<{ id?: string; tag_ids?: string[] }>,
 ): string | null {
+ if (state.logRows) return validateLogDraft(state, kpis)
  if (state.entryMode) {
   const claims = wizardHasClaims(state)
   const evidence = wizardHasEvidence(state)

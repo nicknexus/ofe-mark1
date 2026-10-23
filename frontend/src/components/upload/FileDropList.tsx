@@ -15,6 +15,7 @@ const FILE_TYPES = EVIDENCE_TYPE_ORDER.map(value => ({
 const TYPE_META = (t: Evidence['type']) => FILE_TYPES.find(ft => ft.value === t) || FILE_TYPES[1]
 
 interface FileDropListProps {
+ renderFileDetails?: (file: WizardFile) => React.ReactNode
  files: WizardFile[]
  onAddFiles: (files: File[]) => void
  onRemoveFile: (fileId: string) => void
@@ -29,7 +30,7 @@ interface FileDropListProps {
 }
 
 /** Drop zone + uploading file tiles, shared by the wizard and quick-add dialogs. */
-export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes }: FileDropListProps) {
+export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes, renderFileDetails }: FileDropListProps) {
  const fileInputRef = useRef<HTMLInputElement>(null)
  // Per-row type dropdown, positioned via portal so it never clips inside the
  // scrollable modal body.
@@ -51,7 +52,8 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
   const activeType = file.type || 'documentation'
   const meta = TYPE_META(activeType)
   return (
-   <div key={file.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white">
+   <div key={file.id} className="rounded-xl border border-gray-200 bg-white">
+   <div className="flex items-center gap-2.5 px-3 py-2">
     {file.previewUrl ? (
      <img src={file.previewUrl} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100 flex-shrink-0" />
     ) : (
@@ -98,9 +100,12 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
      onClick={() => onRemoveFile(file.id)}
      className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
      title="Remove"
+     aria-label={`Remove ${file.name}`}
     >
      <X className="w-3.5 h-3.5" />
     </button>
+   </div>
+   {renderFileDetails && <div className="px-3 pb-3">{renderFileDetails(file)}</div>}
    </div>
   )
  }

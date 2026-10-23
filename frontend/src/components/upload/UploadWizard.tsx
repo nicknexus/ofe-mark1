@@ -41,7 +41,8 @@ import {
  wizardEvidenceMetricIds,
 } from './wizardTypes'
 import LogEntryStep from './LogEntryStep'
-import ConfirmDialog from '../ConfirmDialog'
+import LogReviewStep from './LogReviewStep'
+import { buildLogPlan, newLogRow, saveLogPlan } from './logDraft'
 import WizardMetricStep from './WizardMetricStep'
 import WizardScopeStep from './WizardScopeStep'
 import WizardClaimStep from './WizardClaimStep'
@@ -95,9 +96,6 @@ interface UploadWizardProps {
  programTitle?: string
  canCreateClaim: boolean
  canCreateEvidence: boolean
- /** Secondary bulk-entry tools, shared by program and Logs entry points. */
- onAdvancedClaim?: () => void
- onAdvancedEvidence?: () => void
  /** Everything the wizard needs to preview connections; from the Timeline payload. */
  kpis: KPI[]
  locations: Location[]
@@ -195,7 +193,7 @@ const STEP_META: Record<WizardStepId, { label: string | ((s: WizardState) => str
  entry: {
  label: 'Add log',
  title: () => 'Add log',
- subtitle: () => 'Save photos, documents or results. Add the details you know now.',
+ subtitle: () => 'Add results, evidence, or both. Either can be saved on its own.',
  },
  metric: {
  label: 'Metric',
@@ -235,7 +233,7 @@ const STEP_META: Record<WizardStepId, { label: string | ((s: WizardState) => str
 }
 
 /**
- * Capture files and optional results together, then review. Existing records
+ * Capture results, evidence, or both, then review. Existing records
  * retain their focused edit steps and the same server matching rules.
  */
 export default function UploadWizard({
@@ -243,8 +241,6 @@ export default function UploadWizard({
  programTitle,
  canCreateClaim,
  canCreateEvidence,
- onAdvancedClaim,
- onAdvancedEvidence,
   kpis: kpisProp,
   locations: locationsProp,
   tags: tagsProp,
@@ -283,6 +279,7 @@ export default function UploadWizard({
     // skip the type step entirely.
     kind: startKind ?? (canCreateEvidence ? 'evidence' : 'claim'),
     entryMode: !isEdit,
+    logRows: isEdit ? undefined : (lockedMetric ? [newLogRow(lockedMetric)] : kpisProp.length === 1 && kpisProp[0].id ? [newLogRow(kpisProp[0].id)] : []),
     // Smart defaults: today, and the only location / metric when there is
     // exactly one. Every one of these is still editable on its step.
     dateMode: 'single',
@@ -299,7 +296,7 @@ export default function UploadWizard({
  const [stepIndex, setStepIndex] = useState(0)
  const [stepError, setStepError] = useState<string | null>(null)
  const [submitting, setSubmitting] = useState(false)
- const [bulkTarget, setBulkTarget] = useState<'claim' | 'evidence' | null>(null)
+ const [saveProgress, setSaveProgress] = useState({ saved: 0, total: 0 })
  const [savedResult, setSavedResult] = useState<{ claims: number; evidence: number } | null>(null)
  const stateRef = useRef(state)
  const scopeDatePickerRef = useRef<DateRangePickerHandle>(null)
@@ -321,9 +318,9 @@ export default function UploadWizard({
  const cleanedRef = useRef(false)
  const savedRef = useRef(false)
  const savedClaimsRef = useRef(new Map<string, string>())
- const savedEvidenceTypesRef = useRef(new Set<Evidence['type']>())
+ const savedEvidenceKeysRef = useRef(new Set<string>())
  const ownedUploadUrlsRef = useRef(new Set<string>())
- const hasPartialSave = savedClaimsRef.current.size > 0 || savedEvidenceTypesRef.current.size > 0
+ const hasPartialSave = savedClaimsRef.current.size > 0 || savedEvidenceKeysRef.current.size > 0
  const discardOrphanUploads = useCallback(() => {
    if (cleanedRef.current || savedRef.current) return
    cleanedRef.current = true
@@ -338,7 +335,7 @@ export default function UploadWizard({
 
  const handleClose = useCallback(() => {
    discardOrphanUploads()
-   if (savedRef.current || savedClaimsRef.current.size || savedEvidenceTypesRef.current.size) onCreated()
+   if (savedRef.current || savedClaimsRef.current.size || savedEvidenceKeysRef.current.size) onCreated()
    onClose()
  }, [discardOrphanUploads, onClose, onCreated])
 
@@ -377,6 +374,13 @@ export default function UploadWizard({
  return () => window.removeEventListener('keydown', onKey)
  }, [handleClose, submitting])
 
+ useEffect(() => {
+ if (!submitting) return
+ const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+ window.addEventListener('beforeunload', warn)
+ return () => window.removeEventListener('beforeunload', warn)
+ }, [submitting])
+
  const update = (patch: Partial<WizardState>) => {
  setState(prev => {
  const next = { ...prev, ...patch }
@@ -386,7 +390,7 @@ export default function UploadWizard({
  setStepError(null)
  }
 
- const handleAddFiles = (files: File[]) => {
+ const handleAddFiles = (files: File[], retry?: { rowIds?: string[]; type?: Evidence['type'] }) => {
  if (!stateRef.current.evidenceTitle.trim() && files.length > 0) {
   update({ evidenceTitle: files[0].name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') })
  }
@@ -420,7 +424,8 @@ export default function UploadWizard({
  status: 'uploading',
  progress: 0,
  previewUrl,
- type: inferEvidenceType(file.name, file.type),
+ type: retry?.type || inferEvidenceType(file.name, file.type),
+ rowIds: retry?.rowIds,
  raw: file,
  }],
  }))
@@ -434,7 +439,7 @@ export default function UploadWizard({
  const file = current.raw
  if (current.previewUrl) URL.revokeObjectURL(current.previewUrl)
  setState(prev => ({ ...prev, files: prev.files.filter(f => f.id !== fileId) }))
- handleAddFiles([file])
+ handleAddFiles([file], current)
  }
 
  const handleSetFileType = (fileId: string, type: Evidence['type']) => {
@@ -468,6 +473,7 @@ export default function UploadWizard({
    // Select it where it makes sense so the user doesn't have to hunt for it.
    setState(prev => {
      const next: WizardState = { ...prev }
+     if (prev.logRows && created.id) next.logRows = [...prev.logRows, newLogRow(created.id)]
      if (includesEvidence(prev.kind) && prev.kind !== 'both' && created.id) {
        next.evidenceKpiIds = [...prev.evidenceKpiIds, created.id]
      }
@@ -507,7 +513,7 @@ export default function UploadWizard({
      const created = await apiService.createMetricTag(name)
      apiService.clearCache('/metric-tags')
      setTags(prev => prev.some(t => t.id === created.id) ? prev : [...prev, created])
-     const single = wizardHasClaims(stateRef.current)
+     const single = !stateRef.current.logRows && wizardHasClaims(stateRef.current)
      update({ tagIds: single ? [created.id] : [...stateRef.current.tagIds, created.id] })
      notify.success('Tag added')
      onStructureChanged?.()
@@ -616,6 +622,19 @@ export default function UploadWizard({
  return
  }
 
+ if (state.logRows) {
+ const plan = buildLogPlan(state, initiativeId)
+ await saveLogPlan(plan, apiService, {
+  claims: savedClaimsRef.current,
+  evidence: savedEvidenceKeysRef.current,
+  ownedUrls: ownedUploadUrlsRef.current,
+ }, (saved, total) => setSaveProgress({ saved, total }), evidenceForClaim?.id)
+ savedRef.current = true
+ state.files.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
+ setSavedResult({ claims: plan.claims.length, evidence: plan.evidence.length })
+ return
+ }
+
  // One claim per filled metric in the "both" flow; a single claim in
  // the claim-only flow. All share the scope from step one.
  const createdClaimIds: string[] = []
@@ -661,7 +680,7 @@ export default function UploadWizard({
  const multi = buckets.length > 1
  const baseTitle = state.evidenceTitle.trim()
  for (const bucket of buckets) {
- if (savedEvidenceTypesRef.current.has(bucket.type)) {
+ if (savedEvidenceKeysRef.current.has(bucket.type)) {
   evidenceRecordCount++
   continue
  }
@@ -694,7 +713,7 @@ export default function UploadWizard({
  file_sizes: fileSizes,
  }
  await apiService.createEvidence(evidencePayload)
- savedEvidenceTypesRef.current.add(bucket.type)
+ savedEvidenceKeysRef.current.add(bucket.type)
  fileUrls.forEach(url => ownedUploadUrlsRef.current.add(url))
  evidenceRecordCount++
  }
@@ -705,7 +724,7 @@ export default function UploadWizard({
  setSavedResult({ claims: createdClaimIds.length, evidence: evidenceRecordCount })
  } catch (error) {
  const message = error instanceof Error ? error.message : 'Failed to save'
- if (savedClaimsRef.current.size || savedEvidenceTypesRef.current.size) {
+ if (savedClaimsRef.current.size || savedEvidenceKeysRef.current.size) {
   setStepError('Some items were saved. Retry saving to finish the remaining items, or close to view what was saved.')
  }
  notify.error(message)
@@ -714,8 +733,17 @@ export default function UploadWizard({
  }
  }
 
+ const ReviewComponent = state.logRows ? LogReviewStep : WizardReviewStep
  const isLastStep = stepIndex === steps.length - 1
  const meta = STEP_META[step]
+ const subtitle = step !== 'entry'
+ ? meta.subtitle(state)
+ : evidenceForClaim || !canCreateClaim
+ ? 'Upload photos or documents. Add the details you know now.'
+ : !canCreateEvidence
+ ? 'Record results for your metrics. Evidence can be added later.'
+ : meta.subtitle(state)
+ const workspaceStep = step === 'entry'
  const kpiTotals = useMemo(() => {
    const totals: Record<string, number> = {}
    for (const claim of existingClaims) {
@@ -734,7 +762,7 @@ export default function UploadWizard({
    <p className="app-page-subtitle mt-2">You can find these items in Logs and add details later.</p>
    <div className="space-y-2 mt-5">
     {savedResult.evidence > 0 && <p className="text-sm text-secondary-700">{state.evidenceTitle} · {state.files.length} file{state.files.length === 1 ? '' : 's'}</p>}
-    {wizardClaims(state).map(c => <p key={c.kpiId} className="text-sm text-secondary-700">{c.value} {kpis.find(k => k.id === c.kpiId)?.title}</p>)}
+    {wizardClaims(state).map((c, index) => <p key={`${c.kpiId}-${index}`} className="text-sm text-secondary-700">{c.value} {kpis.find(k => k.id === c.kpiId)?.title}</p>)}
     {savedResult.evidence > 0 && requiresEvidenceApproval && <p className="text-sm text-secondary-500">Your evidence is waiting for approval.</p>}
     {savedResult.evidence > 0 && wizardEvidenceMetricIds(state).length === 0 && <p className="text-sm text-secondary-500">A metric can be assigned from the evidence details.</p>}
    </div>
@@ -754,7 +782,7 @@ export default function UploadWizard({
  exit={{ opacity: 0 }}
  transition={{ duration: 0.35 }}
  className={`absolute inset-0 pointer-events-none ${accentStyle ? accentStyle.backdrop : ''}`}
- style={accentStyle ? undefined : {
+ style={accentStyle || state.entryMode ? undefined : {
  background: 'linear-gradient(160deg, rgba(192,223,161,0.14) 0%, rgba(255,255,255,0) 45%, rgba(130,163,161,0.10) 100%)',
  }}
  />
@@ -800,7 +828,7 @@ export default function UploadWizard({
 
  {/* Body */}
  <div ref={bodyScrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
- <div className={`${wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : 'max-w-3xl mx-auto px-5 md:px-8 py-8'}`}>
+ <div className={wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : `${workspaceStep ? 'max-w-7xl' : 'max-w-3xl'} mx-auto px-5 md:px-8 py-8`}>
  <AnimatePresence mode="wait">
  <motion.div
  key={step}
@@ -819,7 +847,7 @@ export default function UploadWizard({
  <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${accentStyle ? accentStyle.title : 'text-gray-800'} `}>
  {meta.title(state)}
  </h1>
- <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'} `}>{meta.subtitle(state)}</p>
+ <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'} `}>{subtitle}</p>
 
  {step === 'entry' && (
  <LogEntryStep
@@ -833,16 +861,6 @@ export default function UploadWizard({
  onCreateLocation={canManageStructure ? () => setLocationModalOpen(true) : undefined}
  onCreateTag={canManageStructure ? handleInlineCreateTag : undefined}
  />
- )}
-
- {step === 'entry' && !evidenceForClaim && (onAdvancedClaim || onAdvancedEvidence) && (
- <details className="hidden md:block mt-5 text-sm text-secondary-500">
- <summary className="cursor-pointer">Entering a reporting period?</summary>
- <div className="flex flex-wrap gap-2 mt-3">
- {canCreateClaim && onAdvancedClaim && <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={() => state.files.length || wizardHasClaims(state) ? setBulkTarget('claim') : onAdvancedClaim()}>Enter results in bulk</button>}
- {canCreateEvidence && onAdvancedEvidence && <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={() => state.files.length || wizardHasClaims(state) ? setBulkTarget('evidence') : onAdvancedEvidence()}>Organize files in bulk</button>}
- </div>
- </details>
  )}
 
  {step === 'metric' && (
@@ -909,7 +927,7 @@ export default function UploadWizard({
  </p>
  </div>
  )}
- <WizardReviewStep
+ <ReviewComponent
  state={state}
  initiativeId={initiativeId}
  kpis={kpis}
@@ -932,6 +950,8 @@ export default function UploadWizard({
  <div className="relative z-10 flex items-center justify-between px-5 py-3 flex-shrink-0 bg-white/80 backdrop-blur border-t border-gray-200/80">
  <div className="min-w-0 mr-4">
  {stepError && <p role="alert" className="text-xs text-red-600">{stepError}</p>}
+ {submitting && <p role="status" className="text-xs text-secondary-600">Saving {saveProgress.saved} of {saveProgress.total} items. Keep this window open.</p>}
+ {!stepError && !submitting && state.logRows && <p className="text-xs text-secondary-500">{buildLogPlan(state).claims.length} results · {state.files.length} files</p>}
  </div>
  <div className="flex items-center gap-2 flex-shrink-0">
  {stepIndex > 0 && (
@@ -953,14 +973,6 @@ export default function UploadWizard({
  )}
  </div>
  </div>
-
- {bulkTarget && (
- <ConfirmDialog title="Switch to bulk entry?" message="The files and details in this log have not been saved. Switching will discard this entry." confirmLabel="Switch to bulk entry" onCancel={() => setBulkTarget(null)} onConfirm={() => {
- discardOrphanUploads()
- if (bulkTarget === 'claim') onAdvancedClaim?.()
- else onAdvancedEvidence?.()
- }} />
- )}
 
  {kpiModalOpen && (
  <CreateKPIModal

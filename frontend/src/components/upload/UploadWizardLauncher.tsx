@@ -5,8 +5,6 @@ import { useTeam } from '../../context/TeamContext'
 import { BeneficiaryGroup, Location, MetricTag, TimelineResponse } from '../../types'
 import { PageLoader } from '../ui'
 import UploadWizard from './UploadWizard'
-import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
-import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 
 interface UploadWizardLauncherProps {
  initiativeId: string
@@ -19,7 +17,7 @@ interface UploadWizardLauncherProps {
  * Self-fetching wrapper around the full-screen UploadWizard for entry points
  * that don't already hold the Timeline payload (the mobile + button, quick
  * actions). Loads everything the wizard needs, then hands over.
- * Uses the same capture form and optional bulk tools as the Logs page.
+ * Uses the same capture workspace as the Logs page.
  */
 export default function UploadWizardLauncher({ initiativeId, programTitle, onClose, onCreated }: UploadWizardLauncherProps) {
  const { canAddImpactClaims, canAddEvidence, canEditMetrics } = useTeam()
@@ -28,7 +26,6 @@ export default function UploadWizardLauncher({ initiativeId, programTitle, onClo
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
  const [tags, setTags] = useState<MetricTag[]>([])
  const [loading, setLoading] = useState(true)
- const [bulk, setBulk] = useState<'claim' | 'evidence' | null>(null)
 
  useEffect(() => {
  let cancelled = false
@@ -61,8 +58,6 @@ export default function UploadWizardLauncher({ initiativeId, programTitle, onClo
  )
  }
 
- if (bulk === 'claim') return <ImpactClaimUploadModal isOpen initiativeId={initiativeId} onClose={onClose} onCreated={onCreated || (() => {})} />
- if (bulk === 'evidence') return <EvidenceUploadModal isOpen initiativeId={initiativeId} onClose={onClose} onCreated={onCreated || (() => {})} />
 
  return (
  <UploadWizard
@@ -70,8 +65,6 @@ export default function UploadWizardLauncher({ initiativeId, programTitle, onClo
  programTitle={programTitle}
  canCreateClaim={canAddImpactClaims}
  canCreateEvidence={canAddEvidence}
- onAdvancedClaim={canAddImpactClaims ? () => setBulk('claim') : undefined}
- onAdvancedEvidence={canAddEvidence ? () => setBulk('evidence') : undefined}
  kpis={data.kpis}
  locations={locations}
  tags={tags}

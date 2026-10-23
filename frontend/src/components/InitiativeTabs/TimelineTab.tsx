@@ -40,8 +40,6 @@ import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
 import EvidenceDetailModal from '../timeline/EvidenceDetailModal'
 import ClaimDetailModal from '../timeline/ClaimDetailModal'
 import ConfirmDialog from '../ConfirmDialog'
-import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
-import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 
 // Each view wears its side's brand color when active: connections are the
 // impact green (the link color), claims are seafoam teal, evidence is the
@@ -133,8 +131,6 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
  const [addEvidenceTarget, setAddEvidenceTarget] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [isWizardOpen, setIsWizardOpen] = useState(false)
- // Advanced flows picked from the wizard's Simple/Advanced step
- const [advancedUpload, setAdvancedUpload] = useState<'claim' | 'evidence' | null>(null)
  const [evidenceMode, setEvidenceMode] = useState<EvidenceViewMode>('list')
 
  const rawView = searchParams.get('view')
@@ -545,8 +541,6 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  canCreateClaim={canAddImpactClaims}
  canCreateEvidence={canAddEvidence}
  lockedMetricId={lockedMetricId}
- onAdvancedClaim={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('claim') }}
- onAdvancedEvidence={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('evidence') }}
  kpis={data.kpis}
  locations={locations}
  tags={tags}
@@ -556,26 +550,6 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  existingClaims={data.claims}
  existingEvidence={data.evidence}
  onClose={() => setIsWizardOpen(false)}
- onCreated={handleLogCreated}
- />
- )}
-
- {/* Advanced claim board (existing multi-claim flow) */}
- {advancedUpload === 'claim' && data && (
- <ImpactClaimUploadModal
- isOpen
- initiativeId={initiativeId}
- onClose={() => setAdvancedUpload(null)}
- onCreated={handleLogCreated}
- />
- )}
-
- {/* Advanced evidence batch organizer (existing kanban flow) */}
- {advancedUpload === 'evidence' && (
- <EvidenceUploadModal
- isOpen
- initiativeId={initiativeId}
- onClose={() => setAdvancedUpload(null)}
  onCreated={handleLogCreated}
  />
  )}

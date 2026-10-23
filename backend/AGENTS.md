@@ -26,7 +26,8 @@
 5. **Types** — Prefer shared types from `src/types/index.ts` for request/response shapes; extend there when adding public contracts.
 6. **Evidence/claim matching** — The five gates (metric, location, date overlap, tag, groups) live in `services/matchService.ts` (`MatchService.explain`). `previewMatches`, `diagnoseEvidence` and `diagnoseClaim` are read-only views over the same function and back the `/preview-matches` and `/match-diagnostics` routes. If you change a gate, change it there and in `evidenceService.ts`'s link/reconcile path together; don't add a third copy.
 7. **Tags attach on use** — `MetricTagService.ensureTagAttachedToKpi` adds a tag to a metric the first time a claim uses it (org-validated). Routes must not reject a claim because the tag isn't already on the metric.
-8. **Program structure** — Templates, structure duplication and readiness are in `services/programStructureService.ts` (`/initiatives/templates`, `/initiatives/from-template`, `/initiatives/:id/duplicate-structure`, `/initiatives/:id/readiness`). None of this requires migrations; it composes existing tables.
+8. **Shared evidence files** — A single upload can belong to several evidence records with different scopes. Removal/editing must check both `evidence_files` and legacy `evidence.file_url` references before deleting storage or decrementing usage. Use `EvidenceService.releaseFiles` and `utils/evidenceFileCleanup.ts`; never delete an upload still referenced by another record.
+9. **Program structure** — Templates, structure duplication and readiness are in `services/programStructureService.ts` (`/initiatives/templates`, `/initiatives/from-template`, `/initiatives/:id/duplicate-structure`, `/initiatives/:id/readiness`). None of this requires migrations; it composes existing tables.
 
 ## Verification
 

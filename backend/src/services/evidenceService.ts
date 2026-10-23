@@ -6,6 +6,7 @@ import { BeneficiaryService } from './beneficiaryService'
 import { MetricTagService } from './metricTagService'
 import { InitiativeService } from './initiativeService'
 import { OrgAccessService } from './orgAccessService'
+import { EvidenceFileReference, releaseEvidenceFiles } from '../utils/evidenceFileCleanup'
 
 /** Columns that actually exist on `public.evidence`. Client payloads also
  *  carry junction/file-set fields (`file_urls`, `file_sizes`, `kpi_ids`, …)
@@ -33,6 +34,23 @@ function pickEvidenceRow(input: Record<string, any>): Record<string, any> {
 }
 
 export class EvidenceService {
+    private static async releaseFiles(files: EvidenceFileReference[], evidenceId: string, organizationId: string | null): Promise<void> {
+        await releaseEvidenceFiles(files, {
+            isReferenced: async (url) => {
+                const [attachments, primaryFiles] = await Promise.all([
+                    supabase.from('evidence_files').select('id', { count: 'exact', head: true }).eq('file_url', url).neq('evidence_id', evidenceId),
+                    supabase.from('evidence').select('id', { count: 'exact', head: true }).eq('file_url', url).neq('id', evidenceId),
+                ])
+                if (attachments.error || primaryFiles.error) throw new Error('Could not check whether an evidence file is still in use')
+                return (attachments.count || 0) > 0 || (primaryFiles.count || 0) > 0
+            },
+            deleteFile: deleteFromSupabase,
+            decrementStorage: async size => {
+                if (organizationId) await StorageService.decrementStorage(organizationId, size)
+            },
+        })
+    }
+
     /**
      * Best-effort cleanup of a half-written evidence row + its junction inserts.
      * Used when a downstream link insert fails inside `create()` so we don't
@@ -100,12 +118,7 @@ export class EvidenceService {
             if (deleteError) {
                 throw new Error(`Failed to remove evidence files: ${deleteError.message}`)
             }
-            for (const f of removed) {
-                await deleteFromSupabase(f.file_url)
-                if (organizationId && (f.file_size || 0) > 0) {
-                    await StorageService.decrementStorage(organizationId, f.file_size)
-                }
-            }
+            await this.releaseFiles(removed, evidenceId, organizationId)
         }
 
         const toInsert = fileUrls
@@ -752,16 +765,11 @@ export class EvidenceService {
         }
 
         // Get all files associated with this evidence (for storage tracking)
-        const { data: evidenceFiles } = await supabase
+        const { data: evidenceFiles, error: filesError } = await supabase
             .from('evidence_files')
-            .select('file_size')
+            .select('file_url, file_size')
             .eq('evidence_id', id);
-
-        // Calculate total file size for storage decrement
-        const totalFileSize = (evidenceFiles || []).reduce(
-            (sum, file) => sum + (file.file_size || 0), 
-            0
-        );
+        if (filesError) throw new Error(`Failed to load evidence files: ${filesError.message}`);
 
         // Delete links first (both legacy and new)
         const { error: linkError } = await supabase
@@ -797,18 +805,12 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to delete evidence: ${error.message}`);
 
-        // Delete file from Supabase Storage if it exists
-        if (evidence?.file_url) {
-            await deleteFromSupabase(evidence.file_url);
-        }
-
-        // Decrement storage usage (Phase 1: tracking only)
-        if (totalFileSize > 0 && evidence?.initiative_id) {
-            const organizationId = await StorageService.getOrganizationIdFromInitiative(evidence.initiative_id);
-            if (organizationId) {
-                await StorageService.decrementStorage(organizationId, totalFileSize);
-            }
-        }
+        const organizationId = evidence?.initiative_id
+            ? await StorageService.getOrganizationIdFromInitiative(evidence.initiative_id) : null;
+        await this.releaseFiles([
+            ...(evidenceFiles || []),
+            ...(evidence?.file_url ? [{ file_url: evidence.file_url }] : []),
+        ], id, organizationId);
 
         return;
     }
@@ -1851,4 +1853,4 @@ export class EvidenceService {
             claimsScanned: claims.length,
         }
     }
-} 
+}
