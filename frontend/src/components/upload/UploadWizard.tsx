@@ -279,7 +279,7 @@ export default function UploadWizard({
     // skip the type step entirely.
     kind: startKind ?? (canCreateEvidence ? 'evidence' : 'claim'),
     entryMode: !isEdit,
-    logRows: isEdit ? undefined : (lockedMetric ? [newLogRow(lockedMetric)] : kpisProp.length === 1 && kpisProp[0].id ? [newLogRow(kpisProp[0].id)] : []),
+    logRows: isEdit ? undefined : (lockedMetric ? [{ ...newLogRow(lockedMetric), keepForEvidence: true }] : kpisProp.length === 1 && kpisProp[0].id ? [{ ...newLogRow(kpisProp[0].id), keepForEvidence: true }] : []),
     // Smart defaults: today, and the only location / metric when there is
     // exactly one. Every one of these is still editable on its step.
     dateMode: 'single',
@@ -828,7 +828,7 @@ export default function UploadWizard({
 
  {/* Body */}
  <div ref={bodyScrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
- <div className={wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : `${workspaceStep ? 'max-w-7xl' : 'max-w-3xl'} mx-auto px-5 md:px-8 py-8`}>
+ <div className={workspaceStep ? 'w-full px-4 sm:px-6 py-4' : wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : 'max-w-3xl mx-auto px-5 md:px-8 py-8'}>
  <AnimatePresence mode="wait">
  <motion.div
  key={step}
@@ -847,7 +847,7 @@ export default function UploadWizard({
  <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${accentStyle ? accentStyle.title : 'text-gray-800'} `}>
  {meta.title(state)}
  </h1>
- <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'} `}>{subtitle}</p>
+ {workspaceStep ? <div className="mb-3" /> : <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'}`}>{subtitle}</p>}
 
  {step === 'entry' && (
  <LogEntryStep

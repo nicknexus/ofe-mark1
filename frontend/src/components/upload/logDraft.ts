@@ -10,6 +10,8 @@ export interface LogMetricRow {
  value: string
  tagValues: Record<string, string>
  overrides: Partial<LogDetails>
+ /** Explicitly included for evidence even when its result is blank. */
+ keepForEvidence?: boolean
 }
 
 export function newLogRow(kpiId: string, id: string = crypto.randomUUID()): LogMetricRow {
@@ -40,6 +42,28 @@ export function rowHasResult(state: WizardState, row: LogMetricRow): boolean {
 
 export function fileRows(state: WizardState, file: WizardFile): LogMetricRow[] {
  return (state.logRows || []).filter(row => file.rowIds === undefined || file.rowIds.includes(row.id))
+}
+
+export function removeLogRow(state: WizardState, id: string): Partial<WizardState> {
+ return {
+  logRows: (state.logRows || []).filter(row => row.id !== id),
+  files: state.files.map(file => ({ ...file, rowIds: file.rowIds?.filter(rowId => rowId !== id) })),
+ }
+}
+
+/** Visible empty cards are not selected. Typing includes one without a picker. */
+export function setLogRowResult(state: WizardState, row: LogMetricRow, value: string): Partial<WizardState> {
+ const next = { ...row, value }
+ if (!rowHasResult(state, next) && !next.keepForEvidence && !Object.keys(next.overrides).length) return removeLogRow(state, row.id)
+ const rows = state.logRows || []
+ return { logRows: rows.some(r => r.id === row.id) ? rows.map(r => r.id === row.id ? next : r) : [...rows, next] }
+}
+
+export function hasAdvancedLogSettings(state: WizardState): boolean {
+ const rows = state.logRows || []
+ return rows.some(row => Object.keys(row.overrides).length > 0)
+  || new Set(rows.map(row => row.kpiId)).size < rows.length
+  || state.files.some(file => file.rowIds !== undefined)
 }
 
 export interface PlannedClaim {
@@ -159,7 +183,7 @@ export function validateLogDraft(state: WizardState, kpis?: Array<{ id?: string;
   if (!start) return 'Choose an activity date for every item'
   if (start > end) return 'The date range is reversed'
  }
- if (plan.evidence.some(e => !e.payload.title)) return 'Give the evidence a short title in shared details or its metric card'
+ if (plan.evidence.some(e => !e.payload.title)) return 'Give the evidence a short title in the master scope or its metric details'
  return null
 }
 

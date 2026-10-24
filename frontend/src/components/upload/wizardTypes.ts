@@ -40,6 +40,8 @@ export interface ClaimEntry {
 export interface WizardState {
  /** Unified capture workspace. Absent for legacy record editing. */
  logRows?: LogMetricRow[]
+ /** Presentation only. Switching views never changes the log's contents. */
+ logMode?: 'simple' | 'advanced'
  kind: WizardKind | null
  /** New logs infer their contents from the form; editing keeps its fixed kind. */
  entryMode?: boolean

@@ -2,13 +2,64 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { INITIAL_WIZARD_STATE, WizardState, validateAll } from './wizardTypes'
-import { buildLogPlan, fileRows, newLogRow, rowDetails, saveLogPlan, LogSaveProgress, matchingLogClaimKeys } from './logDraft'
+import { buildLogPlan, fileRows, newLogRow, rowDetails, saveLogPlan, LogSaveProgress, matchingLogClaimKeys, setLogRowResult, hasAdvancedLogSettings } from './logDraft'
 
 const row = (id: string, kpiId = id) => ({ ...newLogRow(kpiId, id), value: '10' })
 const file = (id: string, rowIds?: string[]): WizardState['files'][number] => ({ id, name: `${id}.jpg`, size: 10, uploadedSize: 8, status: 'done', progress: 100, url: `https://example.test/${id}.jpg`, type: 'visual_proof', rowIds })
 const draft = (patch: Partial<WizardState> = {}): WizardState => ({
  ...INITIAL_WIZARD_STATE, entryMode: true, dateSingle: '2026-10-01', evidenceTitle: 'October workshop',
  locationIds: ['centre'], logRows: [row('students'), row('kits')], ...patch,
+})
+
+test('direct entry includes only the typed metric, accepts zero, and keeps following files in sync', () => {
+ const empty = draft({ logRows: [], files: [file('all')] })
+ const visible = newLogRow('students', 's')
+ assert.deepEqual(buildLogPlan(empty).evidence[0].payload.kpi_ids, [])
+ const typed = { ...empty, ...setLogRowResult(empty, visible, '0') }
+ assert.equal(validateAll(typed), null)
+ assert.deepEqual(buildLogPlan(typed).claims.map(c => c.payload.value), [0])
+ assert.deepEqual(buildLogPlan(typed).evidence[0].payload.kpi_ids, ['students'])
+ const edited = { ...typed, ...setLogRowResult(typed, typed.logRows![0], '25') }
+ assert.equal(edited.logRows!.length, 1)
+ assert.equal(buildLogPlan(edited).claims[0].payload.value, 25)
+ const cleared = { ...edited, ...setLogRowResult(edited, edited.logRows![0], '') }
+ assert.equal(buildLogPlan(cleared).claims.length, 0)
+ assert.deepEqual(buildLogPlan(cleared).evidence[0].payload.kpi_ids, [])
+})
+
+test('clearing a result removes explicit file assignments without broadening them', () => {
+ const state = draft({ files: [file('selected', ['students']), file('all')] })
+ const cleared = { ...state, ...setLogRowResult(state, state.logRows![0], '') }
+ assert.deepEqual(cleared.logRows!.map(r => r.id), ['kits'])
+ assert.deepEqual(cleared.files[0].rowIds, [])
+ assert.equal(cleared.files[1].rowIds, undefined)
+ assert.deepEqual(buildLogPlan(cleared).evidence.map(e => e.payload.kpi_ids), [[], ['kits']])
+})
+
+test('clearing totals retains intentional evidence scopes and incomplete tag allocations', () => {
+ for (const extra of [{ keepForEvidence: true }, { overrides: { locationIds: ['north'] } }]) {
+  const state = draft({ logRows: [{ ...row('students'), ...extra }], files: [file('all')] })
+  const cleared = { ...state, ...setLogRowResult(state, state.logRows![0], '') }
+  assert.equal(cleared.logRows!.length, 1)
+  assert.equal(buildLogPlan(cleared).claims.length, 0)
+  assert.deepEqual(buildLogPlan(cleared).evidence[0].payload.kpi_ids, ['students'])
+ }
+ const tagged = draft({ tagIds: ['a', 'b'], logRows: [{ ...row('students'), tagValues: { a: '6', b: '4' } }] })
+ const cleared = { ...tagged, ...setLogRowResult(tagged, tagged.logRows![0], '') }
+ assert.equal(cleared.logRows!.length, 1)
+ assert.match(validateAll(cleared)!, /total result/)
+})
+
+test('simple and advanced views save the same scopes, amounts and file assignments', () => {
+ assert.equal(hasAdvancedLogSettings(draft()), false)
+ const state = draft({
+  logRows: [row('students'), { ...row('north', 'students'), overrides: { locationIds: ['north'] } }],
+  files: [file('all'), file('selected', ['north']), file('unassigned', [])],
+ })
+ assert.equal(hasAdvancedLogSettings(state), true)
+ assert.equal(hasAdvancedLogSettings(draft({ logRows: [row('a', 'students'), row('b', 'students')] })), true)
+ assert.equal(hasAdvancedLogSettings(draft({ files: [file('unassigned', [])] })), true)
+ assert.deepEqual(buildLogPlan({ ...state, logMode: 'simple' }), buildLogPlan({ ...state, logMode: 'advanced' }))
 })
 
 test('shared changes propagate field by field while explicit empty overrides stay empty', () => {
