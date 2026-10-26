@@ -55,6 +55,10 @@ import {
  GraphicAspect,
  GraphicChrome,
  GraphicCopy,
+ SiteSetupDraft,
+ SiteSetupBranding,
+  SiteSetupApplyStep,
+  SiteSetupStepResult,
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
@@ -1483,6 +1487,42 @@ class ApiService {
  body: JSON.stringify({ messages, stage, context })
  })
  }
+
+ // Set up from your website: chained so each call fits the 60s API limit.
+ async siteScanDiscover(websiteUrl: string): Promise<{ website_url: string; urls: string[] }> {
+ return this.request('/onboarding/site-scan/discover', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl })
+ })
+ }
+
+ async siteScanScrape(websiteUrl: string, urls: string[]): Promise<{ context: string; pages: number }> {
+ return this.request('/onboarding/site-scan/scrape', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl, urls })
+ })
+ }
+
+ async siteScanBranding(websiteUrl: string): Promise<SiteSetupBranding> {
+ return this.request('/onboarding/site-scan/branding', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl })
+ })
+ }
+
+ async siteScanExtract(websiteUrl: string, context: string): Promise<SiteSetupDraft> {
+ return this.request('/onboarding/site-scan/extract', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl, context })
+ })
+ }
+
+  async siteScanApplyStep(step: SiteSetupApplyStep): Promise<SiteSetupStepResult> {
+    return this.request<SiteSetupStepResult>('/onboarding/site-scan/apply', {
+      method: 'POST',
+      body: JSON.stringify(step)
+    })
+  }
 
  async getContentSources(opts?: {
  offset?: number

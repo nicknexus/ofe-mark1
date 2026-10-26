@@ -32,6 +32,7 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import OverviewPage from './pages/OverviewPage'
+import SiteSetupPage from './pages/SiteSetupPage'
 import ContentOrgPage from './pages/ContentOrgPage'
 import ContentPublicPage from './pages/ContentPublicPage'
 import ContentEmbedPage from './pages/ContentEmbedPage'
@@ -873,8 +874,9 @@ function App() {
  <Route path="/*" element={
  <Layout user={user}>
  <Routes>
- <Route index element={<RedirectKeepSearch to="/tracking/programs" />} />
+ <Route index element={<RedirectKeepSearch to="/home" />} />
  <Route path="home" element={<OverviewPage />} />
+ <Route path="setup/website" element={<SiteSetupPage />} />
  <Route path="tracking" element={<RedirectKeepSearch to="/tracking/programs" />} />
  <Route path="tracking/programs" element={<Dashboard />} />
  <Route path="tracking/initiatives" element={<RedirectKeepSearch to="/tracking/programs" />} />

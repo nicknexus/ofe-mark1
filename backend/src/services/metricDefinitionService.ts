@@ -91,24 +91,30 @@ export class MetricDefinitionService {
         const orgId = await this.getOrgId(userId, requestedOrgId);
         if (!orgId) return [];
 
-        const { data: definitions, error } = await supabase
-            .from('metric_definitions')
-            .select('*')
-            .eq('organization_id', orgId)
-            .order('created_at', { ascending: true });
+        // Independent reads run together; each is a full Supabase round trip.
+        const [{ data: definitions, error }, initiatives] = await Promise.all([
+            supabase
+                .from('metric_definitions')
+                .select('*')
+                .eq('organization_id', orgId)
+                .order('created_at', { ascending: true }),
+            // Only initiatives the caller can actually see.
+            InitiativeService.getAll(userId, requestedOrgId),
+        ]);
 
         if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
         if (!definitions || definitions.length === 0) return [];
-
-        // Only initiatives the caller can actually see.
-        const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
         const initiativeById = new Map(initiatives.map((i: any) => [i.id, i]));
+        const definitionIds = definitions.map((d: any) => d.id);
 
-        const { data: instances, error: instancesError } = await supabase
-            .from('kpis')
-            .select('id, definition_id, initiative_id, display_order, kpi_updates(id, value, date_represented)')
-            .in('definition_id', definitions.map((d: any) => d.id))
-            .is('archived_at', null);
+        const [{ data: instances, error: instancesError }, tagsByDefinition] = await Promise.all([
+            supabase
+                .from('kpis')
+                .select('id, definition_id, initiative_id, display_order, kpi_updates(id, value, date_represented)')
+                .in('definition_id', definitionIds)
+                .is('archived_at', null),
+            MetricTagService.getTagIdsForDefinitions(definitionIds),
+        ]);
 
         // Swallowing this would silently render every metric as "Not in use
         // yet" — indistinguishable from a genuinely unattached metric.
@@ -123,10 +129,6 @@ export class MetricDefinitionService {
             arr.push(row);
             byDefinition.set(row.definition_id, arr);
         }
-
-        const tagsByDefinition = await MetricTagService.getTagIdsForDefinitions(
-            definitions.map((d: any) => d.id)
-        );
 
         return definitions.map((def: any) => {
             const rows = byDefinition.get(def.id) || [];

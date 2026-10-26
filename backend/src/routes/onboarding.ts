@@ -1,6 +1,9 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { openai, isOpenAIConfigured } from '../utils/openai';
+import { SiteCrawlError } from '../services/siteCrawlService';
+import { SiteSetupService } from '../services/siteSetupService';
 
 const router = Router();
 
@@ -157,6 +160,93 @@ router.post('/chat', authenticateUser, async (req: AuthenticatedRequest, res) =>
       return;
     }
     res.status(500).json({ error: 'Failed to reach the AI assistant' });
+  }
+});
+
+/**
+ * "Set up from your website". The client chains these calls (each fits inside
+ * the 60s serverless limit): discover → scrape + branding → extract → apply.
+ * Nothing is written until /apply, which takes one item (program, metric,
+ * location, profile) per request.
+ */
+
+// Per-instance memory store: a cost guard against loops, not a hard quota.
+const siteScanLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV !== 'production',
+  keyGenerator: (req) => (req as AuthenticatedRequest).user?.id || req.ip || 'anon',
+  message: { error: 'Too many website scans. Try again in an hour.', code: 'rate_limit' },
+});
+
+function orgHint(req: AuthenticatedRequest): string | undefined {
+  return req.headers['x-organization-id'] as string | undefined;
+}
+
+function sendSetupError(res: Response, step: string, error: unknown) {
+  if (error instanceof SiteCrawlError) {
+    console.warn(`[site-setup] ${step} failed`, { code: error.code, message: error.message.slice(0, 240) });
+    res.status(error.status).json({ error: error.publicMessage, code: error.code });
+    return;
+  }
+  const err = error as any;
+  console.error(`[site-setup] ${step} error:`, err);
+  if (err?.code === 'insufficient_quota' || err?.status === 429) {
+    res.status(503).json({ error: 'The AI is briefly unavailable. Try again in a minute.', code: 'ai_unavailable' });
+    return;
+  }
+  if (err?.name === 'APIConnectionTimeoutError' || err?.name === 'AbortError') {
+    res.status(504).json({ error: 'Reading your website took too long. Try again.', code: 'timeout' });
+    return;
+  }
+  res.status(err?.status === 403 ? 403 : 500).json({ error: err?.message || 'Something went wrong' });
+}
+
+router.post('/site-scan/discover', authenticateUser, siteScanLimiter, async (req: AuthenticatedRequest, res) => {
+  try {
+    res.json(await SiteSetupService.discover(req.user!.id, req.body?.website_url, orgHint(req)));
+  } catch (error) {
+    sendSetupError(res, 'discover', error);
+  }
+});
+
+router.post('/site-scan/scrape', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    res.json(await SiteSetupService.scrape(req.user!.id, {
+      website_url: req.body?.website_url,
+      urls: req.body?.urls,
+    }, orgHint(req)));
+  } catch (error) {
+    sendSetupError(res, 'scrape', error);
+  }
+});
+
+router.post('/site-scan/branding', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    res.json(await SiteSetupService.branding(req.user!.id, req.body?.website_url, orgHint(req)));
+  } catch (error) {
+    sendSetupError(res, 'branding', error);
+  }
+});
+
+router.post('/site-scan/extract', authenticateUser, siteScanLimiter, async (req: AuthenticatedRequest, res) => {
+  try {
+    res.json(await SiteSetupService.extract(req.user!.id, {
+      website_url: req.body?.website_url,
+      context: req.body?.context,
+    }, orgHint(req)));
+  } catch (error) {
+    sendSetupError(res, 'extract', error);
+  }
+});
+
+router.post('/site-scan/apply', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    res.json(await SiteSetupService.applyStep(req.user!.id, req.body, orgHint(req)));
+  } catch (error) {
+    sendSetupError(res, 'apply', error);
   }
 });
 

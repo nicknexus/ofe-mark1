@@ -12,6 +12,7 @@ import ModalFrame from '../components/ModalFrame'
 import { SectionLoader, EmptyState, PageHeader } from '../components/ui'
 import { MetricsHelp } from '../components/tracking/TrackingHelp'
 import { useTeam } from '../context/TeamContext'
+import { readSWR, writeSWR } from '../utils/swrCache'
 
 /**
  * The org's global metrics.
@@ -45,9 +46,12 @@ export default function AllMetricsPage() {
   const { canAddMetrics, canEditMetrics, canDelete, activeOrganization } = useTeam()
   const orgLogoUrl = activeOrganization?.logo_url
 
-  const [definitions, setDefinitions] = useState<MetricDefinitionWithUsage[]>([])
+  const swrKey = activeOrganization?.id ? `metric-definitions:${activeOrganization.id}` : null
+  const [definitions, setDefinitions] = useState<MetricDefinitionWithUsage[]>(
+    () => (swrKey && readSWR<MetricDefinitionWithUsage[]>(swrKey)) || []
+  )
   const [initiatives, setInitiatives] = useState<Initiative[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !(swrKey && readSWR<unknown[]>(swrKey)?.length))
   const [search, setSearch] = useState('')
 
   const [showModal, setShowModal] = useState(false)
@@ -71,12 +75,13 @@ export default function AllMetricsPage() {
       ])
       setDefinitions(defs)
       setInitiatives(inits)
+      if (swrKey) writeSWR(swrKey, defs)
     } catch (err) {
       notify.error((err as Error).message || 'Failed to load metrics')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [swrKey])
 
   useEffect(() => { load() }, [load])
 

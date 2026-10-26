@@ -4,7 +4,7 @@
     "description": "Backend API for Opportunity of Evidence Tool",
     "main": "dist/index.js",
     "scripts": {
-        "dev": "nodemon src/index.ts",
+        "dev": "nodemon --watch src --ext ts,json --exec \"ts-node --transpile-only\" src/index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
         "test": "jest"

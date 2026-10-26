@@ -128,6 +128,14 @@ export class SubscriptionService {
  return apiService.requestCached('/subscription/initiatives-usage')
  }
 
+ static async getLocationsUsage(): Promise<{
+ current: number
+ limit: number | null
+ canCreate: boolean
+ }> {
+ return apiService.requestCached('/subscription/locations-usage')
+ }
+
  /**
  * Feature access for the active org (tier + which features are unlocked).
  * Used to render tags / beneficiary groups in a locked state on Free.

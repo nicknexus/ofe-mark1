@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { FolderKanban, Copy } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { CreateInitiativeForm, Initiative } from '../types'
+import { useSetupOffer, SetupOfferModal } from './setup/SetupOffer'
 
 export type CreateInitiativeSource =
   | { kind: 'blank' }
@@ -70,7 +71,10 @@ export default function CreateInitiativeModal({
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  if (!isOpen) return null
+  const offer = useSetupOffer(isOpen && !editData)
+
+  if (!isOpen || offer.state === 'checking') return null
+  if (offer.state === 'offer') return <SetupOfferModal kind="program" onManual={offer.goManual} onClose={onClose} />
 
   return (
     <ModalFrame zIndexClass="z-[60]" size={editData ? 'sm' : 'md'} onClose={onClose}>

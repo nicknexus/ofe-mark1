@@ -861,3 +861,97 @@ export interface ContentPackage {
  channels_stale?: boolean
  versions?: ContentPost[]
 } 
+// "Set up from your website" draft. Ids (p0, m0, l0) are client-side keys
+// used for cross-references until /onboarding/site-scan/apply persists them.
+export interface SiteSetupProgram {
+ id: string
+ title: string
+ description: string
+  region: string
+  source: string
+  /** Already in the account (rescan): a link target only, never created. */
+  existing_id?: string
+  /** Client-only: reviewed and left out. */
+  skip?: boolean
+}
+
+export interface SiteSetupMetric {
+ id: string
+ title: string
+ description: string
+ metric_type: 'number' | 'percentage'
+ unit_of_measurement: string
+ category: 'input' | 'output' | 'impact'
+  program_ids: string[]
+  rationale: string
+  /** Existing metric that only gets linked to program_ids. */
+  existing_id?: string
+  skip?: boolean
+}
+
+export interface SiteSetupLocation {
+  id: string
+  name: string
+  /** Town or district the place sits in; anchors the geocoder lookup. */
+  area?: string
+  country: string
+ latitude: number | null
+  longitude: number | null
+  program_ids: string[]
+  /** Client-only: the geocoder match the pin is placed on. */
+  place_label?: string
+  /** Client-only: auto lookup state. Undefined means not looked up yet. */
+  geo_status?: 'found' | 'approx' | 'missing' | 'manual'
+  /** Existing location that only gets linked to program_ids. */
+  existing_id?: string
+  skip?: boolean
+}
+
+export interface SiteSetupTitledItem {
+ title: string
+ description: string
+}
+
+export interface SiteSetupStory {
+ problem_statement: string
+ theory_of_change: string
+ theory_of_change_stages: SiteSetupTitledItem[]
+ strategies: SiteSetupTitledItem[]
+}
+
+export interface SiteSetupDraft {
+ website_url: string
+ organization: { description: string; statement: string; donation_url: string }
+ programs: SiteSetupProgram[]
+ metrics: SiteSetupMetric[]
+ locations: SiteSetupLocation[]
+ story: SiteSetupStory
+}
+
+export interface SiteSetupBranding {
+ colors: string[]
+ logo_url: string
+}
+
+export type SiteSetupApplyStep =
+  | { kind: 'program'; program: SiteSetupProgram }
+  | { kind: 'metric'; metric: SiteSetupMetric; program_id_map: Record<string, string> }
+  | { kind: 'location'; location: SiteSetupLocation; program_id_map: Record<string, string> }
+  | {
+    kind: 'profile'
+    website_url: string
+    organization: SiteSetupDraft['organization']
+    story: SiteSetupStory | null
+    branding: { brand_color: string | null; logo_url: string | null }
+  }
+
+export interface SiteSetupStepResult {
+  id: string | null
+  errors: string[]
+}
+
+export interface SiteSetupApplyResult {
+ created: { programs: number; metrics: number; locations: number }
+ first_program_id: string | null
+ errors: string[]
+}

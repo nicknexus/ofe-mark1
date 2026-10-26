@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BarChart3, ChevronRight, Compass, Eye, Globe, LayoutDashboard } from 'lucide-react'
+import { BarChart3, ChevronRight, Compass, Eye, Globe, LayoutDashboard, Sparkles } from 'lucide-react'
 import { apiService } from '../services/api'
 import { Initiative, Location, MetricDefinitionWithUsage, OrganizationContext } from '../types'
 import { useTeam } from '../context/TeamContext'
@@ -9,6 +9,7 @@ import { AppCard, PageLoader, InlineAlert, Skeleton } from '../components/ui'
 import LocationMap from '../components/LocationMap'
 import { getKPIColor } from '../components/metricsDashboard/metricColorPalette'
 import { fadeUp, staggerContainer, easeOut } from '../components/timeline/motion'
+import { lastScannedUrl, wasSetupUsed } from '../components/setup/SetupOffer'
 type CheckItem = { id: string; label: string; done: boolean; to: string }
 type StepTone = 'tracking' | 'share'
 
@@ -115,10 +116,93 @@ function ProgressBar({ pct }: { pct: number }) {
   )
 }
 
+function WebsiteSetupCard({ orgId, defaultUrl }: { orgId: string; defaultUrl: string }) {
+  const navigate = useNavigate()
+  const savedUrl = useMemo(() => {
+    try {
+      return (JSON.parse(localStorage.getItem(`site-setup:${orgId}`) || 'null')?.inputUrl as string) || ''
+    } catch {
+      return ''
+    }
+  }, [orgId])
+  const [url, setUrl] = useState(savedUrl || defaultUrl)
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!url.trim()) return
+    navigate(`/setup/website?url=${encodeURIComponent(url.trim())}`)
+  }
+
+  return (
+    <motion.form
+      onSubmit={submit}
+      className="relative overflow-hidden rounded-2xl p-5 mb-4 flex-shrink-0 text-white bg-gradient-to-br from-primary-900 via-primary-800 to-evidence-700 shadow-app-modal"
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.5, ease: easeOut }}
+    >
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -top-16 -right-12 w-48 h-48 rounded-full bg-primary-400/40 blur-3xl"
+        animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-20 -left-10 w-48 h-48 rounded-full bg-evidence-300/30 blur-3xl"
+        animate={{ scale: [1.15, 1, 1.15] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/15 to-transparent -skew-x-12"
+        initial={{ x: '-150%' }}
+        animate={{ x: '400%' }}
+        transition={{ duration: 2.4, repeat: Infinity, repeatDelay: 3.5, ease: 'easeInOut' }}
+      />
+
+      <div className="relative">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 ring-1 ring-white/25 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
+          <Sparkles className="w-3 h-3" /> About a minute
+        </span>
+        <h2 className="text-xl font-bold leading-tight mt-3">Let us build your account for you</h2>
+        <p className="text-sm text-white/85 mt-1.5 leading-relaxed">
+          Drop your website. We find your programs, metrics, locations and brand, and you approve everything before it is saved.
+        </p>
+        <div className="mt-4 space-y-2">
+          <div className="relative">
+            <Globe className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
+            <input
+              className="app-input pl-10 border-transparent shadow-card"
+              type="text"
+              inputMode="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="yourcharity.org"
+              aria-label="Your website"
+            />
+          </div>
+          <motion.button
+            type="submit"
+            disabled={!url.trim()}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="app-btn w-full bg-primary-500 text-secondary-900 font-semibold shadow-card hover:bg-primary-400 disabled:opacity-60"
+          >
+            {savedUrl && savedUrl === url ? 'Resume my setup' : 'Build my account'} <ChevronRight className="w-4 h-4" />
+          </motion.button>
+        </div>
+      </div>
+    </motion.form>
+  )
+}
+
 export default function OverviewPage() {
   const navigate = useNavigate()
   const {
     isSharedMember,
+    isOwner,
+    isAdmin,
     organizationName,
     ownedOrganization,
     activeOrganization,
@@ -181,6 +265,8 @@ export default function OverviewPage() {
   }, [orgId, reloadTick])
 
   const firstInit = initiatives[0]?.id
+  const showBuildHero = (isOwner || isAdmin) && !wasSetupUsed(orgId)
+    && initiatives.length === 0 && metrics.length === 0 && locations.length === 0
   const o = dashboardOrg
   const orgName = o?.name || organizationName || 'Home'
   const brand = o?.brand_color || '#c0dfa1'
@@ -382,6 +468,7 @@ export default function OverviewPage() {
               <div className="flex items-baseline justify-between gap-2 mb-3 flex-shrink-0">
                 <h2 className="app-card-title">Next steps</h2>
               </div>
+              {showBuildHero && orgId && <WebsiteSetupCard orgId={orgId} defaultUrl={lastScannedUrl(orgId)} />}
               {proveNext.length === 0 && shareNext.length === 0 ? (
                 <div className="flex-1 flex flex-col justify-center py-6">
                   <p className="text-sm font-medium text-secondary-800">You are set</p>

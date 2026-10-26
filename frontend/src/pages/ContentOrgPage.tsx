@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Building2, Link as LinkIcon, Palette } from 'lucide-react'
+import { Building2, Link as LinkIcon, Palette, Sparkles } from 'lucide-react'
 import { BrandingTab } from '../components/account/BrandingTab'
 import { OrganizationTab } from '../components/account/OrganizationTab'
+import { WebsiteImportPanel, hasSavedSetup } from '../components/setup/SetupOffer'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader, PageLoader, InlineAlert } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'about', label: 'About', icon: Building2 },
   { id: 'links', label: 'Links', icon: LinkIcon },
   { id: 'brand', label: 'Brand', icon: Palette },
+  { id: 'website', label: 'Website import', icon: Sparkles },
 ] as const
 
 type OrgTab = (typeof TABS)[number]['id']
@@ -24,6 +26,8 @@ export default function ContentOrgPage() {
   const { activeOrganization, organizationName, refreshPermissions, loading: teamLoading, isOwner, isAdmin } = useTeam()
   const org = activeOrganization
   const canEditShare = isOwner || isAdmin
+  const [hasSavedImport, setHasSavedImport] = useState(() => hasSavedSetup(org?.id))
+  const importOngoing = canEditShare && hasSavedImport
 
   const tabParam = searchParams.get('tab')
   const initialTab: OrgTab = TABS.some(t => t.id === tabParam) ? (tabParam as OrgTab) : 'about'
@@ -110,7 +114,7 @@ export default function ContentOrgPage() {
 
         <div className="flex gap-8">
           <nav className="w-44 flex-shrink-0 sticky top-8 self-start space-y-0.5">
-            {TABS.map(tab => {
+            {TABS.filter(tab => tab.id !== 'website' || canEditShare).map(tab => {
               const active = activeTab === tab.id
               return (
                 <button
@@ -137,6 +141,11 @@ export default function ContentOrgPage() {
                   )}
                   <tab.icon className={`relative z-10 w-4 h-4 ${active ? 'text-primary-800' : 'text-gray-400'}`} />
                   <span className={`relative z-10 ${active ? 'text-gray-900' : 'text-gray-600'}`}>{tab.label}</span>
+                  {tab.id === 'website' && importOngoing && (
+                    <span className="relative z-10 ml-auto text-[10px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 rounded-full px-1.5 py-0.5">
+                      Ongoing
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -144,7 +153,11 @@ export default function ContentOrgPage() {
 
           <div className="flex-1 min-w-0">
             <AnimatePresence mode="wait">
-              {activeTab === 'brand' ? (
+              {activeTab === 'website' && canEditShare ? (
+                <motion.div key="website" {...viewSwap}>
+                  <WebsiteImportPanel readOnly={!canEditShare} onDiscard={() => setHasSavedImport(false)} />
+                </motion.div>
+              ) : activeTab === 'brand' ? (
                 <motion.div key="brand" {...viewSwap}>
                   <BrandingTab
                     organizationName={organizationName}
@@ -165,7 +178,7 @@ export default function ContentOrgPage() {
                   <OrganizationTab
                     organization={org}
                     refreshPermissions={refreshPermissions}
-                    section={activeTab}
+                    section={activeTab === 'website' ? 'about' : activeTab}
                     readOnly={!canEditShare}
                   />
                 </motion.div>
