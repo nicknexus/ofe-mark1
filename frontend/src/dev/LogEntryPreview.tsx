@@ -23,15 +23,15 @@ const sample = (): WizardState => ({
  ...blank(), evidenceTitle: 'October skills workshop', evidenceDescription: 'Practical training and starter kits for the new cohort.', locationIds: ['centre'], tagIds: ['sewing'],
  logRows: [{ ...newLogRow('people', 'people'), value: '24' }, { ...newLogRow('kits', 'kits'), value: '18' }],
  files: [
-  { id: 'photo', name: 'Workshop photo.jpg', type: 'visual_proof', size: 1200000, url: '/fixture-photo', status: 'done', progress: 100 },
+  { id: 'photo', name: 'Workshop photo.jpg', type: 'visual_proof', size: 1200000, url: '/fixture-photo', previewUrl: '/stories.jpg', status: 'done', progress: 100 },
   { id: 'attendance', name: 'Attendance register.pdf', type: 'documentation', size: 280000, url: '/fixture-attendance', status: 'done', progress: 100 },
   { id: 'notes', name: 'Field notes.pdf', type: 'documentation', size: 42000, url: '/fixture-notes', status: 'done', progress: 100 },
  ],
 })
 
-const advancedSample = (): WizardState => {
+const scopedSample = (): WizardState => {
  const state = sample()
- return { ...state, logMode: 'advanced',
+ return { ...state,
   logRows: [...state.logRows!, { ...newLogRow('people', 'north-people'), value: '12', overrides: { locationIds: ['north'] } }],
   files: state.files.map(file => ({ ...file, rowIds: file.id === 'attendance' ? ['people'] : file.id === 'notes' ? [] : undefined })),
  }
@@ -41,7 +41,7 @@ function Preview() {
  const query = new URLSearchParams(window.location.search)
  const embedded = query.has('embedded')
  const [sampleKind, setSampleKind] = useState(query.get('sample') || 'simple')
- const [state, setState] = useState(() => sampleKind === 'empty' ? blank() : sampleKind === 'advanced' ? advancedSample() : sample())
+ const [state, setState] = useState(() => sampleKind === 'empty' ? blank() : sampleKind === 'scoped' ? scopedSample() : sample())
  const [scenario, setScenario] = useState(0)
  const [manyMetrics, setManyMetrics] = useState(query.get('many') === '1')
  const availableKpis = manyMetrics ? [...kpis, ...extraKpis] : kpis
@@ -61,16 +61,17 @@ function Preview() {
  return <div className="min-h-dvh app-canvas text-secondary-700">
   {!embedded && <div className="px-5 py-3 bg-white border-b border-gray-200 flex flex-wrap gap-3 items-center justify-between">
    <p className="text-xs text-secondary-500">Development preview · Sample data only · No records are uploaded or saved</p>
-   <div className="flex flex-wrap gap-2"><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => reset(blank(), 'empty')}>Start empty</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => reset(sample())}>Sample log</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => reset(advancedSample(), 'advanced')}>Advanced sample</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => setManyMetrics(!manyMetrics)}>{manyMetrics ? '3 metrics' : '24 metrics'}</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => setMobile(!mobile)}>{mobile ? 'Desktop preview' : 'Mobile preview'}</button></div>
+   <div className="flex flex-wrap gap-2"><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => reset(blank(), 'empty')}>Start empty</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => reset(sample())}>Sample log</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => reset(scopedSample(), 'scoped')}>Multiple scopes</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => setManyMetrics(!manyMetrics)}>{manyMetrics ? '3 metrics' : '24 metrics'}</button><button className="app-btn app-btn-secondary app-btn-sm" onClick={() => setMobile(!mobile)}>{mobile ? 'Desktop preview' : 'Mobile preview'}</button></div>
   </div>}
   {mobile ? <div className="py-6 flex justify-center"><iframe key={`${scenario}-${manyMetrics}`} title="Mobile log workspace" src={`/dev/log-entry.html?embedded=1&sample=${sampleKind}&many=${manyMetrics ? 1 : 0}`} className="w-[390px] h-[820px] max-w-full rounded-xl border border-gray-200 shadow-card" /></div> : <>
-   <header className="bg-white border-b border-gray-200 px-5 py-3 text-xs text-secondary-500">{step === 'entry' ? '1. Add log' : '1. Add log  /  2. Review'}<span className="float-right">NEXUS</span></header>
+   <header className="bg-white border-b border-gray-200 px-5 py-3 text-xs text-secondary-500 flex items-center justify-between gap-4">{step === 'entry' ? '1. Add log' : '1. Add log  /  2. Review'}<span className="truncate">Community skills program</span></header>
    <main className={`${step === 'entry' ? 'w-full px-4 sm:px-6 py-4' : 'max-w-3xl mx-auto px-5 md:px-8 py-7'} pb-28`}>
-    <p className="text-xs text-secondary-500 mb-1">Community skills program</p>
-    <h1 className="app-page-title">{step === 'entry' ? 'Add log' : step === 'review' ? 'Review & save' : 'Preview saved'}</h1>
-    {step === 'entry' ? <div className="mb-3" /> : <p className="app-page-subtitle mt-1 mb-6">{step === 'review' ? 'Check the details and connections before saving.' : 'The simulated save completed. No real records were created.'}</p>}
+    {step === 'entry' ? <h1 className="sr-only">Add log to Community skills program</h1> : <>
+     <h1 className="app-page-title">{step === 'review' ? 'Review & save' : 'Preview saved'}</h1>
+     <p className="app-page-subtitle mt-1 mb-6">{step === 'review' ? 'Check the details and connections before saving.' : 'The simulated save completed. No real records were created.'}</p>
+    </>}
     {step === 'entry' && <LogEntryStep key={scenario} state={state} update={update} kpis={availableKpis} locations={locations} tags={tags} beneficiaryGroups={beneficiaryGroups} canCreateClaim canCreateEvidence datePickerRef={null}
-     onAddFiles={files => update({ files: [...state.files, ...files.map(f => ({ id: crypto.randomUUID(), name: f.name, size: f.size, type: inferEvidenceType(f.name, f.type), status: 'done' as const, progress: 100, url: URL.createObjectURL(f), raw: f }))] })}
+     onAddFiles={files => update({ files: [...state.files, ...files.map(f => ({ id: crypto.randomUUID(), name: f.name, size: f.size, type: inferEvidenceType(f.name, f.type), status: 'done' as const, progress: 100, url: URL.createObjectURL(f), previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined, raw: f }))] })}
      onRemoveFile={id => update({ files: state.files.filter(f => f.id !== id) })} onRetryFile={() => {}}
      onSetFileType={(id, type) => update({ files: state.files.map(f => f.id === id ? { ...f, type } : f) })}
      onSetAllTypes={type => update({ files: state.files.map(f => ({ ...f, type })) })} />}

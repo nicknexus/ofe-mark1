@@ -44,6 +44,17 @@ export function fileRows(state: WizardState, file: WizardFile): LogMetricRow[] {
  return (state.logRows || []).filter(row => file.rowIds === undefined || file.rowIds.includes(row.id))
 }
 
+/** Both file and metric controls change the same assignment, never the upload. */
+export function setLogFileRow(state: WizardState, fileId: string, rowId: string, included: boolean): Partial<WizardState> {
+ if (!state.logRows?.some(row => row.id === rowId)) return {}
+ return { files: state.files.map(file => {
+  if (file.id !== fileId) return file
+  const selected = fileRows(state, file).map(row => row.id)
+  if (selected.includes(rowId) === included) return file
+  return { ...file, rowIds: included ? [...selected, rowId] : selected.filter(id => id !== rowId) }
+ }) }
+}
+
 export function removeLogRow(state: WizardState, id: string): Partial<WizardState> {
  return {
   logRows: (state.logRows || []).filter(row => row.id !== id),
@@ -57,13 +68,6 @@ export function setLogRowResult(state: WizardState, row: LogMetricRow, value: st
  if (!rowHasResult(state, next) && !next.keepForEvidence && !Object.keys(next.overrides).length) return removeLogRow(state, row.id)
  const rows = state.logRows || []
  return { logRows: rows.some(r => r.id === row.id) ? rows.map(r => r.id === row.id ? next : r) : [...rows, next] }
-}
-
-export function hasAdvancedLogSettings(state: WizardState): boolean {
- const rows = state.logRows || []
- return rows.some(row => Object.keys(row.overrides).length > 0)
-  || new Set(rows.map(row => row.kpiId)).size < rows.length
-  || state.files.some(file => file.rowIds !== undefined)
 }
 
 export interface PlannedClaim {

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { INITIAL_WIZARD_STATE, WizardState, validateAll } from './wizardTypes'
-import { buildLogPlan, fileRows, newLogRow, rowDetails, saveLogPlan, LogSaveProgress, matchingLogClaimKeys, setLogRowResult, hasAdvancedLogSettings } from './logDraft'
+import { buildLogPlan, fileRows, newLogRow, rowDetails, saveLogPlan, LogSaveProgress, matchingLogClaimKeys, setLogRowResult, setLogFileRow } from './logDraft'
 
 const row = (id: string, kpiId = id) => ({ ...newLogRow(kpiId, id), value: '10' })
 const file = (id: string, rowIds?: string[]): WizardState['files'][number] => ({ id, name: `${id}.jpg`, size: 10, uploadedSize: 8, status: 'done', progress: 100, url: `https://example.test/${id}.jpg`, type: 'visual_proof', rowIds })
@@ -50,16 +50,47 @@ test('clearing totals retains intentional evidence scopes and incomplete tag all
  assert.match(validateAll(cleared)!, /total result/)
 })
 
-test('simple and advanced views save the same scopes, amounts and file assignments', () => {
- assert.equal(hasAdvancedLogSettings(draft()), false)
- const state = draft({
-  logRows: [row('students'), { ...row('north', 'students'), overrides: { locationIds: ['north'] } }],
-  files: [file('all'), file('selected', ['north']), file('unassigned', [])],
- })
- assert.equal(hasAdvancedLogSettings(state), true)
- assert.equal(hasAdvancedLogSettings(draft({ logRows: [row('a', 'students'), row('b', 'students')] })), true)
- assert.equal(hasAdvancedLogSettings(draft({ files: [file('unassigned', [])] })), true)
- assert.deepEqual(buildLogPlan({ ...state, logMode: 'simple' }), buildLogPlan({ ...state, logMode: 'advanced' }))
+test('detaching a file from one tagged scope preserves the upload and the other scope', () => {
+ const state = draft({ logRows: [
+  { ...row('culinary', 'participants'), overrides: { tagIds: ['culinary'] } },
+  { ...row('sewing', 'participants'), overrides: { tagIds: ['sewing'] } },
+ ], files: [file('photo'), file('register')] })
+ const changed = { ...state, ...setLogFileRow(state, 'photo', 'sewing', false) }
+ assert.equal(changed.files.length, 2)
+ assert.equal(changed.files[0].url, state.files[0].url)
+ assert.equal(changed.files[0].status, 'done')
+ assert.deepEqual(fileRows(changed, changed.files[0]).map(r => r.id), ['culinary'])
+ assert.equal(changed.files[1], state.files[1])
+ const plan = buildLogPlan(changed)
+ const photo = plan.evidence.find(e => e.files.some(f => f.id === 'photo'))!
+ assert.deepEqual(photo.payload.tag_ids, ['culinary'])
+ assert.deepEqual(matchingLogClaimKeys(plan.claims, photo), [plan.claims[0].key])
+ const restored = { ...changed, ...setLogFileRow(changed, 'photo', 'sewing', true) }
+ assert.deepEqual(fileRows(restored, restored.files[0]).map(r => r.id), ['culinary', 'sewing'])
+ assert.equal(restored.files.length, 2)
+})
+
+test('detaching the last scope saves the file unassigned and restoration does not duplicate links', () => {
+ const state = draft({ logRows: [row('students')], files: [file('photo')] })
+ const detached = { ...state, ...setLogFileRow(state, 'photo', 'students', false) }
+ assert.deepEqual(detached.files[0].rowIds, [])
+ assert.equal(validateAll(detached), null)
+ assert.deepEqual(buildLogPlan(detached).evidence[0].claimKeys, [])
+ const restored = { ...detached, ...setLogFileRow(detached, 'photo', 'students', true) }
+ const repeated = { ...restored, ...setLogFileRow(restored, 'photo', 'students', true) }
+ assert.deepEqual(repeated.files[0].rowIds, ['students'])
+ assert.equal(buildLogPlan(repeated).evidence[0].claimKeys.length, 1)
+ assert.deepEqual(setLogFileRow(state, 'photo', 'missing', false), {})
+})
+
+test('new uploads follow all scopes after other files have custom assignments', () => {
+ const state = draft({ files: [file('photo')] })
+ const changed = { ...state, ...setLogFileRow(state, 'photo', 'students', false) }
+ const added = { ...changed, files: [...changed.files, file('new')] }
+ assert.deepEqual(fileRows(added, added.files[0]).map(r => r.id), ['kits'])
+ assert.deepEqual(fileRows(added, added.files[1]).map(r => r.id), ['students', 'kits'])
+ const unchanged = { ...added, ...setLogFileRow(added, 'new', 'students', true) }
+ assert.equal(unchanged.files[1].rowIds, undefined)
 })
 
 test('shared changes propagate field by field while explicit empty overrides stay empty', () => {

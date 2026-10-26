@@ -55,25 +55,22 @@ export default function LogDetailsFields({ value, onChange, locations, tags, ben
      </div>
     </fieldset>
    </div>
-   <div className={`grid gap-3 ${id === 'shared' ? 'sm:grid-cols-3' : ''}`}>
-    <details>
-     <summary className="cursor-pointer text-xs font-medium text-secondary-700">Description{value.evidenceDescription ? ' (added)' : ''}</summary>
-     <div className="flex justify-end mb-1">{reset(['evidenceDescription'])}</div>
-     <textarea aria-label="Description" className="app-input mt-2" rows={2} value={value.evidenceDescription} onChange={e => onChange({ evidenceDescription: e.target.value })} placeholder="What happened?" />
-    </details>
-    <fieldset disabled={locked} className={`grid gap-3 min-w-0 ${id === 'shared' ? 'sm:col-span-2 sm:grid-cols-2' : ''}`}>
-     {(tags.length > 0 || onCreateTag) && <details>
-      <summary className="cursor-pointer text-xs font-medium text-secondary-700">Tags{value.tagIds.length ? ` (${value.tagIds.length})` : ''}</summary>
-      <div className="flex justify-end my-1">{reset(['tagIds'])}</div>
-      <ScopeChips icon={Tag} label="Tags" hideHeader allowAll={false} options={tags.map(t => ({ id: t.id, name: t.name }))} selected={value.tagIds} onChange={tagIds => onChange({ tagIds })} onCreate={onCreateTag ? name => onCreateTag(name || '') : undefined} createLabel="New tag" createInline />
-     </details>}
-     {beneficiaryGroups.length > 0 && <details>
-      <summary className="cursor-pointer text-xs font-medium text-secondary-700">Beneficiary groups{value.beneficiaryGroupIds.length ? ` (${value.beneficiaryGroupIds.length})` : ''}</summary>
-      <div className="flex justify-end my-1">{reset(['beneficiaryGroupIds'])}</div>
-      <ScopeChips icon={Users} label="Beneficiary groups" hideHeader options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))} selected={value.beneficiaryGroupIds} onChange={beneficiaryGroupIds => onChange({ beneficiaryGroupIds })} />
-     </details>}
-    </fieldset>
+   <div>
+    <div className="flex items-center justify-between gap-2 mb-1"><label htmlFor={`${id}-description`} className="app-label !mb-0">Description</label>{reset(['evidenceDescription'])}</div>
+    <textarea id={`${id}-description`} className="app-input" rows={2} value={value.evidenceDescription} onChange={e => onChange({ evidenceDescription: e.target.value })} placeholder="What happened?" />
    </div>
+   <fieldset disabled={locked} className={`grid gap-3 min-w-0 ${id === 'shared' ? 'sm:grid-cols-2' : ''}`}>
+    {(tags.length > 0 || onCreateTag) && <details>
+     <summary className="cursor-pointer text-xs font-medium text-secondary-700">Tags{value.tagIds.length ? ` (${value.tagIds.length})` : ''}</summary>
+     <div className="flex justify-end my-1">{reset(['tagIds'])}</div>
+     <ScopeChips icon={Tag} label="Tags" hideHeader allowAll={false} options={tags.map(t => ({ id: t.id, name: t.name }))} selected={value.tagIds} onChange={tagIds => onChange({ tagIds })} onCreate={onCreateTag ? name => onCreateTag(name || '') : undefined} createLabel="New tag" createInline />
+    </details>}
+    {beneficiaryGroups.length > 0 && <details>
+     <summary className="cursor-pointer text-xs font-medium text-secondary-700">Beneficiary groups{value.beneficiaryGroupIds.length ? ` (${value.beneficiaryGroupIds.length})` : ''}</summary>
+     <div className="flex justify-end my-1">{reset(['beneficiaryGroupIds'])}</div>
+     <ScopeChips icon={Users} label="Beneficiary groups" hideHeader options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))} selected={value.beneficiaryGroupIds} onChange={beneficiaryGroupIds => onChange({ beneficiaryGroupIds })} />
+    </details>}
+   </fieldset>
   </div>
  )
 }

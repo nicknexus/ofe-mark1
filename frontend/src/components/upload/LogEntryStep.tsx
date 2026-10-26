@@ -4,7 +4,8 @@ import type { BeneficiaryGroup, Evidence, KPI, Location, MetricTag, TimelineClai
 import type { DateRangePickerHandle } from '../DateRangePicker'
 import FileDropList from './FileDropList'
 import LogDetailsFields from './LogDetailsFields'
-import { fileRows, hasAdvancedLogSettings, LogDetails, LogMetricRow, logDates, newLogRow, removeLogRow, rowDetails, rowHasResult, setLogRowResult, sharedLogDetails } from './logDraft'
+import MetricEvidence from './MetricEvidence'
+import { fileRows, LogDetails, LogMetricRow, logDates, newLogRow, removeLogRow, rowDetails, rowHasResult, setLogFileRow, setLogRowResult, sharedLogDetails } from './logDraft'
 import type { WizardState } from './wizardTypes'
 
 interface LogEntryStepProps {
@@ -29,13 +30,13 @@ interface LogEntryStepProps {
  onCreateTag?: (name: string) => Promise<void>
 }
 
-/** Simple and advanced are views of the same draft and use the same save plan. */
+/** One workspace with per-metric details and per-file assignments on demand. */
 export default function LogEntryStep({ state, update, kpis, locations, tags, beneficiaryGroups, canCreateClaim, canCreateEvidence, lockedMetricId, evidenceForClaim, onAddFiles, onRemoveFile, onRetryFile, onSetFileType, onSetAllTypes, onCreateMetric, onCreateLocation, onCreateTag }: LogEntryStepProps) {
  const [showTypes, setShowTypes] = useState(false)
  const [search, setSearch] = useState('')
  const rows = state.logRows || []
- const customSettings = hasAdvancedLogSettings(state)
- const advanced = (state.logMode ?? (customSettings ? 'advanced' : 'simple')) === 'advanced'
+ const [expandedFileId, setExpandedFileId] = useState<string | null>(null)
+ const toggleFile = (id: string) => setExpandedFileId(current => current === id ? null : id)
  const metrics = lockedMetricId ? kpis.filter(k => k.id === lockedMetricId) : kpis
  const setRow = (row: LogMetricRow, patch: Partial<LogMetricRow>) => update({
   logRows: rows.some(r => r.id === row.id) ? rows.map(r => r.id === row.id ? { ...r, ...patch } : r) : [...rows, { ...row, ...patch }],
@@ -59,36 +60,24 @@ export default function LogEntryStep({ state, update, kpis, locations, tags, ben
  const missing = rows.filter(row => !kpis.some(kpi => kpi.id === row.kpiId))
  const visibleCards = cards.filter(({ kpi }) => kpi.title.toLowerCase().includes(search.trim().toLowerCase()))
 
- return <div className="space-y-3">
-  <div className="flex flex-wrap items-center justify-between gap-2">
-   <p className="app-help">{evidenceForClaim ? 'Add evidence for this result.' : !canCreateClaim ? 'Add evidence for your program.' : !canCreateEvidence ? 'Record results for your metrics.' : 'Add results, evidence, or both.'}</p>
-   {!evidenceForClaim && <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-secondary-700">
-    <input type="checkbox" role="switch" checked={advanced} onChange={e => update({ logMode: e.target.checked ? 'advanced' : 'simple' })} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-    Advanced mode
-   </label>}
-  </div>
-  {!advanced && customSettings && <p className="text-xs text-amber-700 flex flex-wrap items-center gap-x-2 gap-y-1" role="status">
-   Custom scopes and file assignments are still applied.
-   <button type="button" onClick={() => update({ logMode: 'advanced' })} className="font-medium underline">Edit in Advanced mode</button>
-  </p>}
+ return (
   <div className={`grid items-start gap-4 ${canCreateEvidence ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : ''}`}>
-   {canCreateEvidence && <aside className="app-card p-4 min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-13rem)] lg:overflow-y-auto" aria-labelledby="log-files-heading">
+   {canCreateEvidence && <aside className="app-card p-4 min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto" aria-labelledby="log-files-heading">
     <div className="flex items-center justify-between gap-2 mb-3">
      <h2 id="log-files-heading" className="app-card-title flex items-center gap-2"><FileText className="w-4 h-4 text-evidence-600" /> Evidence <span className="app-chip">{state.files.length}</span></h2>
-     {(advanced || evidenceForClaim) && state.files.length > 0 && <button type="button" onClick={() => setShowTypes(v => !v)} aria-expanded={showTypes} className="app-btn app-btn-ghost app-btn-sm">Types</button>}
+     {state.files.length > 0 && <button type="button" onClick={() => setShowTypes(v => !v)} aria-expanded={showTypes} className="app-btn app-btn-ghost app-btn-sm">Types</button>}
     </div>
-    <FileDropList files={state.files} onAddFiles={onAddFiles} onRemoveFile={onRemoveFile} onRetryFile={onRetryFile} compact showTypePicker={(advanced || !!evidenceForClaim) && showTypes} onSetFileType={onSetFileType} onSetAllTypes={onSetAllTypes} renderFileDetails={advanced && !evidenceForClaim ? file => {
+    <FileDropList files={state.files} onAddFiles={onAddFiles} onRemoveFile={onRemoveFile} onRetryFile={onRetryFile} compact showTypePicker={showTypes} onSetFileType={onSetFileType} onSetAllTypes={onSetAllTypes} onFileClick={evidenceForClaim ? undefined : toggleFile} expandedFileId={expandedFileId} renderFileDetails={!evidenceForClaim ? file => {
      const selected = fileRows(state, file)
-     const setAssignment = (rowIds: string[] | undefined, all = false) => update({ files: state.files.map(f => all || f.id === file.id ? { ...f, rowIds } : f) })
-     return <details className="border-t border-gray-100 pt-2">
-      <summary className="cursor-pointer text-xs font-medium text-primary-700">{file.rowIds === undefined ? 'All included metrics' : selected.length ? `${selected.length} scope${selected.length === 1 ? '' : 's'} selected` : 'Unassigned'}</summary>
+     const setAssignment = (rowIds: string[] | undefined) => update({ files: state.files.map(f => f.id === file.id ? { ...f, rowIds } : f) })
+     return <details open={expandedFileId === file.id} className="border-t border-gray-100 pt-2">
+      <summary onClick={e => { e.preventDefault(); toggleFile(file.id) }} className="cursor-pointer text-xs font-medium text-primary-700">{file.rowIds === undefined ? 'All included metrics' : selected.length ? `${selected.length} scope${selected.length === 1 ? '' : 's'} selected` : 'Unassigned'}</summary>
       <div className="mt-3 space-y-2">
        <label className="flex gap-2 text-xs text-secondary-700 items-start"><input type="checkbox" className="rounded border-gray-300 text-primary-600 mt-0.5" checked={file.rowIds === undefined} onChange={e => setAssignment(e.target.checked ? undefined : selected.map(r => r.id))} /><span>All included metrics</span></label>
-       {rows.map(row => <label key={row.id} className="flex gap-2 text-xs text-secondary-700 items-start"><input type="checkbox" className="rounded border-gray-300 text-primary-600 mt-0.5" checked={selected.some(r => r.id === row.id)} onChange={e => setAssignment(e.target.checked ? [...selected.map(r => r.id), row.id] : selected.filter(r => r.id !== row.id).map(r => r.id))} /><span>{rowName(row)}</span></label>)}
+       {rows.map(row => <label key={row.id} className="flex gap-2 text-xs text-secondary-700 items-start"><input type="checkbox" className="rounded border-gray-300 text-primary-600 mt-0.5" checked={selected.some(r => r.id === row.id)} onChange={e => update(setLogFileRow(state, file.id, row.id, e.target.checked))} /><span>{rowName(row)}</span></label>)}
        {rows.length === 0 && <p className="app-help">Enter a result or include a metric for evidence.</p>}
        {selected.length > 0 && <p className="app-help">Other results with matching details also connect automatically.</p>}
        <button type="button" className="text-xs text-secondary-500 hover:underline" onClick={() => setAssignment([])}>Leave unassigned</button>
-       {state.files.length > 1 && <button type="button" className="block text-xs text-primary-700 hover:underline" onClick={() => setAssignment(file.rowIds, true)}>Apply to all files</button>}
       </div>
      </details>
     } : undefined} />
@@ -99,7 +88,7 @@ export default function LogEntryStep({ state, update, kpis, locations, tags, ben
     <section className="app-card p-4" aria-labelledby="log-context-heading">
      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
       <h2 id="log-context-heading" className="app-card-title flex items-center gap-2"><Settings2 className="w-4 h-4 text-primary-700" /> Master scope</h2>
-      <p className="app-help">{evidenceForClaim ? 'Date and scope come from the result.' : 'Applies to every metric. Fine-tune in Advanced mode.'}</p>
+      <p className="app-help">{evidenceForClaim ? 'Date and scope come from the result.' : 'Applies to every metric unless you edit its details.'}</p>
      </div>
      <LogDetailsFields {...fieldProps} id="shared" value={sharedLogDetails(state)} onChange={update} locked={!!evidenceForClaim} onCreateLocation={onCreateLocation} onCreateTag={onCreateTag} />
     </section>
@@ -148,16 +137,13 @@ export default function LogEntryStep({ state, update, kpis, locations, tags, ben
           {canCreateClaim ? 'Include for evidence only' : 'Include for evidence'}
          </label> : included && <span className="flex items-center gap-1 text-xs text-primary-700"><Check className="w-3 h-3" /> Included</span>}
          {customCount > 0 && <span className="block text-xs text-amber-700">Custom scope</span>}
-         {advanced && <details className="border-t border-gray-100 pt-2">
+         <details className="border-t border-gray-100 pt-2">
           <summary className="cursor-pointer text-xs font-medium text-secondary-700">Edit details</summary>
+          {canCreateEvidence && included && <div className="mt-3 mb-4"><MetricEvidence files={state.files} attachedIds={supportedFiles.map(file => file.id)} metricLabel={`${kpi.title}, scope ${scope}`} onSetAttached={(fileId, attached) => update(setLogFileRow(state, fileId, row.id, attached))} /></div>}
           <div className="mt-3"><LogDetailsFields {...fieldProps} id={row.id} value={details} onChange={setDetails} overrides={row.overrides} onReset={resetDetails} /></div>
           {customCount > 0 && <button type="button" onClick={() => setRow(row, { overrides: {} })} className="text-xs text-primary-700 hover:underline mt-3">Use master scope</button>}
-          {canCreateEvidence && <div className="border-t border-gray-100 mt-3 pt-3">
-           <p className="text-xs text-secondary-500">{supportedFiles.length} supporting file{supportedFiles.length === 1 ? '' : 's'}</p>
-           <ul className="mt-1 text-xs text-secondary-500 space-y-1">{supportedFiles.map(file => <li key={file.id} className="truncate">{file.name}</li>)}</ul>
-          </div>}
           {included && <button type="button" onClick={() => update({ logRows: [...rows, { ...newLogRow(row.kpiId), overrides: { ...row.overrides } }] })} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline mt-3"><Copy className="w-3 h-3" /> Add another scope</button>}
-         </details>}
+         </details>
         </div>
        </article>
       })}
@@ -167,5 +153,5 @@ export default function LogEntryStep({ state, update, kpis, locations, tags, ben
     </section>}
    </div>
   </div>
- </div>
+ )
 }

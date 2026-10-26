@@ -16,6 +16,8 @@ const TYPE_META = (t: Evidence['type']) => FILE_TYPES.find(ft => ft.value === t)
 
 interface FileDropListProps {
  renderFileDetails?: (file: WizardFile) => React.ReactNode
+ onFileClick?: (fileId: string) => void
+ expandedFileId?: string | null
  files: WizardFile[]
  onAddFiles: (files: File[]) => void
  onRemoveFile: (fileId: string) => void
@@ -30,7 +32,7 @@ interface FileDropListProps {
 }
 
 /** Drop zone + uploading file tiles, shared by the wizard and quick-add dialogs. */
-export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes, renderFileDetails }: FileDropListProps) {
+export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes, renderFileDetails, onFileClick, expandedFileId }: FileDropListProps) {
  const fileInputRef = useRef<HTMLInputElement>(null)
  // Per-row type dropdown, positioned via portal so it never clips inside the
  // scrollable modal body.
@@ -51,9 +53,7 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
  const fileTile = (file: WizardFile, withTypeBox: boolean) => {
   const activeType = file.type || 'documentation'
   const meta = TYPE_META(activeType)
-  return (
-   <div key={file.id} className="rounded-xl border border-gray-200 bg-white">
-   <div className="flex items-center gap-2.5 px-3 py-2">
+  const identity = <>
     {file.previewUrl ? (
      <img src={file.previewUrl} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100 flex-shrink-0" />
     ) : (
@@ -73,6 +73,12 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
       {file.status === 'error' && (file.error || 'Upload failed')}
      </p>
     </div>
+  </>
+  return (
+   <div key={file.id} className="rounded-xl border border-gray-200 bg-white">
+   <div className="flex items-center gap-2.5 px-3 py-2">
+    {onFileClick ? <button type="button" onClick={() => onFileClick(file.id)} aria-expanded={expandedFileId === file.id} aria-label={`Assign ${file.name} to metrics`} className="flex items-center gap-2.5 min-w-0 flex-1 text-left rounded-lg hover:bg-gray-50 focus-visible:outline focus-visible:outline-primary-500">{identity}</button>
+     : <div className="flex items-center gap-2.5 min-w-0 flex-1">{identity}</div>}
     {withTypeBox && file.status !== 'error' && (
      <button
       type="button"

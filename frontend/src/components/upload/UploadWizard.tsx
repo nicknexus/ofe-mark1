@@ -816,6 +816,7 @@ export default function UploadWizard({
  )
  })}
  </div>
+ {workspaceStep && programTitle && <p className="ml-auto pl-4 text-xs text-secondary-500 truncate">{programTitle}</p>}
  <button
  onClick={handleClose}
  disabled={submitting}
@@ -843,11 +844,13 @@ export default function UploadWizard({
  {accentStyle.label}
  </span>
  )}
+ {workspaceStep ? <h1 className="sr-only">Add log{programTitle ? ` to ${programTitle}` : ''}</h1> : <>
  {programTitle && <p className="text-xs font-medium text-secondary-500 mb-1">{programTitle}</p>}
- <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${accentStyle ? accentStyle.title : 'text-gray-800'} `}>
+ <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${accentStyle ? accentStyle.title : 'text-gray-800'}`}>
  {meta.title(state)}
  </h1>
- {workspaceStep ? <div className="mb-3" /> : <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'}`}>{subtitle}</p>}
+ <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'}`}>{subtitle}</p>
+ </>}
 
  {step === 'entry' && (
  <LogEntryStep
