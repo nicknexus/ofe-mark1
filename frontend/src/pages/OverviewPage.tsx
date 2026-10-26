@@ -9,7 +9,7 @@ import { AppCard, PageLoader, InlineAlert, Skeleton } from '../components/ui'
 import LocationMap from '../components/LocationMap'
 import { getKPIColor } from '../components/metricsDashboard/metricColorPalette'
 import { fadeUp, staggerContainer, easeOut } from '../components/timeline/motion'
-import { lastScannedUrl, wasSetupUsed } from '../components/setup/SetupOffer'
+import { lastScannedUrl } from '../components/setup/SetupOffer'
 type CheckItem = { id: string; label: string; done: boolean; to: string }
 type StepTone = 'tracking' | 'share'
 
@@ -165,9 +165,9 @@ function WebsiteSetupCard({ orgId, defaultUrl }: { orgId: string; defaultUrl: st
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 ring-1 ring-white/25 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
           <Sparkles className="w-3 h-3" /> About a minute
         </span>
-        <h2 className="text-xl font-bold leading-tight mt-3">Let us build your account for you</h2>
+        <h2 className="text-xl font-bold leading-tight mt-3">Let Nexus Impacts AI build your account.</h2>
         <p className="text-sm text-white/85 mt-1.5 leading-relaxed">
-          Drop your website. We find your programs, metrics, locations and brand, and you approve everything before it is saved.
+          Paste in your website URL, we&apos;ll take care of the rest!
         </p>
         <div className="mt-4 space-y-2">
           <div className="relative">
@@ -265,7 +265,7 @@ export default function OverviewPage() {
   }, [orgId, reloadTick])
 
   const firstInit = initiatives[0]?.id
-  const showBuildHero = (isOwner || isAdmin) && !wasSetupUsed(orgId)
+  const showBuildHero = (isOwner || isAdmin)
     && initiatives.length === 0 && metrics.length === 0 && locations.length === 0
   const o = dashboardOrg
   const orgName = o?.name || organizationName || 'Home'

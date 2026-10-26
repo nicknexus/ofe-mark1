@@ -11,7 +11,7 @@ import {
   ProgramsStep, MetricsStep, LocationsStep, StoryStep, BrandStep, DraftUpdater,
 } from '../components/setup/SiteSetupSteps'
 import { geocodePlace } from '../hooks/useNominatimSearch'
-import { markSetupUsed, rememberScannedUrl } from '../components/setup/SetupOffer'
+import { rememberScannedUrl } from '../components/setup/SetupOffer'
 import { clearSWR } from '../utils/swrCache'
 import { SiteSetupDraft, SiteSetupBranding, SiteSetupApplyResult, SiteSetupApplyStep, SiteSetupMetric } from '../types'
 import '../components/onboarding/onboarding.css'
@@ -305,7 +305,6 @@ export default function SiteSetupPage() {
 
     // Writes are not idempotent: drop the saved draft so a reload cannot replay them.
     if (storageKey) localStorage.removeItem(storageKey)
-    if (orgId) markSetupUsed(orgId)
     setPhase('applying')
     report('')
 

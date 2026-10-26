@@ -9,13 +9,6 @@ import { useTeam } from '../../context/TeamContext'
 
 type OfferState = 'checking' | 'offer' | 'manual'
 
-const usedKey = (orgId: string) => `site-setup-used:${orgId}`
-
-/** After one finished website setup, the scan only lives in Organization > Website import. */
-export function markSetupUsed(orgId: string) {
-  try { localStorage.setItem(usedKey(orgId), '1') } catch { /* private mode */ }
-}
-
 const lastUrlKey = (orgId: string) => `site-setup-last-url:${orgId}`
 
 export function rememberScannedUrl(orgId: string, url: string) {
@@ -46,11 +39,6 @@ function readSavedSetup(orgId: string | null | undefined): SavedSetup | null {
 
 export const hasSavedSetup = (orgId: string | null | undefined) => !!readSavedSetup(orgId)
 
-export function wasSetupUsed(orgId: string | null | undefined): boolean {
-  if (!orgId) return false
-  try { return localStorage.getItem(usedKey(orgId)) === '1' } catch { return false }
-}
-
 /** Nothing tracked yet: no programs, metrics or locations. */
 export async function isAccountEmpty(): Promise<boolean> {
   const [programs, metrics, locations] = await Promise.all([
@@ -69,7 +57,7 @@ export async function isAccountEmpty(): Promise<boolean> {
 export function useSetupOffer(active: boolean) {
   const { isOwner, isAdmin, activeOrganization, ownedOrganization } = useTeam()
   const orgId = (activeOrganization || ownedOrganization)?.id
-  const eligible = active && (isOwner || isAdmin) && !!orgId && !wasSetupUsed(orgId)
+  const eligible = active && (isOwner || isAdmin) && !!orgId
   const [state, setState] = useState<OfferState>('manual')
 
   // Layout effect so the create form never flashes before the check settles.
