@@ -65,7 +65,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  const [storageLoading, setStorageLoading] = useState(true)
  const [initiativesUsage, setInitiativesUsage] = useState<{ current: number; limit: number | null } | null>(null)
  const [managingSubscription, setManagingSubscription] = useState(false)
- const [upgrading, setUpgrading] = useState(false)
+ const [upgrading, setUpgrading] = useState<'growth' | 'pro' | null>(null)
 
  // Team state
  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -134,22 +134,20 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  if (url) window.location.href = url
  else notify.error('Failed to open billing portal')
  } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to open billing portal')
+ notify.error(error instanceof Error ? error.message : "Couldn't open billing. Please try again.")
  } finally {
  setManagingSubscription(false)
  }
  }
 
- const handleUpgrade = async () => {
- setUpgrading(true)
+ const handleUpgrade = async (tier: 'growth' | 'pro') => {
+ setUpgrading(tier)
  try {
- const { url } = await SubscriptionService.createCheckoutSession()
- if (url) window.location.href = url
- else notify.error('Failed to start checkout')
+ await SubscriptionService.startCheckout(tier, 'monthly')
  } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to start checkout')
+ notify.error(error instanceof Error ? error.message : "Couldn't open checkout. Please try again.")
  } finally {
- setUpgrading(false)
+ setUpgrading(null)
  }
  }
 
@@ -427,16 +425,27 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  </div>
  )}
 
- {subscriptionStatus?.subscription.status === 'active' && subscriptionStatus.subscription.stripe_customer_id && (
+ {subscriptionStatus?.subscription.stripe_subscription_id && subscriptionStatus.subscription.stripe_customer_id && (
  <button onClick={handleManageSubscription} disabled={managingSubscription} className="app-btn app-btn-secondary w-full py-3">
  {managingSubscription ? <Spinner className="w-4 h-4" /> : <><ExternalLink className="w-4 h-4" />Open Billing Portal</>}
  </button>
  )}
 
- {subscriptionStatus?.subscription.status === 'trial' && isOwner && (
- <button onClick={handleUpgrade} disabled={upgrading} className="app-btn app-btn-primary w-full py-3">
- {upgrading ? <Spinner className="w-4 h-4" /> : 'Subscribe Now — $2/day'}
+ {/* Card-less trial (legacy grace period): pick a plan to keep access. */}
+ {subscriptionStatus?.subscription.status === 'trial' && !subscriptionStatus.subscription.stripe_subscription_id && isOwner && (
+ <div className="space-y-2">
+ <p className="text-sm text-gray-600">Add a card to keep access when your trial ends.</p>
+ {(['growth', 'pro'] as const).map(tier => (
+ <button
+ key={tier}
+ onClick={() => handleUpgrade(tier)}
+ disabled={upgrading !== null}
+ className={`app-btn w-full py-3 ${tier === 'growth' ? 'app-btn-primary' : 'app-btn-secondary'}`}
+ >
+ {upgrading === tier ? <Spinner className="w-4 h-4" /> : tier === 'growth' ? 'Choose Growth ($75/mo)' : 'Choose Pro ($240/mo)'}
  </button>
+ ))}
+ </div>
  )}
 
  {isSharedMember && (
@@ -495,7 +504,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  <div>
  <label className="app-label text-xs uppercase tracking-wider mb-1.5">Support link</label>
  <input type="url" value={orgDonationLink} onChange={e => setOrgDonationLink(e.target.value)} placeholder="https://yourorg.com/support" className="app-input" />
- <p className="app-help mt-1">The page where donors can best support you — a donation form, campaign, or your website.</p>
+ <p className="app-help mt-1">The page where donors can best support you: a donation form, campaign, or your website.</p>
  </div>
  <button onClick={handleSaveOrg} disabled={savingOrg} className="app-btn app-btn-primary w-full py-3">
  <Save className="w-4 h-4" />

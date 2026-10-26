@@ -1,13 +1,22 @@
-import React, { useState } from 'react'
-import { Clock, ArrowRight, X } from 'lucide-react'
+import { useState } from 'react'
+import { CreditCard, CalendarX2, ArrowRight, X, type LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-
-const BANNER_DISMISSED_KEY = 'nexus-trial-banner-dismissed'
 
 interface Props {
  remainingDays: number | null
  planName?: string
  trialEndsAt?: string | null
+ /** No card on file (legacy grace period): access ends unless they add one. */
+ cardless?: boolean
+ /** Trial was cancelled: access ends at trial end and nothing is billed. */
+ cancelling?: boolean
+}
+
+type Tone = 'amber' | 'red'
+
+const TONES: Record<Tone, { accent: string; chip: string; icon: string }> = {
+ amber: { accent: 'border-l-amber-500', chip: 'bg-amber-50', icon: 'text-amber-600' },
+ red: { accent: 'border-l-red-500', chip: 'bg-red-50', icon: 'text-red-600' },
 }
 
 function formatDate(iso?: string | null) {
@@ -17,73 +26,83 @@ function formatDate(iso?: string | null) {
  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function TrialBanner({ remainingDays, planName, trialEndsAt }: Props) {
- const [dismissed, setDismissed] = useState(() => {
- const stored = localStorage.getItem(BANNER_DISMISSED_KEY)
- return stored === 'true'
- })
+const dayCount = (n: number) => (n === 1 ? '1 day' : `${n} days`)
+
+export default function TrialBanner({ remainingDays, planName, trialEndsAt, cardless, cancelling }: Props) {
  const navigate = useNavigate()
+ const state = cardless ? 'cardless' : 'cancelling'
+ // Keyed by state + end date so a new situation (e.g. they just cancelled)
+ // shows once even if an earlier banner was dismissed. The card-less grace
+ // banner only hides for this session: losing access must never be a surprise.
+ const dismissKey = `nexus-trial-banner-dismissed:${state}:${trialEndsAt ?? ''}`
+ const store = cardless ? sessionStorage : localStorage
+ const [dismissed, setDismissed] = useState(() => {
+  try { return store.getItem(dismissKey) === 'true' } catch { return false }
+ })
 
- if (remainingDays === null || dismissed) return null
+ // Trials with a card on file that will convert get no banner at all.
+ if (remainingDays === null || dismissed || (!cardless && !cancelling)) return null
 
- const isUrgent = remainingDays <= 7
- const isCritical = remainingDays <= 3
  const endLabel = formatDate(trialEndsAt)
- const plan = planName ? planName.charAt(0).toUpperCase() + planName.slice(1) : 'your plan'
+ const left = remainingDays === 0 ? 'Ends today' : `${dayCount(remainingDays)} left`
 
- const handleBilling = () => {
- navigate('/account?tab=billing')
+ let tone: Tone
+ let icon: LucideIcon
+ let title: string
+ let detail: string
+ let action: string
+ if (cardless) {
+  tone = remainingDays <= 3 ? 'red' : 'amber'
+  icon = CreditCard
+  title = `${left} of access`
+  detail = `Add a card to keep your account${endLabel ? ` after ${endLabel}` : ''}.`
+  action = 'Add a card'
+ } else {
+  tone = 'amber'
+  icon = CalendarX2
+  title = 'Trial cancelled'
+  detail = `Access ends${endLabel ? ` ${endLabel}` : ' when your trial ends'}. You will not be billed.`
+  action = 'Resume plan'
  }
+ const t = TONES[tone]
+ const Icon = icon
 
- const getBannerStyle = () => {
- if (isCritical) {
- return 'bg-gradient-to-r from-red-500 to-red-600'
- }
- if (isUrgent) {
- return 'bg-gradient-to-r from-amber-500 to-amber-600'
- }
- return 'bg-gradient-to-r from-primary-500 to-primary-600'
- }
-
- const getMessage = () => {
- if (remainingDays === 0) {
- return `${plan} trial ends today. You will be billed unless you cancel.`
- }
- if (remainingDays === 1) {
- return `1 day left on ${plan}. You will be billed${endLabel ? ` on ${endLabel}` : ''} unless you cancel.`
- }
- return `${remainingDays} days left on ${plan}. You will be billed${endLabel ? ` on ${endLabel}` : ''} unless you cancel.`
+ const dismiss = () => {
+  try { store.setItem(dismissKey, 'true') } catch { /* storage blocked */ }
+  setDismissed(true)
  }
 
  return (
- <div className={`${getBannerStyle()} text-white py-2.5 px-4 fixed top-0 left-0 right-0 z-[100]`}>
- <div className="max-w-7xl mx-auto flex items-center justify-between">
- <div className="flex items-center gap-2 text-sm">
- <Clock className="w-4 h-4" />
- <span className="font-medium">{getMessage()}</span>
- </div>
-
- <div className="flex items-center gap-3">
- <button
- onClick={handleBilling}
- className="flex items-center gap-1 text-sm font-semibold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors cursor-pointer"
- >
- Manage billing
- <ArrowRight className="w-4 h-4" />
- </button>
-
- <button
- onClick={() => {
- localStorage.setItem(BANNER_DISMISSED_KEY, 'true')
- setDismissed(true)
- }}
- className="text-white/70 hover:text-white p-1 rounded transition-colors cursor-pointer"
- aria-label="Dismiss"
- >
- <X className="w-4 h-4" />
- </button>
- </div>
- </div>
- </div>
+  <div
+   className="fixed left-3 right-3 sm:left-auto sm:right-4 z-[100] sm:w-[400px] animate-slide-up"
+   style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
+   role="status"
+  >
+   <div className={`app-card-elevated overflow-hidden border-l-4 ${t.accent}`}>
+    <div className="flex items-start gap-3 p-3.5">
+     <div className={`w-9 h-9 rounded-lg ${t.chip} flex items-center justify-center shrink-0`}>
+      <Icon className={`w-[18px] h-[18px] ${t.icon}`} />
+     </div>
+     <div className="min-w-0 flex-1">
+      <p className="text-sm font-semibold text-gray-900 leading-5">{title}</p>
+      <p className="text-xs text-gray-500 leading-4 mt-0.5">{detail}</p>
+      <button
+       onClick={() => navigate('/account?tab=billing')}
+       className="app-btn app-btn-sm app-btn-secondary mt-2.5"
+      >
+       {action}
+       <ArrowRight className="w-3.5 h-3.5" />
+      </button>
+     </div>
+     <button
+      onClick={dismiss}
+      className="app-btn app-btn-ghost h-7 w-7 px-0 rounded-lg -mr-1 -mt-1 shrink-0"
+      aria-label="Dismiss"
+     >
+      <X className="w-4 h-4" />
+     </button>
+    </div>
+   </div>
+  </div>
  )
 }

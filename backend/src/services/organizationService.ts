@@ -219,6 +219,47 @@ export class OrganizationService {
         return data;
     }
 
+    /**
+     * Store a new logo in Supabase Storage, point the org at it, and remove the
+     * previous file. Caller is responsible for compression / format.
+     */
+    static async replaceLogo(
+        orgId: string,
+        userId: string,
+        buffer: Buffer,
+        mimetype: string,
+        ext: string
+    ): Promise<{ logo_url: string; organization: Organization }> {
+        const { data: currentOrg } = await supabase
+            .from('organizations')
+            .select('logo_url')
+            .eq('id', orgId)
+            .maybeSingle();
+
+        const filePath = `logos/${orgId}/${Date.now()}-${Math.round(Math.random() * 1E9)}-logo${ext}`;
+        const { error: uploadError } = await supabase.storage
+            .from('evidence-files')
+            .upload(filePath, buffer, { contentType: mimetype, upsert: false });
+        if (uploadError) throw new Error('Failed to upload logo');
+
+        const { data: urlData } = supabase.storage.from('evidence-files').getPublicUrl(filePath);
+        if (!urlData?.publicUrl) throw new Error('Failed to generate logo URL');
+
+        if (currentOrg?.logo_url) {
+            try {
+                const oldUrlParts = currentOrg.logo_url.split('/evidence-files/');
+                if (oldUrlParts.length === 2) {
+                    await supabase.storage.from('evidence-files').remove([oldUrlParts[1]]);
+                }
+            } catch (e) {
+                console.warn('[Logo] Failed to delete old logo:', e);
+            }
+        }
+
+        const organization = await this.update(orgId, { logo_url: urlData.publicUrl }, userId);
+        return { logo_url: urlData.publicUrl, organization };
+    }
+
     // Search public organizations (excludes demo / sandbox orgs).
     static async searchPublic(query: string): Promise<Organization[]> {
         const { data, error } = await supabase

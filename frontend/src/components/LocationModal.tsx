@@ -4,6 +4,7 @@ import { Location } from '../types'
 import { debounce } from '../utils'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { Spinner } from './ui'
+import { useSetupOffer, SetupOfferModal } from './setup/SetupOffer'
 
 interface NominatimResult {
  place_id: number
@@ -54,7 +55,8 @@ export default function LocationModal({
  const [isSearching, setIsSearching] = useState(false)
  const [showResults, setShowResults] = useState(false)
  const [showCoords, setShowCoords] = useState(false)
- const searchRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const offer = useSetupOffer(isOpen && !initialLocation)
 
  // Add/remove body class to dim map when modal is open
  useEffect(() => {
@@ -226,9 +228,10 @@ export default function LocationModal({
  }
  }
 
- if (!isOpen) return null
+  if (!isOpen || offer.state === 'checking') return null
+  if (offer.state === 'offer') return <SetupOfferModal kind="location" onManual={offer.goManual} onClose={onClose} />
 
- const hasCoords = formData.latitude && formData.longitude
+  const hasCoords = formData.latitude && formData.longitude
 
  return (
  <ModalFrame size="md" zIndexClass="z-[200]">

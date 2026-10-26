@@ -7,7 +7,7 @@ interface OnboardingContextType {
   isActive: boolean
   /** True once the user has finished or skipped onboarding (persisted to user_metadata). */
   hasCompletedOnboarding: boolean
-  /** Launch the wizard manually (e.g. from the dashboard "Set up" entry point). */
+  /** Launch the wizard manually (e.g. from the dashboard "Quick setup" entry point). */
   startOnboarding: () => void
   /** Close the wizard without marking complete (lets the user resume later). */
   pauseOnboarding: () => void
@@ -44,15 +44,8 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         Number(user.user_metadata?.tutorial_version_seen ?? 0) > 0 ||
         accountAgeMs > 2 * 24 * 60 * 60 * 1000
 
+      // The setup wizard is retired and never auto-launches.
       setHasCompletedOnboarding(completed || established)
-
-      // Only auto-launch for brand-new accounts. Live orgs from before this
-      // flag existed were getting the setup wizard on every login, which also
-      // hid What's New (and stamped it seen if they clicked through).
-      if (!established) {
-        const timer = setTimeout(() => setIsActive(true), 1200)
-        return () => clearTimeout(timer)
-      }
     } catch (error) {
       console.error('Error checking onboarding status:', error)
     }

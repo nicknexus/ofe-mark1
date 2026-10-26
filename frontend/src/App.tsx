@@ -4,6 +4,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParam
 import { AppToaster } from './components/ui'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
+import { apiService, SUBSCRIPTION_REQUIRED_EVENT, ACTIVE_ORG_CHANGED_EVENT } from './services/api'
+import { notify } from './lib/notify'
+import { useRecheckOnReturn } from './hooks/useRecheckOnReturn'
+import { TRIAL_DURATION_DAYS } from './config/trial'
 import { TeamService, PendingInviteCheck } from './services/team'
 import { User, SubscriptionStatus } from './types'
 import { TutorialProvider } from './context/TutorialContext'
@@ -12,7 +16,6 @@ import { StorageProvider } from './context/StorageContext'
 import { TeamProvider } from './context/TeamContext'
 import { UploadProvider } from './context/UploadContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
-import OnboardingWizard from './components/onboarding/OnboardingWizard'
 import LayoutIntro from './components/LayoutIntro'
 import FloatingUploadPanel from './components/FloatingUploadPanel'
 import TrialBanner from './components/TrialBanner'
@@ -29,6 +32,7 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import OverviewPage from './pages/OverviewPage'
+import SiteSetupPage from './pages/SiteSetupPage'
 import ContentOrgPage from './pages/ContentOrgPage'
 import ContentPublicPage from './pages/ContentPublicPage'
 import ContentEmbedPage from './pages/ContentEmbedPage'
@@ -63,6 +67,8 @@ import OfferCheckoutPage from './pages/OfferCheckoutPage'
 import EmbedPage from './pages/EmbedPage'
 import Layout from './components/Layout'
 import PublicScrollToTop from './components/public/PublicScrollToTop'
+
+const ACTIVE_ORG_KEY = 'nexus-active-org-id'
 
 function RedirectKeepSearch({ to }: { to: string }) {
  const { search } = useLocation()
@@ -121,6 +127,7 @@ function App() {
  const { updateAvailable, dismiss: dismissUpdate, refresh: refreshApp } = useVersionCheck()
  const checkedUserIdRef = useRef<string | null>(null)
  const subCheckGenRef = useRef(0)
+ const lastCheckedOrgRef = useRef<string | null>(null)
 
  useEffect(() => {
  // Get initial user
@@ -222,11 +229,29 @@ function App() {
  // hit. Keep the loader up and retry instead of flashing Connection Issue.
  const attempts = 3
  let lastError: unknown
+ let switchedOrg = false
  for (let i = 0; i < attempts; i++) {
  if (gen !== subCheckGenRef.current) return
  try {
+ const checkedOrg = localStorage.getItem(ACTIVE_ORG_KEY)
  const status = await SubscriptionService.getStatus()
  if (gen !== subCheckGenRef.current) return
+ // This org is locked but another of theirs isn't: move them there.
+ if (!status.hasAccess && status.fallbackOrgId && !switchedOrg) {
+ switchedOrg = true
+ if (checkedOrg) {
+ notify.error(
+ status.reason === 'org_payment_failed' || status.reason === 'payment_past_due'
+ ? "That organization's payment didn't go through. Switched you back to an active one."
+ : "That organization's plan has ended. Switched you back to an active one."
+ )
+ }
+ localStorage.setItem(ACTIVE_ORG_KEY, status.fallbackOrgId)
+ apiService.clearCache()
+ i--
+ continue
+ }
+ lastCheckedOrgRef.current = checkedOrg
  setSubscriptionStatus(status)
  if (params.get('checkout') === 'success' && !status.hasAccess && i < attempts - 1) {
  await new Promise(r => setTimeout(r, 600 * (i + 1)))
@@ -254,7 +279,7 @@ function App() {
  updated_at: ''
  },
  remainingTrialDays: null,
- trialDurationDays: 10,
+ trialDurationDays: TRIAL_DURATION_DAYS,
  })
  } finally {
  if (showLoader && gen === subCheckGenRef.current) {
@@ -263,10 +288,42 @@ function App() {
  }
  }
 
- const handleTrialStarted = () => {
- // Re-check subscription after trial is started (show loader since user expects it)
- checkSubscription(true)
+ // Silent re-check (no full-screen loader): used when returning from Stripe
+ // and when the API reports the plan has ended mid-session.
+ const recheckSubscription = () => {
+ apiService.clearCache('/subscription')
+ checkSubscription(false)
  }
+
+ const lastLockRecheckRef = useRef(0)
+ useEffect(() => {
+ const onSubscriptionRequired = () => {
+ // Drop any "failed to load" toasts from the refused requests; the
+ // locked screen explains what happened.
+ notify.dismiss()
+ // Many requests can be refused at once; one re-check is enough.
+ if (Date.now() - lastLockRecheckRef.current < 10_000) return
+ lastLockRecheckRef.current = Date.now()
+ recheckSubscription()
+ }
+ window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, onSubscriptionRequired)
+ return () => window.removeEventListener(SUBSCRIPTION_REQUIRED_EVENT, onSubscriptionRequired)
+ })
+
+ // Access is per org (the owner's plan decides), so re-check on org switch.
+ useEffect(() => {
+ const onActiveOrgChanged = () => {
+ if (localStorage.getItem(ACTIVE_ORG_KEY) !== lastCheckedOrgRef.current) recheckSubscription()
+ }
+ window.addEventListener(ACTIVE_ORG_CHANGED_EVENT, onActiveOrgChanged)
+ return () => window.removeEventListener(ACTIVE_ORG_CHANGED_EVENT, onActiveOrgChanged)
+ })
+
+ // Coming back from the billing portal (new tab) or Checkout: pick up
+ // cancellations, plan changes and new subscriptions without a reload.
+ useRecheckOnReturn(() => {
+ if (user) recheckSubscription()
+ }, 30_000)
 
  // Shared public routes fragment used in multiple render branches
  const publicRoutes = (
@@ -327,7 +384,7 @@ function App() {
  {publicRoutes}
  <Route path="/invite/:token" element={<InviteAcceptPage />} />
  <Route path="/*" element={
- <PWAAuthPage onAuthSuccess={() => window.location.reload()} />
+ <PWAAuthPage onAuthSuccess={() => { checkUser() }} />
  } />
  </Routes>
  <AppToaster />
@@ -379,7 +436,7 @@ function App() {
  </div>
  <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Issue</h2>
  <p className="text-gray-600 mb-6">
- We couldn't verify your account right now. This is usually caused by a weak connection — your account is fine.
+ We couldn't verify your account right now. This is usually caused by a weak connection. Your account is fine.
  </p>
  <button
  onClick={() => {
@@ -406,7 +463,12 @@ function App() {
  }
 
  // Gate: No subscription — check for pending invites / trial
- if (subscriptionStatus.subscription.status === 'none' && !subscriptionStatus.hasAccess) {
+ if (
+ subscriptionStatus.subscription.status === 'none' &&
+ !subscriptionStatus.hasAccess &&
+ subscriptionStatus.reason !== 'org_plan_ended' &&
+ subscriptionStatus.reason !== 'org_payment_failed'
+ ) {
  if (pendingInvite === null && !checkingPendingInvite) {
  setCheckingPendingInvite(true)
  TeamService.checkMyPendingInvite()
@@ -432,7 +494,7 @@ function App() {
  return (
  <>
  <TrialActivationPage
- onTrialStarted={handleTrialStarted}
+ onRecheck={recheckSubscription}
  trialDurationDays={subscriptionStatus.trialDurationDays}
  />
  <AppToaster />
@@ -447,6 +509,8 @@ function App() {
  <SubscriptionExpiredPage
  reason={subscriptionStatus.reason}
  remainingDays={subscriptionStatus.remainingTrialDays}
+ trialAvailable={!subscriptionStatus.subscription.trial_used_at}
+ onRecheck={recheckSubscription}
  />
  <AppToaster />
  </>
@@ -455,8 +519,11 @@ function App() {
 
  // All gates passed — render PWA app
  const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
- const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
- const showTrialBanner = isOnTrial && !bannerDismissed
+ const trialCardless = isOnTrial && !subscriptionStatus.subscription.stripe_subscription_id
+ const trialCancelling = isOnTrial && !!subscriptionStatus.subscription.cancel_at_period_end
+ // A trial with a card on file converts silently (details live in Billing);
+ // only warn when access is actually going to end.
+ const showTrialBanner = trialCardless || trialCancelling
 
  return (
  <AppRouter>
@@ -469,6 +536,8 @@ function App() {
  remainingDays={subscriptionStatus.remainingTrialDays}
  planName={subscriptionStatus.subscription.plan_tier || undefined}
  trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ cardless={trialCardless}
+ cancelling={trialCancelling}
  />
  )}
  <Routes>
@@ -596,7 +665,7 @@ function App() {
  </div>
  <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Issue</h2>
  <p className="text-gray-600 mb-6">
- We couldn't verify your account right now. This is usually caused by a weak connection — your account is fine.
+ We couldn't verify your account right now. This is usually caused by a weak connection. Your account is fine.
  </p>
  <button
  onClick={() => {
@@ -624,7 +693,7 @@ function App() {
 
  // User has no own subscription (status is 'none') but might have inherited access
  // or a pending team invitation
- if (subscriptionStatus.subscription.status === 'none') {
+ if (subscriptionStatus.subscription.status === 'none' && subscriptionStatus.reason !== 'org_plan_ended' && subscriptionStatus.reason !== 'org_payment_failed') {
  if (subscriptionStatus.hasAccess) {
  // They have inherited access - let them through to the app
  } else {
@@ -685,7 +754,7 @@ function App() {
  return (
  <>
  <TrialActivationPage
- onTrialStarted={handleTrialStarted}
+ onRecheck={recheckSubscription}
  trialDurationDays={subscriptionStatus.trialDurationDays}
  />
  <AppToaster />
@@ -701,6 +770,8 @@ function App() {
  <SubscriptionExpiredPage
  reason={subscriptionStatus.reason}
  remainingDays={subscriptionStatus.remainingTrialDays}
+ trialAvailable={!subscriptionStatus.subscription.trial_used_at}
+ onRecheck={recheckSubscription}
  />
  <AppToaster />
  </>
@@ -709,8 +780,11 @@ function App() {
 
  // User has access - show the app
  const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
- const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
- const showTrialBanner = isOnTrial && !bannerDismissed
+ const trialCardless = isOnTrial && !subscriptionStatus.subscription.stripe_subscription_id
+ const trialCancelling = isOnTrial && !!subscriptionStatus.subscription.cancel_at_period_end
+ // A trial with a card on file converts silently (details live in Billing);
+ // only warn when access is actually going to end.
+ const showTrialBanner = trialCardless || trialCancelling
 
  // Mobile browser: show install gate (prod only, skip in dev for testing)
  if (isMobile && import.meta.env.PROD) {
@@ -733,6 +807,8 @@ function App() {
  remainingDays={subscriptionStatus.remainingTrialDays}
  planName={subscriptionStatus.subscription.plan_tier || undefined}
  trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ cardless={trialCardless}
+ cancelling={trialCancelling}
  />
  )}
  <Routes>
@@ -783,6 +859,8 @@ function App() {
  remainingDays={subscriptionStatus.remainingTrialDays}
  planName={subscriptionStatus.subscription.plan_tier || undefined}
  trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ cardless={trialCardless}
+ cancelling={trialCancelling}
  />
  )}
 
@@ -796,13 +874,14 @@ function App() {
  <Route path="/*" element={
  <Layout user={user}>
  <Routes>
- <Route index element={<RedirectKeepSearch to="/tracking/programs" />} />
+ <Route index element={<RedirectKeepSearch to="/home" />} />
  <Route path="home" element={<OverviewPage />} />
+ <Route path="setup/website" element={<SiteSetupPage />} />
  <Route path="tracking" element={<RedirectKeepSearch to="/tracking/programs" />} />
  <Route path="tracking/programs" element={<Dashboard />} />
  <Route path="tracking/initiatives" element={<RedirectKeepSearch to="/tracking/programs" />} />
- <Route path="programs/:id" element={<InitiativePage />} />
- <Route path="programs/:id/metrics/:kpiId" element={<InitiativePage />} />
+ {/* One route so /metrics/:kpiId does not remount the program page. */}
+ <Route path="programs/:id/*" element={<InitiativePage />} />
  <Route path="initiatives/:id" element={<RedirectInitiativeToProgram />} />
  <Route path="initiatives/:id/metrics/:kpiId" element={<RedirectInitiativeToProgram />} />
  <Route path="metrics" element={<AllMetricsPage />} />
@@ -815,7 +894,8 @@ function App() {
  <Route path="share/org" element={<ContentOrgPage />} />
  <Route path="share/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
  <Route path="share/embed" element={<ContentEmbedPage />} />
- <Route path="share/create" element={<ContentCreatePage />} />
+ <Route path="share/content/*" element={<ContentCreatePage />} />
+ <Route path="share/create" element={<RedirectKeepSearch to="/share/content" />} />
  <Route path="share/team" element={<ShareTeamPage />} />
  <Route path="share/context" element={<OrgContextPage />} />
  <Route path="context" element={<RedirectKeepSearch to="/share/context" />} />
@@ -824,7 +904,7 @@ function App() {
  <Route path="content/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
  <Route path="content/public" element={<RedirectKeepSearch to="/share/public" />} />
  <Route path="content/embed" element={<RedirectKeepSearch to="/share/embed" />} />
- <Route path="content/create" element={<RedirectKeepSearch to="/share/create" />} />
+ <Route path="content/create" element={<RedirectKeepSearch to="/share/content" />} />
  <Route path="settings/team" element={<TeamSettingsPage />} />
  {user.is_admin && (
  <Route path="admin/demos" element={<AdminDemosPage />} />
@@ -835,7 +915,6 @@ function App() {
  } />
  </Routes>
  <InteractiveTutorial />
- <OnboardingWizard />
  <LayoutIntro />
  {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
  </OnboardingProvider>

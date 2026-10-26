@@ -85,6 +85,9 @@ export default function InstallPrompt({ onLogout }: InstallPromptProps) {
  )}
  {platform === 'android-other' && <AndroidOtherInstructions />}
  {platform === 'other' && <GenericInstructions />}
+ <p className="text-xs text-gray-500 text-center mt-5">
+ Then open Nexus from your home screen and sign in with the same email.
+ </p>
  </div>
  </div>
 

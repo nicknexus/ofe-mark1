@@ -10,13 +10,6 @@ export async function createProgramFromSource(
   form: CreateInitiativeForm,
   source: CreateInitiativeSource
 ): Promise<{ initiative: Initiative; summary: string }> {
-  if (source.kind === 'template' && source.templateId) {
-    const r = await apiService.createInitiativeFromTemplate(source.templateId, form)
-    return {
-      initiative: r.initiative,
-      summary: `Program created with ${r.metrics_created} metric${r.metrics_created === 1 ? '' : 's'}${r.groups_created > 0 ? ` and ${r.groups_created} group${r.groups_created === 1 ? '' : 's'}` : ''}.`,
-    }
-  }
   if (source.kind === 'duplicate' && source.sourceInitiativeId) {
     const r = await apiService.duplicateInitiativeStructure(source.sourceInitiativeId, form)
     const parts = [
@@ -27,5 +20,5 @@ export async function createProgramFromSource(
     return { initiative: r.initiative, summary: `Program created with ${parts.join(', ')}.` }
   }
   const initiative = await apiService.createInitiative(form)
-  return { initiative, summary: 'Program created. Open Set up to add metrics and locations.' }
+  return { initiative, summary: 'Program created.' }
 }

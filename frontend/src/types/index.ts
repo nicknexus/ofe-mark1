@@ -529,7 +529,8 @@ export interface SubscriptionStatus {
  remainingTrialDays: number | null;
  trialDurationDays?: number;
  isInherited?: boolean;
- inheritedFromOrgId?: string;
+    inheritedFromOrgId?: string;
+    fallbackOrgId?: string;
 }
 
 export interface InitiativeDashboard {
@@ -663,4 +664,294 @@ export interface ModalState {
  isOpen: boolean;
  type?: 'create' | 'edit' | 'view';
  data?: any;
+}
+
+export type ContentPostKind = 'social' | 'email'
+export type ContentPostFormat = 'ig_square' | 'linkedin' | 'email'
+export type ContentSourceType = 'evidence' | 'story'
+export type GraphicLayout = 'clean' | 'title' | 'stats'
+export type GraphicAspect = 'square' | 'landscape' | 'portrait'
+
+export interface GraphicChrome {
+ logo: boolean
+ orgName: boolean
+ title: boolean
+ metric: boolean
+ location: boolean
+}
+
+export interface GraphicCopy {
+ orgName: string
+ title: string
+ metricText: string
+ metricLabel: string
+ location: string
+}
+export type ContentStoryType = 'glance' | 'moment' | 'journey'
+export type ContentChannel = 'linkedin' | 'instagram' | 'facebook' | 'donor_email' | 'newsletter' | 'sms'
+export type ContentDraftStatus = 'draft' | 'ready'
+export type ContentUsageFilter = 'all' | 'unused' | 'used'
+
+export interface ContentOverlay {
+ label: string
+ value: number
+ unit: string
+}
+
+export interface ContentSource {
+ source_type: ContentSourceType
+ source_id: string
+ title: string
+ description?: string
+ date_represented: string
+ image_url: string
+ thumb_url?: string
+ initiative_id: string
+ initiative_title: string
+ overlay?: ContentOverlay | null
+ used?: boolean
+ location?: string | null
+}
+
+export interface ContentPost {
+ id: string
+ organization_id: string
+ kind: ContentPostKind
+ format: ContentPostFormat
+ source_type: ContentSourceType
+ source_id: string
+ caption?: string | null
+ email_subject?: string | null
+ email_body?: string | null
+ email_html?: string | null
+ image_url?: string | null
+ overlay?: ContentOverlay | null
+ created_by?: string | null
+ created_at: string
+ updated_at: string
+ package_id?: string | null
+ channel?: ContentChannel | null
+ status?: ContentDraftStatus
+}
+
+export interface ContentCopy {
+ caption_short: string
+ caption_linkedin: string
+ email_subject: string
+ email_body: string
+}
+
+export interface ContentMaster {
+ story_type: ContentStoryType
+ hook: string
+ body: string
+ evidence_line: string
+ cta: string
+ why: string
+ layout: GraphicLayout
+ source: ContentSource
+ extras?: ContentSource[]
+}
+
+export interface ContentSourceRef {
+ source_type: ContentSourceType
+ source_id: string
+}
+
+export interface ContentMediaItem extends ContentSourceRef {
+ image_url: string
+ title: string
+}
+
+export type ContentJourneyStatus = 'ongoing' | 'completed'
+
+export interface ContentJourney {
+ id: string
+ organization_id: string
+ initiative_id?: string | null
+ initiative_title?: string | null
+ title: string
+ description?: string | null
+ status: ContentJourneyStatus
+ published_at?: string | null
+ created_by?: string | null
+ created_at: string
+ updated_at: string
+ update_count: number
+ published_count: number
+ last_update_at?: string | null
+ cover_url?: string | null
+}
+
+export interface ContentChannelVersion {
+ channel: ContentChannel
+ caption?: string
+ email_subject?: string
+ email_body?: string
+}
+
+export type ContentIdeaStatus = 'suggested' | 'accepted' | 'dismissed' | 'snoozed' | 'posted' | 'expired'
+
+export interface ContentIdeaCard {
+ title: string
+ why: string
+ who: string
+ ask: string[]
+ capture: { quick: string[]; good: string[]; story: string[] }
+ channels: string[]
+ journey_potential: boolean
+ follow_up: string
+}
+
+export interface ContentIdea {
+ id: string
+ organization_id: string
+ signal_key: string
+ angle: string
+ angle_label: string
+ initiative_id?: string | null
+ initiative_title?: string | null
+ kpi_id?: string | null
+ journey_id?: string | null
+ journey_title?: string | null
+ card: ContentIdeaCard
+ rank: number
+ status: ContentIdeaStatus
+ dismiss_reason?: string | null
+ snoozed_until?: string | null
+ story_id?: string | null
+ package_id?: string | null
+ created_at: string
+ acted_at?: string | null
+}
+
+export interface ContentIdeaGuide {
+ do: string[]
+ dont: string[]
+ levels: Record<'quick' | 'good' | 'story', { label: string; time: string }>
+}
+
+export interface ContentIdeaList {
+ ideas: ContentIdea[]
+ generated_at: string | null
+ nothing_needed: boolean
+}
+
+export interface ContentPackage {
+ id: string
+ organization_id: string
+ story_type: ContentStoryType
+    hook?: string | null
+    body?: string | null
+    evidence_line?: string | null
+    cta?: string | null
+ why?: string | null
+ visual_source_type?: ContentSourceType | null
+ visual_source_id?: string | null
+ layout: GraphicLayout
+ status: ContentDraftStatus
+ created_by?: string | null
+ created_at: string
+ updated_at: string
+ image_url?: string | null
+ journey_id?: string | null
+ media?: ContentMediaItem[]
+ published_at?: string | null
+ edited_at?: string | null
+ channels_stale?: boolean
+ versions?: ContentPost[]
 } 
+// "Set up from your website" draft. Ids (p0, m0, l0) are client-side keys
+// used for cross-references until /onboarding/site-scan/apply persists them.
+export interface SiteSetupProgram {
+ id: string
+ title: string
+ description: string
+  region: string
+  source: string
+  /** Already in the account (rescan): a link target only, never created. */
+  existing_id?: string
+  /** Client-only: reviewed and left out. */
+  skip?: boolean
+}
+
+export interface SiteSetupMetric {
+ id: string
+ title: string
+ description: string
+ metric_type: 'number' | 'percentage'
+ unit_of_measurement: string
+ category: 'input' | 'output' | 'impact'
+  program_ids: string[]
+  rationale: string
+  /** Existing metric that only gets linked to program_ids. */
+  existing_id?: string
+  skip?: boolean
+}
+
+export interface SiteSetupLocation {
+  id: string
+  name: string
+  /** Town or district the place sits in; anchors the geocoder lookup. */
+  area?: string
+  country: string
+ latitude: number | null
+  longitude: number | null
+  program_ids: string[]
+  /** Client-only: the geocoder match the pin is placed on. */
+  place_label?: string
+  /** Client-only: auto lookup state. Undefined means not looked up yet. */
+  geo_status?: 'found' | 'approx' | 'missing' | 'manual'
+  /** Existing location that only gets linked to program_ids. */
+  existing_id?: string
+  skip?: boolean
+}
+
+export interface SiteSetupTitledItem {
+ title: string
+ description: string
+}
+
+export interface SiteSetupStory {
+ problem_statement: string
+ theory_of_change: string
+ theory_of_change_stages: SiteSetupTitledItem[]
+ strategies: SiteSetupTitledItem[]
+}
+
+export interface SiteSetupDraft {
+ website_url: string
+ organization: { description: string; statement: string; donation_url: string }
+ programs: SiteSetupProgram[]
+ metrics: SiteSetupMetric[]
+ locations: SiteSetupLocation[]
+ story: SiteSetupStory
+}
+
+export interface SiteSetupBranding {
+ colors: string[]
+ logo_url: string
+}
+
+export type SiteSetupApplyStep =
+  | { kind: 'program'; program: SiteSetupProgram }
+  | { kind: 'metric'; metric: SiteSetupMetric; program_id_map: Record<string, string> }
+  | { kind: 'location'; location: SiteSetupLocation; program_id_map: Record<string, string> }
+  | {
+    kind: 'profile'
+    website_url: string
+    organization: SiteSetupDraft['organization']
+    story: SiteSetupStory | null
+    branding: { brand_color: string | null; logo_url: string | null }
+  }
+
+export interface SiteSetupStepResult {
+  id: string | null
+  errors: string[]
+}
+
+export interface SiteSetupApplyResult {
+ created: { programs: number; metrics: number; locations: number }
+ first_program_id: string | null
+ errors: string[]
+}

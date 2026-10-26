@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { HelpCircle } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from '../ModalFrame'
 
-export function PageHelpTip({ label, children }: { label: string; children: ReactNode }) {
+export function PageHelpTip({ label, children, align = 'center' }: { label: string; children: ReactNode; align?: 'center' | 'end' }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -16,12 +17,12 @@ export function PageHelpTip({ label, children }: { label: string; children: Reac
         >
           <HelpCircle className="w-4 h-4" />
         </button>
-        <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg bg-secondary-800 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-card transition-opacity group-hover:opacity-100">
+        <span className={`pointer-events-none absolute top-full z-20 mt-1.5 whitespace-nowrap rounded-lg bg-secondary-800 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-card transition-opacity group-hover:opacity-100 ${align === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}>
           Learn more
         </span>
       </div>
 
-      {open && (
+      {open && createPortal(
         <ModalFrame size="lg" onClose={() => setOpen(false)}>
           <ModalHeader title={`About ${label.toLowerCase()}`} onClose={() => setOpen(false)} />
           <ModalBody>
@@ -32,7 +33,8 @@ export function PageHelpTip({ label, children }: { label: string; children: Reac
               Got it
             </button>
           </ModalFooter>
-        </ModalFrame>
+        </ModalFrame>,
+        document.body,
       )}
     </>
   )

@@ -296,7 +296,7 @@ export default function AllTagsPage() {
  <div className="max-w-5xl mx-auto">
  <PageHeader
  title="Tags"
- subtitle={`${tags.length} tag${tags.length !== 1 ? 's' : ''}. Shared across programs. Create them here or from any program's Set up.`}
+ subtitle={`${tags.length} tag${tags.length !== 1 ? 's' : ''}. Shared across programs. Create them here or from any program's Quick setup.`}
  help={<TagsHelp />}
  actions={addButton}
  />
@@ -352,7 +352,7 @@ export default function AllTagsPage() {
  <EmptyState
  icon={TagIcon}
  title={tags.length === 0 ? 'No tags yet' : `No tags match "${search}"`}
- description={tags.length === 0 ? 'Tags are shared across programs. Create them here or attach them from a program\'s Set up.' : undefined}
+ description={tags.length === 0 ? 'Tags are shared across programs. Create them here or attach them from a program\'s Quick setup.' : undefined}
  />
  ) : (
  <DndContext

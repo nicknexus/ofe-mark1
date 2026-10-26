@@ -14,6 +14,8 @@ interface AddLocationPickerModalProps {
  excludeIds: string[]
  onCreateNew: () => void
  onLinked: () => void
+ /** Fired as soon as Add is clicked, before the links finish. */
+ onOptimisticAdd?: (count: number) => void
 }
 
 export default function AddLocationPickerModal({
@@ -23,10 +25,12 @@ export default function AddLocationPickerModal({
  excludeIds,
  onCreateNew,
  onLinked,
+ onOptimisticAdd,
 }: AddLocationPickerModalProps) {
  const [allLocations, setAllLocations] = useState<Location[]>([])
  const [loading, setLoading] = useState(false)
- const [linkingId, setLinkingId] = useState<string | null>(null)
+ const [adding, setAdding] = useState(false)
+ const [selected, setSelected] = useState<string[]>([])
  const [search, setSearch] = useState('')
 
  useEffect(() => {
@@ -47,6 +51,13 @@ export default function AddLocationPickerModal({
  return () => { cancelled = true }
  }, [isOpen])
 
+ useEffect(() => {
+ if (!isOpen) {
+ setSelected([])
+ setSearch('')
+ }
+ }, [isOpen])
+
  const filtered = useMemo(() => {
  const excluded = new Set(excludeIds)
  const q = search.trim().toLowerCase()
@@ -55,18 +66,28 @@ export default function AddLocationPickerModal({
  .filter(l => !q || l.name.toLowerCase().includes(q) || (l.country?.toLowerCase().includes(q) ?? false))
  }, [allLocations, excludeIds, search])
 
- const handleLink = async (loc: Location) => {
- if (!loc.id) return
- try {
- setLinkingId(loc.id)
- await apiService.linkLocationToInitiative(loc.id, initiativeId)
- notify.success(`Added "${loc.name}" to this program`)
+ const toggle = (id: string) => {
+ setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+ }
+
+ const handleAdd = async () => {
+ if (selected.length === 0 || adding) return
+ const ids = [...selected]
+ onOptimisticAdd?.(ids.length)
+ onClose()
+ const results = await Promise.allSettled(
+ ids.map(id => apiService.linkLocationToInitiative(id, initiativeId))
+ )
+ const added = results.filter(r => r.status === 'fulfilled').length
+ const failed = results.length - added
+ if (added > 0) {
+ notify.success(added === 1 ? 'Added 1 location' : `Added ${added} locations`)
  onLinked()
- } catch (err) {
- console.error('Failed to link location', err)
- notify.error('Failed to add location')
- } finally {
- setLinkingId(null)
+ }
+ if (added === 0) onOptimisticAdd?.(-ids.length)
+ if (failed > 0 && added > 0) onOptimisticAdd?.(-failed)
+ if (failed > 0) {
+ notify.error(failed === results.length ? 'Failed to add locations' : `${failed} could not be added`)
  }
  }
 
@@ -137,12 +158,19 @@ className="app-input pl-10"
  </div>
  ) : (
  <div className="space-y-1.5">
- {filtered.map((loc) => (
+ {filtered.map((loc) => {
+ const isSelected = !!loc.id && selected.includes(loc.id)
+ return (
  <button
  key={loc.id}
- onClick={() => handleLink(loc)}
- disabled={linkingId === loc.id}
- className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 hover:border-gray-200 transition-all text-left disabled:opacity-60"
+ type="button"
+ onClick={() => loc.id && toggle(loc.id)}
+ disabled={adding}
+ className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left disabled:opacity-60 ${
+ isSelected
+ ? 'border-primary-400 bg-primary-50/70 ring-1 ring-primary-200'
+ : 'border-gray-100 bg-white hover:bg-gray-50 hover:border-gray-200'
+ }`}
  >
  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
  <MapPin className="w-4 h-4 text-gray-500" />
@@ -153,24 +181,26 @@ className="app-input pl-10"
  {loc.country || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`}
  </p>
  </div>
- {linkingId === loc.id ? (
- <Spinner className="w-4 h-4" />
- ) : (
- <Check className="w-4 h-4 text-gray-300" />
- )}
+ <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+ isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 bg-white text-transparent'
+ }`}>
+ <Check className="w-3 h-3" />
+ </span>
  </button>
- ))}
+ )
+ })}
  </div>
  )}
  </div>
 
  {/* Footer */}
- <div className="px-5 py-3 border-t border-gray-100 flex justify-end flex-shrink-0">
- <button
- onClick={onClose}
- className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
- >
- Done
+ <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2 flex-shrink-0">
+ <button type="button" onClick={onClose} disabled={adding} className="app-btn app-btn-secondary">
+ Cancel
+ </button>
+ <button type="button" onClick={handleAdd} disabled={adding || selected.length === 0} className="app-btn app-btn-primary">
+ {adding ? <Spinner className="w-4 h-4" /> : null}
+ {selected.length > 0 ? `Add ${selected.length}` : 'Add'}
  </button>
  </div>
  </ModalFrame>

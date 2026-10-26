@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { BarChart3, Trash2, Search, Globe2, Plus, Check } from 'lucide-react'
+import { BarChart3, Trash2, Search, Plus, Check } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
-import { CreateKPIForm, MetricDefinitionWithUsage } from '../types'
+import { CreateKPIForm, KPI, MetricDefinitionWithUsage } from '../types'
 import TagPicker from './MetricTags/TagPicker'
 import { apiService } from '../services/api'
 import { notify } from '../lib/notify'
@@ -18,7 +18,7 @@ interface CreateKPIModalProps {
   /** Edit mode only: opens the typed-confirmation delete flow. */
   onDelete?: () => void
   /** Called after an existing org-global metric is attached to this initiative. */
-  onAttached?: () => void
+  onAttached?: (created?: KPI[], meta?: { dropPendingDefinitionIds?: string[] }) => void
 }
 
 const CATEGORIES = [
@@ -107,22 +107,31 @@ export default function CreateKPIModal({
 
   const attachSelected = async () => {
     if (selectedIds.length === 0 || attaching) return
-    setAttaching(true)
     const picked = definitions.filter(d => selectedIds.includes(d.id))
+    const optimistic: KPI[] = picked.map(d => ({
+      id: `pending-${d.id}`,
+      title: d.title,
+      description: d.description || '',
+      metric_type: d.metric_type,
+      unit_of_measurement: d.unit_of_measurement,
+      category: d.category,
+      definition_id: d.id,
+      initiative_id: initiativeId,
+    }))
+    onAttached?.(optimistic)
+    onClose()
     const results = await Promise.allSettled(
       picked.map(definition => apiService.addMetricToInitiative(definition.id, initiativeId))
     )
-    const ok = picked.filter((_, i) => results[i].status === 'fulfilled').map(d => d.id)
-    const failed = results.filter(r => r.status === 'rejected').length
-    if (ok.length > 0) {
-      setAddedIds(prev => [...prev, ...ok])
-      setSelectedIds(prev => prev.filter(id => !ok.includes(id)))
-      notify.success(ok.length === 1
-        ? `"${picked.find(d => d.id === ok[0])?.title || 'Metric'}" added to this program`
-        : `${ok.length} metrics added to this program`)
+    const created = results.flatMap(r => r.status === 'fulfilled' ? [r.value] : [])
+    const failed = results.length - created.length
+    onAttached?.(created, { dropPendingDefinitionIds: picked.map(d => d.id) })
+    if (created.length > 0) {
+      notify.success(created.length === 1
+        ? `"${created[0].title || 'Metric'}" added to this program`
+        : `${created.length} metrics added to this program`)
     }
     if (failed > 0) notify.error(failed === 1 ? 'Could not add 1 metric' : `Could not add ${failed} metrics`)
-    setAttaching(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,7 +177,12 @@ export default function CreateKPIModal({
         mode === 'existing' && !editData ? 'md:max-w-4xl' : 'md:max-w-2xl'
       }`}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+      <form onSubmit={handleSubmit} className="relative flex flex-col min-h-0 flex-1 overflow-hidden">
+        {attaching && mode === 'existing' && !editData && (
+          <div className="absolute inset-0 z-20 bg-white/90 flex items-center justify-center">
+            <SectionLoader label="Adding to this program" />
+          </div>
+        )}
         <ModalHeader
           icon={BarChart3}
           title={editData ? 'Edit metric' : 'Add metric'}
@@ -203,8 +217,8 @@ export default function CreateKPIModal({
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Globe2 className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-              Add existing
+              <BarChart3 className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+              Add existing metric
             </button>
           </div>
         )}
@@ -324,7 +338,7 @@ export default function CreateKPIModal({
                 className="app-btn app-btn-primary"
               >
                 {attaching
-                  ? 'Adding…'
+                  ? 'Adding to this program…'
                   : selectedIds.length === 0
                     ? 'Add metrics'
                     : `Add ${selectedIds.length} metric${selectedIds.length === 1 ? '' : 's'}`}

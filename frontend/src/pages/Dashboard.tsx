@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Plus,
   Edit,
@@ -39,13 +39,10 @@ import UpgradeModal from '../components/UpgradeModal'
 import { SubscriptionService } from '../services/subscription'
 import { Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
-import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
 import { Button, PageLoader, InlineAlert, PageHelpTip } from '../components/ui'
 import { InitiativesHelp } from '../components/tracking/TrackingHelp'
 import { easeOut, dropdownPop } from '../components/timeline/motion'
-import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
-
 // Warm the program page's two payloads on hover so the click lands on an
 // in-memory cache hit. apiService dedupes in-flight requests and caches GETs
 // for 60s, so repeated hovers are free (and invalidation still works).
@@ -65,13 +62,13 @@ function StatCount({
   loading: boolean
 }) {
   return (
-    <div className="flex-1 min-w-0 px-3 py-2.5">
+    <div className="min-w-[3.25rem] text-center">
       {loading ? (
-        <span className="block h-7 w-8 rounded bg-gray-100 animate-pulse" />
+        <span className="mx-auto block h-4 w-5 rounded bg-gray-100 animate-pulse" />
       ) : (
-        <p className="text-[1.65rem] font-semibold tabular-nums text-secondary-900 leading-none tracking-tight">{value ?? 0}</p>
+        <p className="text-[15px] font-semibold tabular-nums text-secondary-900 leading-none tracking-tight">{value ?? 0}</p>
       )}
-      <p className="mt-1.5 text-[11px] font-medium text-secondary-400">{label}</p>
+      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-secondary-400">{label}</p>
     </div>
   )
 }
@@ -176,7 +173,7 @@ function SortableInitiativeCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1 min-w-0">
             <h3
-              className={`text-[17px] font-semibold leading-snug line-clamp-2 tracking-tight ${
+              className={`text-[23px] font-semibold leading-snug line-clamp-2 tracking-tight ${
                 locked ? 'text-secondary-400' : 'text-secondary-900 group-hover:text-primary-800'
               }`}
               title={initiative.title}
@@ -200,9 +197,8 @@ function SortableInitiativeCard({
             Locked
           </span>
         ) : (
-          <div className="flex rounded-xl bg-gray-50 ring-1 ring-gray-100 overflow-hidden">
+          <div className="flex items-start gap-5">
             <StatCount value={stats?.metrics} label={stats?.metrics === 1 ? 'metric' : 'metrics'} loading={statsLoading} />
-            <div className="w-px bg-gray-200/80 my-2.5" />
             <StatCount value={stats?.locations} label={stats?.locations === 1 ? 'location' : 'locations'} loading={statsLoading} />
           </div>
         )}
@@ -226,7 +222,7 @@ function SortableInitiativeCard({
                 ? 'app-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'
                 : 'app-btn-secondary'}`}
             >
-              <Settings2 className="w-3.5 h-3.5" /> Set up
+              <Settings2 className="w-3.5 h-3.5" /> Quick setup
             </button>
           )}
         </div>
@@ -300,7 +296,7 @@ function SortableInitiativeCard({
                   className="absolute right-0 top-full mt-1 w-48 app-card-elevated p-1.5 origin-top-right"
                 >
                   {canEditInitiatives && (
-                    <MenuItem icon={Settings2} label="Set up" onClick={() => { setMenuOpen(false); openSetup(initiative) }} />
+                    <MenuItem icon={Settings2} label="Quick setup" onClick={() => { setMenuOpen(false); openSetup(initiative) }} />
                   )}
                   {canEditInitiatives && (
                     <MenuItem icon={Edit} label="Edit details" onClick={() => { setMenuOpen(false); openEditModal(initiative) }} />
@@ -347,9 +343,9 @@ function MenuItem({ icon: Icon, label, onClick, tone = 'default' }: {
 }
 
 export default function Dashboard() {
+ const navigate = useNavigate()
  const [searchParams, setSearchParams] = useSearchParams()
- const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
- const { hasCompletedOnboarding, isActive: onboardingActive } = useOnboarding()
+ const { startTutorial } = useTutorial()
  const {
  isSharedMember,
  organizationName,
@@ -473,17 +469,6 @@ export default function Dashboard() {
  window.removeEventListener('show-tutorial', handleShowTutorial)
  }
  }, [])
-
- // Auto-launch the (versioned) tutorial for returning users who haven't seen
- // the current version. Held until onboarding is done and its wizard is closed
- // so the two full-screen overlays never fight for the screen.
- useEffect(() => {
- if (!needsTutorial || tutorialActive) return
- if (!hasCompletedOnboarding || onboardingActive) return
- if (shouldHoldTutorialAutostart()) return
- const t = setTimeout(() => startTutorial(), 900)
- return () => clearTimeout(t)
- }, [needsTutorial, tutorialActive, hasCompletedOnboarding, onboardingActive, startTutorial])
 
  // Refresh dashboard data when the onboarding wizard closes — entities it
  // created (initiatives, locations, metrics) should appear without a manual
@@ -613,12 +598,12 @@ export default function Dashboard() {
       const { initiative: newInitiative, summary } = await createProgramFromSource(formData, source)
       notify.success(summary)
       apiService.clearCache()
+      if (newInitiative?.id) {
+        navigate(`/programs/${newInitiative.id}`, { state: { initiative: newInitiative } })
+        return
+      }
       await refreshInitiatives()
       refreshKPIsAndEvidence()
-      // Blank programs land straight in Set up so the next step is obvious.
-      if (source.kind === 'blank' && newInitiative?.id) {
-        setSetupInitiative(newInitiative)
-      }
 
  } catch (error: any) {
  // Check if it's an initiative limit error
@@ -652,8 +637,8 @@ export default function Dashboard() {
 
  const handleDeleteInitiative = async (initiative: Initiative) => {
  if (!initiative.id) return
- if (deleteConfirmText !== 'DELETE MY INITIATIVE') {
- notify.error('Please type "DELETE MY INITIATIVE" exactly to confirm')
+ if (deleteConfirmText !== 'DELETE MY PROGRAM') {
+ notify.error('Please type "DELETE MY PROGRAM" exactly to confirm')
  return
  }
  try {
@@ -860,7 +845,7 @@ export default function Dashboard() {
  items={initiatives.map(i => i.id!).filter(Boolean)}
  strategy={rectSortingStrategy}
  >
- <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+ <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
  {initiatives.map((initiative) => (
  <SortableInitiativeCard
  key={initiative.id}
@@ -949,13 +934,13 @@ export default function Dashboard() {
 
  <div className="mb-6">
  <label className="block text-sm font-medium text-gray-700 mb-2">
- Type <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">DELETE MY INITIATIVE</span> to confirm:
+ Type <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">DELETE MY PROGRAM</span> to confirm:
  </label>
  <input
  type="text"
  value={deleteConfirmText}
  onChange={(e) => setDeleteConfirmText(e.target.value)}
- placeholder="DELETE MY INITIATIVE"
+ placeholder="DELETE MY PROGRAM"
  className="app-input"
  />
  </div>
@@ -969,7 +954,7 @@ export default function Dashboard() {
  </button>
  <button
  onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
- disabled={deleteConfirmText !== 'DELETE MY INITIATIVE'}
+ disabled={deleteConfirmText !== 'DELETE MY PROGRAM'}
  className="app-btn app-btn-danger flex-1"
  >
  Delete Program

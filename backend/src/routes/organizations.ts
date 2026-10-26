@@ -290,17 +290,9 @@ router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: Au
             return;
         }
 
-        // Fetch current logo_url so we can clean it up after replacement
-        const { data: ownedOrg } = await supabase
-            .from('organizations')
-            .select('logo_url')
-            .eq('id', orgId)
-            .maybeSingle();
-
         // Compress image if needed
         let finalBuffer = req.file.buffer;
         let finalMimetype = req.file.mimetype;
-        let finalSize = req.file.size;
 
         if (isCompressibleImage(req.file.mimetype)) {
             const compressionResult = await compressImage(
@@ -310,65 +302,20 @@ router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: Au
             );
             finalBuffer = compressionResult.buffer;
             finalMimetype = compressionResult.mimetype;
-            finalSize = compressionResult.size;
         }
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const randomId = Math.round(Math.random() * 1E9);
         const ext = path.extname(req.file.originalname);
-        const filename = `${timestamp}-${randomId}-logo${ext}`;
-        const filePath = `logos/${orgId}/${filename}`;
-
-        // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-            .from('evidence-files')
-            .upload(filePath, finalBuffer, {
-                contentType: finalMimetype,
-                upsert: false
-            });
-
-        if (uploadError) {
-            console.error('[Logo Upload] Storage upload error:', uploadError);
-            res.status(500).json({ error: 'Failed to upload logo' });
-            return;
-        }
-
-        console.log('[Logo Upload] File uploaded to storage, getting public URL');
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from('evidence-files')
-            .getPublicUrl(filePath);
-
-        if (!urlData?.publicUrl) {
-            console.log('[Logo Upload] ERROR: Failed to generate public URL');
-            res.status(500).json({ error: 'Failed to generate logo URL' });
-            return;
-        }
-
-        console.log('[Logo Upload] Public URL:', urlData.publicUrl);
-
-        // Delete old logo if exists
-        if (ownedOrg?.logo_url) {
-            try {
-                const oldUrlParts = ownedOrg.logo_url.split('/evidence-files/');
-                if (oldUrlParts.length === 2) {
-                    await supabase.storage.from('evidence-files').remove([oldUrlParts[1]]);
-                }
-            } catch (e) {
-                console.warn('[Logo Upload] Failed to delete old logo:', e);
-            }
-        }
-
-        // Update organization with new logo URL
-        console.log('[Logo Upload] Updating organization with logo URL');
-        const updatedOrg = await OrganizationService.update(orgId, { logo_url: urlData.publicUrl }, userId);
-        console.log('[Logo Upload] Updated org:', updatedOrg?.id, 'logo_url:', updatedOrg?.logo_url);
+        const { logo_url, organization: updatedOrg } = await OrganizationService.replaceLogo(
+            orgId,
+            userId,
+            finalBuffer,
+            finalMimetype,
+            ext
+        );
 
         res.json({
             success: true,
-            logo_url: urlData.publicUrl,
+            logo_url,
             organization: updatedOrg
         });
         console.log('[Logo Upload] SUCCESS');

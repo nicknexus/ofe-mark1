@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Link2, AlertCircle, FileText, Camera, MessageSquare, DollarSign, Paperclip, ChevronDown, MapPin, Calendar, User, Clock } from 'lucide-react'
+import { Link2, AlertCircle, FileText, Camera, MessageSquare, DollarSign, Paperclip, ChevronDown, MapPin, Calendar, User, Clock, Plus, Settings2 } from 'lucide-react'
 import { AppCard, EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
@@ -10,6 +10,7 @@ import {
   getEvidenceImageUrl,
   hasActiveFilters,
   previewMatchingEvidence,
+  needsFirstLogSetup,
   sortByMode,
 } from '../../utils/timeline'
 import { rowEntrance, easeOut } from './motion'
@@ -275,6 +276,13 @@ interface ConnectionsViewProps {
   onAddEvidenceToClaim?: (claim: TimelineClaim, kpi: KPI | undefined) => void
   /** Attach an existing unconnected evidence record to this claim. */
   onConnectExistingToClaim?: (claim: TimelineClaim) => void
+  /** Open the add-log wizard from the empty state. */
+  onAddLog?: () => void
+  /** Open Quick setup when a metric or location is still missing. */
+  onQuickSetup?: () => void
+  /** Live counts from the program page. The timeline payload lags behind adds. */
+  knownMetricCount?: number
+  knownLocationCount?: number | null
 }
 
 /**
@@ -299,6 +307,10 @@ export default function ConnectionsView({
   onOpenEvidence,
   onAddEvidenceToClaim,
   onConnectExistingToClaim,
+  onAddLog,
+  onQuickSetup,
+  knownMetricCount,
+  knownLocationCount,
 }: ConnectionsViewProps) {
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
@@ -339,8 +351,31 @@ export default function ConnectionsView({
   )
 
   if (visibleClaims.length === 0) {
+    const needsSetup = needsFirstLogSetup({
+      kpiCount: kpis.length,
+      locationCount: locations.length,
+      knownMetricCount,
+      knownLocationCount,
+    })
+    if (needsSetup && !hasActiveFilters(filters)) {
+      return (
+        <div className="app-card md:p-8 min-h-[24rem] flex items-center justify-center">
+          <EmptyState
+            icon={AlertCircle}
+            title="Before your first log"
+            description="You must add at least one metric and 1 location to this program before making your first log."
+            action={onQuickSetup ? (
+              <button type="button" onClick={onQuickSetup} className="app-btn app-btn-lg app-btn-primary">
+                <Settings2 className="w-5 h-5" />
+                Quick setup
+              </button>
+            ) : undefined}
+          />
+        </div>
+      )
+    }
     return (
-      <div className="app-card md:p-8">
+      <div className="app-card md:p-8 min-h-[24rem] flex items-center justify-center">
         <EmptyState
           icon={Link2}
           title="No connections to show"
@@ -349,6 +384,12 @@ export default function ConnectionsView({
               ? 'Try adjusting your filters or search query'
               : 'Add logs with claims and evidence to see how they connect'
           }
+          action={!hasActiveFilters(filters) && onAddLog ? (
+            <button type="button" onClick={onAddLog} className="app-btn app-btn-lg app-btn-primary">
+              <Plus className="w-5 h-5" />
+              Add log
+            </button>
+          ) : undefined}
         />
       </div>
     )

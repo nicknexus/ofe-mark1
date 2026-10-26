@@ -5,6 +5,7 @@ import { requireAdmin, requireSuperAdmin, requireOrgAccess } from '../middleware
 import { PlatformAdminService } from '../services/platformAdminService';
 import { AdminAccountService, bustUserDirectory } from '../services/adminAccountService';
 import { SubscriptionService } from '../services/subscriptionService';
+import { EntitlementService } from '../services/entitlementService';
 import { PlanTier } from '../config/planCatalog';
 import { OrganizationService } from '../services/organizationService';
 import { DemoSeedService } from '../services/demoSeedService';
@@ -1087,6 +1088,7 @@ router.patch('/orgs/:id/limits', requireOrgAccess(), async (req: AuthenticatedRe
             .maybeSingle();
         if (error) throw error;
 
+        EntitlementService.bustAll();
         console.log(`[admin] ${req.user!.email} adjusted limits for org ${id}:`, updates);
         await recordAdminAction({
             adminUserId: req.user!.id,

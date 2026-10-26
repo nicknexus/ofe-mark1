@@ -193,11 +193,11 @@ export function filterEvidence(evidence: TimelineEvidence[], filters: TimelineFi
  })
 }
 
-/** Sort newest upload first (created_at DESC); stable for equal timestamps. */
+/** Sort oldest upload first (created_at ASC) so a new log lands at the bottom. */
 export function sortByUploadDate<T extends { created_at?: string }>(rows: T[]): T[] {
  return rows
  .slice()
- .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+ .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
 }
 
 /** Effective activity date for ordering (range end, else the single date). */
@@ -205,13 +205,31 @@ function activityDateOf(r: { date_represented?: string; date_range_end?: string;
  return r.date_range_end || r.date_represented || r.date_range_start || ''
 }
 
-/** Sort rows newest-first by whichever date the order mode selects. */
+/**
+ * True when a program still needs a metric and a location before the first log.
+ * Live counts from the program page win over the timeline payload, which can
+ * stay empty for a few seconds after you add them.
+ */
+export function needsFirstLogSetup(opts: {
+  kpiCount: number
+  locationCount: number
+  knownMetricCount?: number
+  /** null means the program page has not loaded locations yet. */
+  knownLocationCount?: number | null
+}): boolean {
+  if (opts.knownLocationCount === null) return false
+  const metrics = opts.knownMetricCount ?? opts.kpiCount
+  const locations = opts.knownLocationCount ?? opts.locationCount
+  return metrics === 0 || locations === 0
+}
+
+/** Sort rows oldest-first by whichever date the order mode selects. */
 export function sortByMode<T extends { created_at?: string; date_represented?: string; date_range_start?: string; date_range_end?: string }>(
  rows: T[],
  orderMode: OrderMode
 ): T[] {
  if (orderMode === 'activity') {
- return rows.slice().sort((a, b) => activityDateOf(b).localeCompare(activityDateOf(a)))
+ return rows.slice().sort((a, b) => activityDateOf(a).localeCompare(activityDateOf(b)))
  }
  return sortByUploadDate(rows)
 }

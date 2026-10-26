@@ -389,6 +389,182 @@ export interface ConnectEvidenceResult {
     reconcile?: { created: number; pruned: number };
 }
 
+export type ContentPostKind = 'social' | 'email';
+export type ContentPostFormat = 'ig_square' | 'linkedin' | 'email';
+export type ContentSourceType = 'evidence' | 'story';
+export type GraphicLayout = 'clean' | 'title' | 'stats';
+export type GraphicAspect = 'square' | 'landscape' | 'portrait';
+export type ContentStoryType = 'glance' | 'moment' | 'journey';
+export type ContentChannel = 'linkedin' | 'instagram' | 'facebook' | 'donor_email' | 'newsletter' | 'sms';
+export type ContentDraftStatus = 'draft' | 'ready';
+export type ContentUsageFilter = 'all' | 'unused' | 'used';
+
+export interface ContentOverlay {
+    label: string;
+    value: number;
+    unit: string;
+}
+
+export interface ContentSource {
+    source_type: ContentSourceType;
+    source_id: string;
+    title: string;
+    description?: string;
+    date_represented: string;
+    image_url: string;
+    thumb_url?: string;
+    initiative_id: string;
+    initiative_title: string;
+    overlay?: ContentOverlay | null;
+    used?: boolean;
+    location?: string | null;
+}
+
+export interface ContentPost {
+    id: string;
+    organization_id: string;
+    kind: ContentPostKind;
+    format: ContentPostFormat;
+    source_type: ContentSourceType;
+    source_id: string;
+    caption?: string | null;
+    email_subject?: string | null;
+    email_body?: string | null;
+    email_html?: string | null;
+    image_url?: string | null;
+    overlay?: ContentOverlay | null;
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+    package_id?: string | null;
+    channel?: ContentChannel | null;
+    status?: ContentDraftStatus;
+}
+
+export interface ContentCopy {
+    caption_short: string;
+    caption_linkedin: string;
+    email_subject: string;
+    email_body: string;
+}
+
+export interface ContentMaster {
+    story_type: ContentStoryType;
+    hook: string;
+    body: string;
+    evidence_line: string;
+    cta: string;
+    why: string;
+    layout: GraphicLayout;
+    source: ContentSource;
+    extras?: ContentSource[];
+}
+
+export interface ContentChannelVersion {
+    channel: ContentChannel;
+    caption?: string;
+    email_subject?: string;
+    email_body?: string;
+}
+
+export interface ContentPackage {
+    id: string;
+    organization_id: string;
+    story_type: ContentStoryType;
+    hook?: string | null;
+    body?: string | null;
+    evidence_line?: string | null;
+    cta?: string | null;
+    why?: string | null;
+    visual_source_type?: ContentSourceType | null;
+    visual_source_id?: string | null;
+    layout: GraphicLayout;
+    status: ContentDraftStatus;
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+    image_url?: string | null;
+    journey_id?: string | null;
+    media?: ContentMediaItem[];
+    published_at?: string | null;
+    edited_at?: string | null;
+    channels_stale?: boolean;
+    versions?: ContentPost[];
+}
+
+export interface ContentMediaItem {
+    source_type: ContentSourceType;
+    source_id: string;
+    image_url: string;
+    title: string;
+}
+
+export interface ContentSourceRef {
+    source_type: ContentSourceType;
+    source_id: string;
+}
+
+export type ContentJourneyStatus = 'ongoing' | 'completed';
+
+export interface ContentJourney {
+    id: string;
+    organization_id: string;
+    initiative_id?: string | null;
+    initiative_title?: string | null;
+    title: string;
+    description?: string | null;
+    status: ContentJourneyStatus;
+    published_at?: string | null;
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+    update_count: number;
+    published_count: number;
+    last_update_at?: string | null;
+    cover_url?: string | null;
+}
+
+export type ContentIdeaStatus = 'suggested' | 'accepted' | 'dismissed' | 'snoozed' | 'posted' | 'expired';
+
+export interface ContentIdeaCard {
+    title: string;
+    why: string;
+    who: string;
+    ask: string[];
+    capture: { quick: string[]; good: string[]; story: string[] };
+    channels: string[];
+    journey_potential: boolean;
+    follow_up: string;
+}
+
+export interface ContentIdea {
+    id: string;
+    organization_id: string;
+    signal_key: string;
+    angle: string;
+    angle_label: string;
+    initiative_id?: string | null;
+    initiative_title?: string | null;
+    kpi_id?: string | null;
+    journey_id?: string | null;
+    journey_title?: string | null;
+    card: ContentIdeaCard;
+    rank: number;
+    status: ContentIdeaStatus;
+    dismiss_reason?: string | null;
+    snoozed_until?: string | null;
+    story_id?: string | null;
+    package_id?: string | null;
+    created_at: string;
+    acted_at?: string | null;
+}
+
+export interface ContentIdeaList {
+    ideas: ContentIdea[];
+    generated_at: string | null;
+    nothing_needed: boolean;
+}
+
 export interface User {
     id: string;
     email: string;

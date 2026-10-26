@@ -17,6 +17,22 @@ export interface NominatimResult {
   }
 }
 
+/** One-shot forward geocode: best match for a place name, or null. */
+export async function geocodePlace(query: string): Promise<NominatimResult | null> {
+  if (!query.trim()) return null
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`,
+      { headers: { 'User-Agent': 'OFE App' } }
+    )
+    if (!response.ok) return null
+    const data = await response.json()
+    return data?.[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Shared OpenStreetMap / Nominatim place-search behavior. Extracted from
  * LocationModal so the onboarding wizard's location step reuses identical

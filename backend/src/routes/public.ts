@@ -1,5 +1,7 @@
-import { Router, Response } from 'express';
+import { Router, Response, Request, NextFunction } from 'express';
 import { PublicService } from '../services/publicService';
+import { SubscriptionService } from '../services/subscriptionService';
+import { supabase } from '../utils/supabase';
 import { OrganizationContextService } from '../services/organizationContextService';
 import { EntitlementService, stripGatedFields } from '../services/entitlementService';
 import { MetricDefinitionService } from '../services/metricDefinitionService';
@@ -15,6 +17,36 @@ async function sendPublic(res: Response, orgSlug: string, payload: any): Promise
     const ent = await EntitlementService.getForOrgSlug(orgSlug);
     res.json(stripGatedFields(payload, ent.features));
 }
+
+// A lapsed plan has no event (the trial date just passes), so is_public can
+// still be true. Every org-scoped route checks the owner's plan at read time.
+const LIVE_TTL_MS = 60_000;
+const liveCache = new Map<string, { live: boolean; until: number }>();
+
+async function orgSlugIsLive(slug: string): Promise<boolean> {
+    const hit = liveCache.get(slug);
+    if (hit && hit.until > Date.now()) return hit.live;
+    const { data: org } = await supabase.from('organizations').select('id').eq('slug', slug).maybeSingle();
+    // Unknown slugs fall through to the route's own 404.
+    const live = !org || (await SubscriptionService.orgIsLiveForPublic(org.id));
+    liveCache.set(slug, { live, until: Date.now() + LIVE_TTL_MS });
+    return live;
+}
+
+function requireLiveOrg(param: 'slug' | 'orgSlug') {
+    return async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (await orgSlugIsLive(req.params[param])) return next();
+            res.status(404).json({ error: 'Organization not found' });
+        } catch (error) {
+            console.error('Public live check error:', error);
+            next();
+        }
+    };
+}
+
+router.use('/organizations/:slug', requireLiveOrg('slug'));
+router.use('/initiatives/:orgSlug', requireLiveOrg('orgSlug'));
 
 // ============================================
 // SHOWCASE (landing page live feed)

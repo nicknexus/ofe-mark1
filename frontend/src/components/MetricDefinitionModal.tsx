@@ -4,6 +4,7 @@ import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import TagPicker from './MetricTags/TagPicker'
 import { CreateMetricDefinitionForm, Initiative, MetricDefinitionWithUsage } from '../types'
 import { useTeam } from '../context/TeamContext'
+import { useSetupOffer, SetupOfferModal } from './setup/SetupOffer'
 
 interface MetricDefinitionModalProps {
   isOpen: boolean
@@ -100,7 +101,10 @@ export default function MetricDefinitionModal({
     })
   }
 
-  if (!isOpen) return null
+  const offer = useSetupOffer(isOpen && !editData)
+
+  if (!isOpen || offer.state === 'checking') return null
+  if (offer.state === 'offer') return <SetupOfferModal kind="metric" onManual={offer.goManual} onClose={onClose} />
 
   const sharedCount = editData?.initiative_count ?? 0
 

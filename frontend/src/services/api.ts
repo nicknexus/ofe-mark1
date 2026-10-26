@@ -23,21 +23,55 @@ import {
  MetricTag,
  MetricDefinitionWithUsage,
  CreateMetricDefinitionForm,
-    TimelineResponse,
-    ConnectEvidenceResult,
-    ProgramTemplate,
-    StructureSummary,
-    ProgramReadiness,
-  InitiativeActivity,
-    MatchPreviewScope,
-    MatchPreviewResult,
-    EvidenceMatchDiagnostics,
-    ClaimMatchDiagnostics
+ TimelineResponse,
+ ConnectEvidenceResult,
+ ProgramTemplate,
+ StructureSummary,
+ ProgramReadiness,
+ InitiativeActivity,
+ MatchPreviewScope,
+ MatchPreviewResult,
+ EvidenceMatchDiagnostics,
+ ClaimMatchDiagnostics,
+ ContentCopy,
+ ContentChannel,
+ ContentChannelVersion,
+ ContentIdea,
+ ContentIdeaGuide,
+ ContentIdeaList,
+ ContentJourney,
+ ContentJourneyStatus,
+ ContentMaster,
+ ContentPackage,
+ ContentSourceRef,
+ ContentPost,
+ ContentPostFormat,
+ ContentPostKind,
+ ContentSource,
+ ContentSourceType,
+ ContentStoryType,
+ ContentUsageFilter,
+ GraphicLayout,
+ GraphicAspect,
+ GraphicChrome,
+ GraphicCopy,
+ SiteSetupDraft,
+ SiteSetupBranding,
+  SiteSetupApplyStep,
+  SiteSetupStepResult,
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+/**
+ * Fired on window when the API refuses a request because the plan has ended.
+ * App.tsx re-checks the subscription and swaps to the "trial/subscription
+ * ended" screen instead of letting an error surface.
+ */
+export const SUBSCRIPTION_REQUIRED_EVENT = 'nexus:subscription-required'
+export const ACTIVE_ORG_CHANGED_EVENT = 'nexus:active-org-changed'
 
 /**
  * Authenticated mirror of the anonymous widget payload, served by
@@ -232,6 +266,9 @@ class ApiService {
  errorWithCode.code = error.code
  errorWithCode.status = response.status
  errorWithCode.usage = error.usage // For initiative limit errors
+ if (response.status === 403 && error.code === 'subscription_required') {
+ window.dispatchEvent(new CustomEvent(SUBSCRIPTION_REQUIRED_EVENT))
+ }
  throw errorWithCode
  } catch (parseError: any) {
  // If it's our custom error, re-throw it
@@ -1449,6 +1486,323 @@ class ApiService {
  method: 'POST',
  body: JSON.stringify({ messages, stage, context })
  })
+ }
+
+ // Set up from your website: chained so each call fits the 60s API limit.
+ async siteScanDiscover(websiteUrl: string): Promise<{ website_url: string; urls: string[] }> {
+ return this.request('/onboarding/site-scan/discover', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl })
+ })
+ }
+
+ async siteScanScrape(websiteUrl: string, urls: string[]): Promise<{ context: string; pages: number }> {
+ return this.request('/onboarding/site-scan/scrape', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl, urls })
+ })
+ }
+
+ async siteScanBranding(websiteUrl: string): Promise<SiteSetupBranding> {
+ return this.request('/onboarding/site-scan/branding', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl })
+ })
+ }
+
+ async siteScanExtract(websiteUrl: string, context: string): Promise<SiteSetupDraft> {
+ return this.request('/onboarding/site-scan/extract', {
+ method: 'POST',
+ body: JSON.stringify({ website_url: websiteUrl, context })
+ })
+ }
+
+  async siteScanApplyStep(step: SiteSetupApplyStep): Promise<SiteSetupStepResult> {
+    return this.request<SiteSetupStepResult>('/onboarding/site-scan/apply', {
+      method: 'POST',
+      body: JSON.stringify(step)
+    })
+  }
+
+ async getContentSources(opts?: {
+ offset?: number
+ limit?: number
+ source_type?: ContentSourceType | 'all'
+ usage?: ContentUsageFilter
+ singleDate?: string
+ startDate?: string
+ endDate?: string
+ initiativeId?: string
+ }): Promise<{ sources: ContentSource[]; has_more: boolean }> {
+ const params = new URLSearchParams()
+ if (opts?.initiativeId) params.set('initiative_id', opts.initiativeId)
+ if (opts?.offset) params.set('offset', String(opts.offset))
+ if (opts?.limit) params.set('limit', String(opts.limit))
+ if (opts?.source_type && opts.source_type !== 'all') params.set('source_type', opts.source_type)
+ if (opts?.usage && opts.usage !== 'all') params.set('usage', opts.usage)
+ if (opts?.singleDate) params.set('single_date', opts.singleDate)
+ if (opts?.startDate) params.set('start_date', opts.startDate)
+ if (opts?.endDate) params.set('end_date', opts.endDate)
+ const qs = params.toString()
+ return this.request<{ sources: ContentSource[]; has_more: boolean }>(`/content/sources${qs ? `?${qs}` : ''}`)
+ }
+
+ async getContentPosts(): Promise<ContentPost[]> {
+ return this.request<ContentPost[]>('/content/posts')
+ }
+
+ async createContentPost(input: {
+ kind: ContentPostKind
+ format?: ContentPostFormat
+ source_type: ContentSourceType
+ source_id: string
+ caption?: string | null
+ email_subject?: string | null
+ email_body?: string | null
+ }): Promise<ContentPost> {
+ return this.request<ContentPost>('/content/posts', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async updateContentPost(id: string, patch: Partial<Pick<ContentPost, 'caption' | 'email_subject' | 'email_body' | 'kind' | 'format'>>): Promise<ContentPost> {
+ return this.request<ContentPost>(`/content/posts/${id}`, {
+ method: 'PATCH',
+ body: JSON.stringify(patch),
+ })
+ }
+
+ async deleteContentPost(id: string): Promise<void> {
+ await this.request(`/content/posts/${id}`, { method: 'DELETE' })
+ }
+
+ async getContentImageFile(source_type: ContentSourceType, source_id: string, title: string): Promise<File> {
+ return this.fetchContentFile(`/api/content/image?${new URLSearchParams({ source_type, source_id })}`, title, 'image/jpeg')
+ }
+
+ async getContentGraphicFile(
+ source_type: ContentSourceType,
+ source_id: string,
+ title: string,
+ opts?: {
+ layout?: GraphicLayout
+ aspect?: GraphicAspect
+ chrome?: GraphicChrome
+ copy?: GraphicCopy
+ }
+ ): Promise<File> {
+ const params = new URLSearchParams({ source_type, source_id })
+ if (opts?.layout) params.set('layout', opts.layout)
+ if (opts?.aspect) params.set('aspect', opts.aspect)
+ if (opts?.chrome) {
+ params.set('show_logo', opts.chrome.logo ? '1' : '0')
+ params.set('show_name', opts.chrome.orgName ? '1' : '0')
+ params.set('show_title', opts.chrome.title ? '1' : '0')
+ params.set('show_metric', opts.chrome.metric ? '1' : '0')
+ params.set('show_location', opts.chrome.location ? '1' : '0')
+ }
+ if (opts?.copy) {
+ params.set('org_name', opts.copy.orgName || '')
+ params.set('title', opts.copy.title || '')
+ params.set('metric_text', opts.copy.metricText || '')
+ params.set('metric_label', opts.copy.metricLabel || '')
+ params.set('location', opts.copy.location || '')
+ }
+ return this.fetchContentFile(`/api/content/graphic?${params}`, title, 'image/png')
+ }
+
+ private async fetchContentFile(path: string, title: string, fallbackType: string): Promise<File> {
+ const headers = await this.getAuthHeaders()
+ const response = await fetch(`${API_BASE_URL}${path}`, { headers })
+ if (!response.ok) {
+ let message = 'Could not download photo'
+ try {
+ const err = await response.json()
+ message = err.error || err.message || message
+ } catch { /* ignore */ }
+ throw new Error(message)
+ }
+ const blob = await response.blob()
+ const type = blob.type && blob.type !== 'application/octet-stream' ? blob.type : fallbackType
+ const ext = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : 'jpg'
+ const base = title.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'impact-photo'
+ return new File([blob], `${base}.${ext}`, { type })
+ }
+
+ async generateContentCopy(source_type: ContentSourceType, source_id: string): Promise<ContentCopy> {
+ return this.request<ContentCopy>('/content/generate-copy', {
+ method: 'POST',
+ body: JSON.stringify({ source_type, source_id }),
+ })
+ }
+
+ async recommendContent(story_type?: ContentStoryType): Promise<ContentMaster> {
+ return this.request<ContentMaster>('/content/recommend', {
+ method: 'POST',
+ body: JSON.stringify(story_type ? { story_type } : {}),
+ })
+ }
+
+ async generateContentMaster(input: {
+ source_type: ContentSourceType
+ source_id: string
+ story_type: ContentStoryType
+ why?: string
+ journey_id?: string | null
+ package_id?: string | null
+ extras?: ContentSourceRef[]
+ idea_id?: string | null
+ }): Promise<ContentMaster> {
+ return this.request<ContentMaster>('/content/generate-master', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async refineContentMaster(input: {
+ source_type: ContentSourceType
+ source_id: string
+ story_type: ContentStoryType
+ hook: string
+ body: string
+ evidence_line?: string
+ cta?: string
+ context: string
+ why?: string
+ journey_id?: string | null
+ package_id?: string | null
+ extras?: ContentSourceRef[]
+ }): Promise<ContentMaster> {
+ return this.request<ContentMaster>('/content/refine-master', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async generateContentVersions(input: {
+ source_type: ContentSourceType
+ source_id: string
+ story_type: ContentStoryType
+ hook: string
+ body: string
+ evidence_line?: string
+ cta?: string
+ context?: string
+ channels: ContentChannel[]
+ journey_id?: string | null
+ package_id?: string | null
+ extras?: ContentSourceRef[]
+ }): Promise<ContentChannelVersion[]> {
+ const result = await this.request<{ versions: ContentChannelVersion[] }>('/content/generate-versions', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ return result.versions
+ }
+
+ async getContentPackages(journeyId?: string | 'none'): Promise<ContentPackage[]> {
+ const qs = journeyId ? `?${new URLSearchParams({ journey_id: journeyId })}` : ''
+ return this.request<ContentPackage[]>(`/content/packages${qs}`)
+ }
+
+ async getContentPackage(id: string): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}`)
+ }
+
+ async getContentIdeas(): Promise<ContentIdeaList> {
+ return this.request<ContentIdeaList>('/content/ideas')
+ }
+
+ async refreshContentIdeas(): Promise<ContentIdeaList> {
+ return this.request<ContentIdeaList>('/content/ideas/refresh', { method: 'POST' })
+ }
+
+ async getContentIdea(id: string): Promise<ContentIdea & { guide: ContentIdeaGuide }> {
+ return this.request<ContentIdea & { guide: ContentIdeaGuide }>(`/content/ideas/${id}`)
+ }
+
+ async updateContentIdea(
+ id: string,
+ input: { status: 'accepted' | 'dismissed' | 'snoozed' | 'suggested'; reason?: string; snooze_days?: number }
+ ): Promise<ContentIdea> {
+ return this.request<ContentIdea>(`/content/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+ }
+
+ async getContentIdeaSignals(): Promise<unknown[]> {
+ return this.request<unknown[]>('/content/ideas/signals')
+ }
+
+ async getContentJourneys(): Promise<ContentJourney[]> {
+ return this.request<ContentJourney[]>('/content/journeys')
+ }
+
+ async createContentJourney(input: { title: string; description?: string | null; initiative_id?: string | null }): Promise<ContentJourney> {
+ return this.request<ContentJourney>('/content/journeys', {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async updateContentJourney(
+ id: string,
+ patch: { title?: string; description?: string | null; initiative_id?: string | null; status?: ContentJourneyStatus; published?: boolean }
+ ): Promise<ContentJourney> {
+ return this.request<ContentJourney>(`/content/journeys/${id}`, {
+ method: 'PATCH',
+ body: JSON.stringify(patch),
+ })
+ }
+
+ async deleteContentJourney(id: string): Promise<void> {
+ await this.request(`/content/journeys/${id}`, { method: 'DELETE' })
+ }
+
+ async saveContentPackage(input: {
+ id?: string | null
+ journey_id?: string | null
+ idea_id?: string | null
+ extras?: ContentSourceRef[]
+ hook: string
+ body: string
+ evidence_line?: string
+ cta?: string
+ why?: string
+ layout?: GraphicLayout
+ source_type: ContentSourceType
+ source_id: string
+ publish?: boolean
+ }): Promise<ContentPackage> {
+ const { id, ...body } = input
+ return this.request<ContentPackage>(id ? `/content/packages/${id}` : '/content/packages', {
+ method: id ? 'PUT' : 'POST',
+ body: JSON.stringify(body),
+ })
+ }
+
+ async publishContentPackage(id: string, published: boolean): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/publish`, {
+ method: 'PATCH',
+ body: JSON.stringify({ published }),
+ })
+ }
+
+ async generateContentChannels(id: string, input: { channels: ContentChannel[]; context?: string }): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/channels/generate`, {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
+ async saveContentChannels(id: string, versions: ContentChannelVersion[]): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/channels`, {
+ method: 'PUT',
+ body: JSON.stringify({ versions }),
+ })
+ }
+
+ async deleteContentPackage(id: string): Promise<void> {
+ await this.request(`/content/packages/${id}`, { method: 'DELETE' })
  }
 
  // Storage - Phase 1: Tracking Only

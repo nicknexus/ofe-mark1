@@ -152,9 +152,10 @@ function SortableLocationCard({
 interface LocationTabProps {
  onStoryClick?: (storyId: string) => void
  onMetricClick?: (kpiId: string) => void
+ onCount?: (count: number) => void
 }
 
-export default function LocationTab({ onStoryClick, onMetricClick }: LocationTabProps) {
+export default function LocationTab({ onStoryClick, onMetricClick, onCount }: LocationTabProps) {
  const { id: initiativeId } = useParams<{ id: string }>()
  const { canEditLocations, canDelete } = useTeam()
  const [locations, setLocations] = useState<Location[]>([])
@@ -248,6 +249,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  setLoading(true)
  const data = await apiService.getLocations(initiativeId)
  setLocations(data)
+ onCount?.(data.length)
  } catch (error) {
  notify.error('Failed to load locations')
  console.error(error)
@@ -542,7 +544,9 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  initiativeId={initiativeId}
  excludeIds={locations.map(l => l.id!).filter(Boolean)}
  onCreateNew={handleCreateNewFromPicker}
+ onOptimisticAdd={(n) => onCount?.(Math.max(0, locations.length + n))}
  onLinked={() => {
+ setIsPickerOpen(false)
  loadLocations()
  }}
  />

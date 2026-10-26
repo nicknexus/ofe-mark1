@@ -42,7 +42,9 @@ export default function LayoutIntro() {
         } catch {
           localSeen = 0
         }
-        if (seen >= LAYOUT_INTRO_VERSION || localSeen >= LAYOUT_INTRO_VERSION) {
+        // Nothing is "new" to accounts created in the last 30 days.
+        const isNewAccount = Date.now() - new Date(user.created_at).getTime() < 30 * 24 * 60 * 60 * 1000
+        if (isNewAccount || seen >= LAYOUT_INTRO_VERSION || localSeen >= LAYOUT_INTRO_VERSION) {
           markLayoutIntroSeenLocal(user.id)
           endLayoutIntroCheck(false)
           return

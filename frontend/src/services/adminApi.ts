@@ -67,8 +67,18 @@ export interface AdminOrgSubscription {
  stripe_subscription_id?: string | null
 }
 
-/** Where a customer's plan came from — paid, comped by us, or neither. */
-export type PlanSource = 'stripe' | 'admin' | 'code' | 'free' | 'none'
+/** What an account actually is right now. Mirrors backend AccountState. */
+export type AccountState =
+ | 'paying'
+ | 'discounted'
+ | 'past_due'
+ | 'trialing'
+ | 'trial_cancelling'
+ | 'grace'
+ | 'comped'
+ | 'internal'
+ | 'ended'
+ | 'no_plan'
 
 export type PlanTier = 'free' | 'growth' | 'pro'
 
@@ -77,12 +87,19 @@ export interface AdminOrg {
  name: string
  slug: string
  is_public: boolean
+ public_live: boolean
+ paid_before: boolean
+ stripe_status: string | null
  created_at: string
  logo_url: string | null
  brand_color: string | null
  owner: { id: string | null; email?: string; name?: string; last_sign_in_at?: string | null }
  subscription: AdminOrgSubscription | null
- plan_source: PlanSource
+ state: AccountState
+ has_access: boolean
+ key_date: string | null
+ mrr_cents: number | null
+ discount_label: string | null
  limits_overridden: boolean
  usage: {
  team_members: number
@@ -130,6 +147,7 @@ export interface AdminAccount {
  slug: string
  description?: string | null
  is_public: boolean
+ public_live: boolean
  is_demo: boolean
  created_at: string
  logo_url?: string | null
@@ -149,12 +167,16 @@ export interface AdminAccount {
  tier: PlanTier
  name: string
  status: string
- source: PlanSource
+ state: AccountState
+ has_access: boolean
+ paid_before: boolean
+ key_date: string | null
+ discount_label: string | null
  trial_ends_at: string | null
  catalog_limits: PlanLimits
  effective_limits: PlanLimits
  overridden_fields: string[]
- features: { tags: boolean; beneficiaryGroups: boolean }
+ features: { tags: boolean; beneficiaryGroups: boolean; contentStudio: boolean }
  }
  billing: AdminBilling | null
  access_code: { code: string | null; days_granted: number | null; description: string | null; redeemed_at: string } | null

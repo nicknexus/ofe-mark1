@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import Stripe from 'stripe';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { SubscriptionService, Subscription } from '../services/subscriptionService';
 import { stripe, STRIPE_CONFIG, priceIdForTier, tierFromPriceId, BillingInterval } from '../utils/stripe';
@@ -77,7 +78,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
         } else if (sub.stripe_customer_id && (sub.status === 'none' || sub.status === 'expired' || sub.status === 'cancelled')) {
             await SubscriptionService.syncFromStripeCustomer(req.user!.id, sub.stripe_customer_id);
         }
-        const { hasAccess, reason, subscription, isSupportMode } =
+        const { hasAccess, reason, subscription, isSupportMode, fallbackOrgId } =
             await SubscriptionService.getAccessForContext(req.user!.id, requestedOrgId);
         const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
 
@@ -88,49 +89,10 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
             remainingTrialDays,
             trialDurationDays: TRIAL_DURATION_DAYS,
             isSupportMode,
+            ...(fallbackOrgId && { fallbackOrgId }),
         });
     } catch (error) {
         console.error('Error fetching subscription status:', error);
-        res.status(500).json({ error: (error as Error).message });
-    }
-});
-
-/**
- * POST /api/subscription/redeem-code
- * Redeem an access code for extended trial
- */
-router.post('/redeem-code', authenticateUser, blockInSupportMode, async (req: AuthenticatedRequest, res) => {
-    try {
-        const { code } = req.body;
-        console.log('[redeem-code] body:', JSON.stringify(req.body), 'code:', code);
-
-        if (!code || typeof code !== 'string') {
-            console.log('[redeem-code] 400: Access code is required');
-            res.status(400).json({ error: 'Access code is required' });
-            return;
-        }
-
-        const result = await SubscriptionService.redeemAccessCode(req.user!.id, code);
-
-        if (!result.success) {
-            console.log('[redeem-code] 400:', result.error);
-            res.status(400).json({ error: result.error });
-            return;
-        }
-
-        const remainingTrialDays = result.subscription
-            ? SubscriptionService.getRemainingTrialDays(result.subscription)
-            : result.daysGranted;
-
-        res.json({
-            success: true,
-            subscription: result.subscription,
-            remainingTrialDays,
-            daysGranted: result.daysGranted,
-            message: `Access code redeemed! You have ${result.daysGranted} days of full access.`
-        });
-    } catch (error) {
-        console.error('Error redeeming access code:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -201,6 +163,7 @@ function getFeaturesByPlan(
         { name: plan.ai_reports_per_day === null ? 'Unlimited AI reports' : `${plan.ai_reports_per_day} AI report/day`, included: true },
         { name: 'Metric tags / themes', included: plan.features.tags },
         { name: 'Beneficiary groups', included: plan.features.beneficiaryGroups },
+        { name: 'Impact content studio', included: plan.features.contentStudio },
     ];
 }
 
@@ -356,7 +319,8 @@ router.post('/confirm-checkout', authenticateUser, blockInSupportMode, async (re
             return;
         }
 
-        const stripeSub = await stripe.subscriptions.retrieve(session.subscription as string) as any;
+        let stripeSub = await stripe.subscriptions.retrieve(session.subscription as string) as any;
+        stripeSub = await SubscriptionService.enforceOneTrialPerCard(req.user!.id, stripeSub);
         const subscription = await SubscriptionService.applyStripeSubscription(req.user!.id, stripeSub, {
             markTrialUsed: true,
         });
@@ -364,7 +328,7 @@ router.post('/confirm-checkout', authenticateUser, blockInSupportMode, async (re
             success: true,
             subscription: toClientSubscription(subscription),
             remainingTrialDays: SubscriptionService.getRemainingTrialDays(subscription),
-            hasAccess: SubscriptionService.isLiveForPublic(subscription) || subscription.status === 'trial',
+            hasAccess: SubscriptionService.evaluate(subscription),
         });
     } catch (error) {
         console.error('Error confirming checkout:', error);
@@ -408,9 +372,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 const userId = session.metadata?.user_id;
 
                 if (userId && session.subscription) {
-                    const stripeSubscription = await stripe.subscriptions.retrieve(
+                    let stripeSubscription = await stripe.subscriptions.retrieve(
                         session.subscription as string
                     ) as any;
+                    stripeSubscription = await SubscriptionService.enforceOneTrialPerCard(userId, stripeSubscription);
                     const applied = await SubscriptionService.applyStripeSubscription(userId, stripeSubscription, {
                         markTrialUsed: true,
                     });
@@ -430,6 +395,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     subscriptionId: subscription.id,
                     status: subscription.status,
                     cancel_at_period_end: subscription.cancel_at_period_end,
+                    cancel_at: subscription.cancel_at,
                     hasUserId: !!userId,
                     metadata: subscription.metadata,
                 });
@@ -447,28 +413,35 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
                 }
                 if (userId) {
-                    await SubscriptionService.deactivateAndUnpublish(userId);
-                    console.log(`✅ Subscription deleted for user ${userId} → unpublished and locked`);
+                    const applied = await SubscriptionService.handleStripeCancellation(userId, subscription);
+                    console.log(`✅ Subscription deleted for user ${userId} (status=${applied.status}, access until ${applied.current_period_end ?? 'now'})`);
                 } else {
                     console.warn('[webhook] customer.subscription.deleted: no user_id (metadata or stripe_subscription_id lookup)', subscription.id);
                 }
                 break;
             }
 
+            case 'invoice.paid': {
+                await SubscriptionService.emailReceiptForPaidInvoice(event.data.object as Stripe.Invoice);
+                break;
+            }
+
             case 'invoice.payment_failed': {
-                const invoice = event.data.object as any;
-                const subscriptionId = invoice.subscription as string;
+                const invoice = event.data.object as Stripe.Invoice;
+                // Newer API versions moved this under parent.subscription_details.
+                const legacySub = (invoice as { subscription?: string | { id?: string } }).subscription;
+                const parentSub = invoice.parent?.subscription_details?.subscription;
+                const subscriptionId =
+                    (typeof legacySub === 'string' ? legacySub : legacySub?.id)
+                    ?? (typeof parentSub === 'string' ? parentSub : parentSub?.id);
 
                 if (subscriptionId) {
                     const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
                     const userId = stripeSubscription.metadata?.user_id;
 
                     if (userId) {
-                        await SubscriptionService.updateFromStripe(userId, {
-                            status: 'past_due',
-                        });
-
-                        console.log(`⚠️ Payment failed for user ${userId}`);
+                        await SubscriptionService.applyStripeSubscription(userId, stripeSubscription);
+                        console.log(`⚠️ Payment failed for user ${userId} (stripe status ${stripeSubscription.status})`);
                     }
                 }
                 break;
