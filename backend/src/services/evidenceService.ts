@@ -155,32 +155,35 @@ export class EvidenceService {
             throw new Error('initiative_id is required');
         }
 
-        await OrgAccessService.assertEvidenceLinkageConsistency(
-            evidenceData.initiative_id,
-            userId,
-            requestedOrgId,
-            {
-                kpi_ids: kpi_ids as string[] | undefined,
-                kpi_update_ids: kpi_update_ids as string[] | undefined,
-                location_ids: location_ids as string[] | undefined,
-                beneficiary_group_ids: beneficiary_group_ids as string[] | undefined,
-            }
-        );
-
         const { PermissionService } = await import('./permissionService');
-        await PermissionService.assert(userId, requestedOrgId, 'evidence', 'create', {
-            initiativeId: evidenceData.initiative_id,
-        });
-
-        // Review gate: evidence from a flagged team member is saved as
-        // 'pending' — the row and its files exist, but it gets no
-        // evidence_kpi_updates links until an admin approves it, so it never
-        // connects to claims or counts in any aggregate.
         const { TeamService } = await import('./teamService');
-        const orgCtx = await OrgAccessService.resolveOrgContext(userId, requestedOrgId);
-        const requiresApproval = orgCtx && !orgCtx.isOwner
-            ? await TeamService.evidenceRequiresApproval(userId, orgCtx.organizationId)
-            : false;
+        // Read-only checks, each a Supabase round trip; nothing is written until all pass.
+        const [, , requiresApproval] = await Promise.all([
+            OrgAccessService.assertEvidenceLinkageConsistency(
+                evidenceData.initiative_id,
+                userId,
+                requestedOrgId,
+                {
+                    kpi_ids: kpi_ids as string[] | undefined,
+                    kpi_update_ids: kpi_update_ids as string[] | undefined,
+                    location_ids: location_ids as string[] | undefined,
+                    beneficiary_group_ids: beneficiary_group_ids as string[] | undefined,
+                }
+            ),
+            PermissionService.assert(userId, requestedOrgId, 'evidence', 'create', {
+                initiativeId: evidenceData.initiative_id,
+            }),
+            // Review gate: evidence from a flagged team member is saved as
+            // 'pending' — the row and its files exist, but it gets no
+            // evidence_kpi_updates links until an admin approves it, so it never
+            // connects to claims or counts in any aggregate.
+            (async () => {
+                const orgCtx = await OrgAccessService.resolveOrgContext(userId, requestedOrgId);
+                return orgCtx && !orgCtx.isOwner
+                    ? await TeamService.evidenceRequiresApproval(userId, orgCtx.organizationId)
+                    : false;
+            })(),
+        ]);
 
         const { data, error } = await supabase
             .from('evidence')
@@ -198,100 +201,77 @@ export class EvidenceService {
         // Locations are load-bearing for auto-link (autoLinkToMatchingUpdates short-circuits
         // on empty location_ids), so a silent drop here would produce an evidence row that
         // can never auto-link to claims. Treat failures as fatal and roll back.
-        if (location_ids && location_ids.length > 0) {
-            const locationLinks = (location_ids as string[]).map((locationId: string) => ({
-                evidence_id: data.id,
-                location_id: locationId,
-                user_id: userId
-            }));
-
-            const { error: locationError } = await supabase
-                .from('evidence_locations')
-                .insert(locationLinks);
-
-            if (locationError) {
-                console.error('Failed to insert evidence locations:', locationError);
-                await this.cleanupPartialEvidence(data.id)
-                throw new Error(`Failed to link evidence to locations: ${locationError.message}`)
-            }
-        }
-
         // Insert multiple files into evidence_files table if provided.
         // For grouped uploads this is the single source of truth for the file set —
         // silently dropping the inserts would leave a titled evidence row with zero
         // files visible in the UI. Roll back on failure so the caller can retry.
-        if (file_urls && file_urls.length > 0) {
-            const evidenceFiles = (file_urls as string[]).map((fileUrl: string, index: number) =>
-                this.fileRowFromUrl(data.id, fileUrl, index, (file_sizes as number[] | undefined)?.[index] || 0)
-            )
-
-            const { error: filesError } = await supabase
-                .from('evidence_files')
-                .insert(evidenceFiles)
-
-            if (filesError) {
-                console.error('Failed to insert evidence files:', filesError)
-                await this.cleanupPartialEvidence(data.id)
-                throw new Error(`Failed to attach files to evidence: ${filesError.message}`)
-            }
+        // Both inserts settle before any rollback so cleanup never races a write.
+        const [locationResult, filesResult] = await Promise.all([
+            location_ids && location_ids.length > 0
+                ? supabase.from('evidence_locations').insert((location_ids as string[]).map((locationId: string) => ({
+                    evidence_id: data.id,
+                    location_id: locationId,
+                    user_id: userId
+                })))
+                : null,
+            file_urls && file_urls.length > 0
+                ? supabase.from('evidence_files').insert((file_urls as string[]).map((fileUrl: string, index: number) =>
+                    this.fileRowFromUrl(data.id, fileUrl, index, (file_sizes as number[] | undefined)?.[index] || 0)
+                ))
+                : null,
+        ]);
+        if (locationResult?.error || filesResult?.error) {
+            if (locationResult?.error) console.error('Failed to insert evidence locations:', locationResult.error);
+            if (filesResult?.error) console.error('Failed to insert evidence files:', filesResult.error);
+            await this.cleanupPartialEvidence(data.id)
+            throw new Error(locationResult?.error
+                ? `Failed to link evidence to locations: ${locationResult.error.message}`
+                : `Failed to attach files to evidence: ${filesResult!.error!.message}`)
         }
 
-        // Legacy: Link to KPIs if provided
-        if (kpi_ids && kpi_ids.length > 0) {
-            const kpiLinks = (kpi_ids as string[]).map((kpiId: string) => ({
-                evidence_id: data.id,
-                kpi_id: kpiId
-            }));
-
-            const { error: linkError } = await supabase
-                .from('evidence_kpis')
-                .insert(kpiLinks);
-
-            if (linkError) throw new Error(`Failed to link evidence to KPIs: ${linkError.message}`);
-        }
-
-        // New: Link to specific KPI updates (data points) if provided.
-        // Pending evidence gets NO claim links — they're created on approval
-        // by reconcileLinksForEvidence (matching scope ⇒ auto-link).
-        if (!requiresApproval && kpi_update_ids && kpi_update_ids.length > 0) {
-            const updateLinks = (kpi_update_ids as string[]).map((updateId: string) => ({
-                evidence_id: data.id,
-                kpi_update_id: updateId,
-                user_id: userId
-            }));
-
-            const { error: linkError2 } = await supabase
-                .from('evidence_kpi_updates')
-                .insert(updateLinks);
-
-            if (linkError2) throw new Error(`Failed to link evidence to data points: ${linkError2.message}`);
-        }
-
-        // Auto-link to any existing matching impact claims not already linked.
-        // Pass tag_ids alongside ben groups so the auto-link respects the tag gate.
-        if (!requiresApproval) {
-            await this.autoLinkToMatchingUpdates(data.id, kpi_ids || [], location_ids || [], {
+        // Independent link writes. Auto-link skips kpi_update_ids (passed as
+        // already linked), so it never inserts the same pair as the explicit links.
+        const linkResults = await Promise.allSettled([
+            // Legacy: Link to KPIs if provided
+            (async () => {
+                if (!kpi_ids || kpi_ids.length === 0) return;
+                const { error: linkError } = await supabase
+                    .from('evidence_kpis')
+                    .insert((kpi_ids as string[]).map((kpiId: string) => ({ evidence_id: data.id, kpi_id: kpiId })));
+                if (linkError) throw new Error(`Failed to link evidence to KPIs: ${linkError.message}`);
+            })(),
+            // New: Link to specific KPI updates (data points) if provided.
+            // Pending evidence gets NO claim links — they're created on approval
+            // by reconcileLinksForEvidence (matching scope ⇒ auto-link).
+            (async () => {
+                if (requiresApproval || !kpi_update_ids || kpi_update_ids.length === 0) return;
+                const { error: linkError2 } = await supabase
+                    .from('evidence_kpi_updates')
+                    .insert((kpi_update_ids as string[]).map((updateId: string) => ({
+                        evidence_id: data.id,
+                        kpi_update_id: updateId,
+                        user_id: userId
+                    })));
+                if (linkError2) throw new Error(`Failed to link evidence to data points: ${linkError2.message}`);
+            })(),
+            // Auto-link to any existing matching impact claims not already linked.
+            // Pass tag_ids alongside ben groups so the auto-link respects the tag gate.
+            requiresApproval ? null : this.autoLinkToMatchingUpdates(data.id, kpi_ids || [], location_ids || [], {
                 date_represented: data.date_represented,
                 date_range_start: data.date_range_start,
                 date_range_end: data.date_range_end
-            }, kpi_update_ids || [], userId, beneficiary_group_ids || [], tag_ids || []);
-        }
-
-        // Link to beneficiary groups if provided
-        if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
-            const bgLinks = beneficiary_group_ids.map((bgId: string) => ({
-                evidence_id: data.id,
-                beneficiary_group_id: bgId
-            }));
-
-            const { error: bgError } = await supabase
-                .from('evidence_beneficiary_groups')
-                .insert(bgLinks);
-
-            if (bgError) {
-                console.error('Failed to insert evidence beneficiary groups:', bgError);
-            }
-        }
+            }, kpi_update_ids || [], userId, beneficiary_group_ids || [], tag_ids || []),
+            // Link to beneficiary groups if provided
+            (async () => {
+                if (!beneficiary_group_ids || beneficiary_group_ids.length === 0) return;
+                const { error: bgError } = await supabase
+                    .from('evidence_beneficiary_groups')
+                    .insert(beneficiary_group_ids.map((bgId: string) => ({ evidence_id: data.id, beneficiary_group_id: bgId })));
+                if (bgError) console.error('Failed to insert evidence beneficiary groups:', bgError);
+            })(),
+        ]);
+        const linkFailure = linkResults.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+        if (linkFailure) throw linkFailure.reason;
 
         if (Array.isArray(tag_ids)) {
             await MetricTagService.setTagsForEvidence(data.id, tag_ids, userId, requestedOrgId)

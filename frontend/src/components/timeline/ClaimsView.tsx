@@ -31,10 +31,12 @@ interface ClaimsViewProps {
   onQuickSetup?: () => void
   knownMetricCount?: number
   knownLocationCount?: number | null
+  /** Records created in the save the user just finished. */
+  newIds?: Set<string>
 }
 
-/** All impact claims in the initiative, oldest first so a new log sits at the bottom. */
-export default function ClaimsView({ claims, kpis, locations, evidence, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim, onQuickSetup, knownMetricCount, knownLocationCount }: ClaimsViewProps) {
+/** All impact claims in the initiative, newest first so a new log sits at the top. */
+export default function ClaimsView({ claims, kpis, locations, evidence, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim, onQuickSetup, knownMetricCount, knownLocationCount, newIds }: ClaimsViewProps) {
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
 
@@ -112,6 +114,7 @@ export default function ClaimsView({ claims, kpis, locations, evidence, contribu
             <TimelineRow
               key={claim.id}
               layout="claim"
+              isNew={!!newIds?.has(claim.id!)}
               title={
                 <span className="inline-flex items-baseline gap-1">
                   <span className="text-lg font-bold text-gray-900 tabular-nums">

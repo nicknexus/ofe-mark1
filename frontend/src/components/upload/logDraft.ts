@@ -128,7 +128,7 @@ export function buildLogPlan(state: WizardState, initiativeId?: string) {
   const rows = fileRows(state, file)
   const scopes = new Map<string, { details: LogDetails; rowIds: string[]; kpiIds: string[] }>()
   for (const row of rows.length ? rows : [null]) {
-   const details = row ? rowDetails(state, row) : sharedLogDetails(state)
+   const details = { ...(row ? rowDetails(state, row) : sharedLogDetails(state)), ...file.overrides }
    const scopeKey = JSON.stringify([details.evidenceTitle, details.evidenceDescription, logDates(details), sorted(details.locationIds), sorted(details.tagIds), sorted(details.beneficiaryGroupIds)])
    const scope = scopes.get(scopeKey) || { details, rowIds: [], kpiIds: [] }
    if (row) { scope.rowIds.push(row.id); scope.kpiIds.push(row.kpiId) }
@@ -187,8 +187,62 @@ export function validateLogDraft(state: WizardState, kpis?: Array<{ id?: string;
   if (!start) return 'Choose an activity date for every item'
   if (start > end) return 'The date range is reversed'
  }
- if (plan.evidence.some(e => !e.payload.title)) return 'Give the evidence a short title in the master scope or its metric details'
+ if (plan.evidence.some(e => !e.payload.title)) return 'Give the evidence a short title in the Master Scope or its metric details'
+ if (plan.evidence.some(e => !e.payload.location_ids?.length)) return 'Choose a location for the evidence so it can connect to results'
  return null
+}
+
+/** Evidence-only members can't add results, so a metric tag is the only way their files connect. */
+export function evidenceMetricError(state: WizardState, metricCount: number): string | null {
+ if (!metricCount || !state.files.length || (state.logRows || []).length) return null
+ return 'Pick at least one metric this evidence supports'
+}
+
+export type LogField = 'title' | 'date' | 'location' | 'amount'
+export interface LogFieldIssues {
+ shared: LogField[]
+ rows: Record<string, LogField[]>
+ files: Record<string, LogField[]>
+}
+
+const FIELD_KEYS: Record<Exclude<LogField, 'amount'>, Array<keyof LogDetails>> = {
+ title: ['evidenceTitle'],
+ date: ['dateMode', 'dateSingle', 'dateStart', 'dateEnd'],
+ location: ['locationIds'],
+}
+
+/** Points each validation gap at the scope that owns the empty field. */
+export function logFieldIssues(state: WizardState): LogFieldIssues {
+ const issues: LogFieldIssues = { shared: [], rows: {}, files: {} }
+ const add = (list: LogField[], field: LogField) => { if (!list.includes(field)) list.push(field) }
+ const owns = (overrides: Partial<LogDetails> | undefined, field: Exclude<LogField, 'amount'>) => FIELD_KEYS[field].some(key => overrides?.[key] !== undefined)
+ const flag = (field: Exclude<LogField, 'amount'>, row?: LogMetricRow, file?: WizardFile) => {
+  if (file && owns(file.overrides, field)) add(issues.files[file.id] ||= [], field)
+  else if (row && owns(row.overrides, field)) add(issues.rows[row.id] ||= [], field)
+  else add(issues.shared, field)
+ }
+ const badDate = (details: LogDetails) => {
+  const { start, end } = logDates(details)
+  return !start || start > end
+ }
+ const rows = state.logRows || []
+ for (const row of rows) {
+  if (!rowHasResult(state, row)) continue
+  const details = rowDetails(state, row)
+  if (details.locationIds.length !== 1) flag('location', row)
+  if (badDate(details)) flag('date', row)
+  const values = details.tagIds.length > 1 ? [row.value, ...details.tagIds.map(id => row.tagValues[id] || '')] : [row.value]
+  if (values.some(v => !v.trim() || !Number.isFinite(Number(v)))) add(issues.rows[row.id] ||= [], 'amount')
+ }
+ for (const evidence of buildLogPlan(state).evidence) {
+  const row = evidence.rowIds.length === 1 ? rows.find(r => r.id === evidence.rowIds[0]) : undefined
+  for (const file of evidence.files) {
+   if (!evidence.payload.title) flag('title', row, file)
+   if (!evidence.details.locationIds.length) flag('location', row, file)
+   if (badDate(evidence.details)) flag('date', row, file)
+  }
+ }
+ return issues
 }
 
 export interface LogSaveProgress {
@@ -200,7 +254,10 @@ export interface LogSaveProgress {
 /** Retain confirmed records on retry; never submit the already-saved prefix again. */
 export async function saveLogPlan(
  plan: ReturnType<typeof buildLogPlan>,
- api: { createKPIUpdate: (id: string, payload: CreateKPIUpdateForm) => Promise<{ id?: string }>; createEvidence: (payload: CreateEvidenceForm) => Promise<{ id?: string }> },
+ api: {
+  createKPIUpdatesBatch: (updates: Array<CreateKPIUpdateForm & { kpi_id: string }>) => Promise<Array<{ id?: string; kpi_id?: string }>>
+  createEvidence: (payload: CreateEvidenceForm) => Promise<{ id?: string }>
+ },
  progress: LogSaveProgress,
  onProgress: (saved: number, total: number) => void,
  pinClaimId?: string,
@@ -208,23 +265,32 @@ export async function saveLogPlan(
  const total = plan.claims.length + plan.evidence.length
  const report = () => onProgress(progress.claims.size + progress.evidence.size, total)
  report()
- for (const claim of plan.claims) {
-  if (!progress.claims.has(claim.key)) {
-   const created = await api.createKPIUpdate(claim.kpiId, claim.payload)
-   if (!created?.id) throw new Error('The result could not be confirmed as saved')
-   progress.claims.set(claim.key, created.id)
+ const pendingClaims = plan.claims.filter(claim => !progress.claims.has(claim.key))
+ if (pendingClaims.length) {
+  // The batch endpoint returns rows grouped by metric in first-seen order; send them that way so indexes line up.
+  const grouped = [...new Set(pendingClaims.map(c => c.kpiId))].flatMap(kpiId => pendingClaims.filter(c => c.kpiId === kpiId))
+  const created = await api.createKPIUpdatesBatch(grouped.map(c => ({ ...c.payload, kpi_id: c.kpiId })))
+  if (created.length !== grouped.length || created.some((row, i) => !row?.id || (row.kpi_id && row.kpi_id !== grouped[i].kpiId))) {
+   throw new Error('The results could not be confirmed as saved')
+  }
+  grouped.forEach((claim, i) => progress.claims.set(claim.key, created[i].id!))
+  report()
+ }
+ const queue = plan.evidence.filter(evidence => !progress.evidence.has(evidence.key))
+ const worker = async () => {
+  for (let evidence = queue.shift(); evidence; evidence = queue.shift()) {
+   const created = await api.createEvidence({ ...evidence.payload, kpi_update_ids: sorted([
+    ...evidence.claimKeys.flatMap(key => progress.claims.get(key) || []),
+    ...(pinClaimId ? [pinClaimId] : []),
+   ]) })
+   if (!created?.id) throw new Error('The evidence could not be confirmed as saved')
+   progress.evidence.add(evidence.key)
+   evidence.files.forEach(f => progress.ownedUrls.add(f.url!))
    report()
   }
  }
- for (const evidence of plan.evidence) {
-  if (progress.evidence.has(evidence.key)) continue
-  const created = await api.createEvidence({ ...evidence.payload, kpi_update_ids: sorted([
-   ...evidence.claimKeys.flatMap(key => progress.claims.get(key) || []),
-   ...(pinClaimId ? [pinClaimId] : []),
-  ]) })
-  if (!created?.id) throw new Error('The evidence could not be confirmed as saved')
-  progress.evidence.add(evidence.key)
-  evidence.files.forEach(f => progress.ownedUrls.add(f.url!))
-  report()
- }
+ // Settle every in-flight request before surfacing an error, so a retry never races a save still running.
+ const results = await Promise.allSettled(Array.from({ length: Math.min(3, queue.length) }, worker))
+ const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
+ if (failed) throw failed.reason
 }

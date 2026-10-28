@@ -43,7 +43,7 @@ const TABS: { id: ProgramTab; label: string; icon: React.ComponentType<{ classNa
   { id: 'logs', label: 'Logs', icon: Activity },
   { id: 'metrics', label: 'Metrics', icon: BarChart3 },
   { id: 'location', label: 'Locations', icon: MapPin },
-  { id: 'beneficiaries', label: 'People', icon: Users },
+  { id: 'beneficiaries', label: 'Groups', icon: Users },
   { id: 'stories', label: 'Stories', icon: BookOpen },
 ]
 

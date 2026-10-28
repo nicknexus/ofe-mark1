@@ -4,6 +4,7 @@ import { KPI, Location, TimelineClaim, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
 import { filterClaims, filterEvidence, getEvidenceImageUrl, hasActiveFilters, sortByMode, TimelineFilters } from '../../utils/timeline'
 import { EmptyState } from '../ui'
+import { JustAddedBadge, JUST_ADDED_ROW } from './TimelineRow'
 
 interface AllLogsViewProps {
  claims: TimelineClaim[]
@@ -13,10 +14,12 @@ interface AllLogsViewProps {
  filters: TimelineFilters
  onOpenClaim: (claim: TimelineClaim, kpi: KPI | undefined) => void
  onOpenEvidence: (evidence: TimelineEvidence) => void
+ /** Records created in the save the user just finished. */
+ newIds?: Set<string>
 }
 
 /** Saved records stay visible whether or not they have a support relationship. */
-export default function AllLogsView({ claims, evidence, kpis, locations, filters, onOpenClaim, onOpenEvidence }: AllLogsViewProps) {
+export default function AllLogsView({ claims, evidence, kpis, locations, filters, onOpenClaim, onOpenEvidence, newIds }: AllLogsViewProps) {
  const rows = useMemo(() => sortByMode([
   ...(filters.evidenceTypes.length ? [] : filterClaims(claims, filters)).map(record => ({ ...record, kind: 'claim' as const, record })),
   ...filterEvidence(evidence, filters).map(record => ({ ...record, kind: 'evidence' as const, record })),
@@ -46,11 +49,12 @@ export default function AllLogsView({ claims, evidence, kpis, locations, filters
      : ev && !ev.kpi_ids?.length ? 'Assign a metric'
      : ev && !locationIds.length ? 'Add a location'
      : claim && claim.evidence_count === 0 ? 'Evidence can be added later' : 'Saved'
+    const isNew = !!newIds?.has(row.id!)
     return (
-     <button key={`${row.kind}-${row.id}`} type="button" onClick={() => ev ? onOpenEvidence(ev) : claim && onOpenClaim(claim, metric)} className="w-full text-left p-4 sm:px-5 flex items-center gap-3 hover:bg-gray-50 transition-colors">
+     <button key={`${row.kind}-${row.id}`} type="button" onClick={() => ev ? onOpenEvidence(ev) : claim && onOpenClaim(claim, metric)} className={`w-full text-left p-4 sm:px-5 flex items-center gap-3 hover:bg-gray-50 transition-colors ${isNew ? JUST_ADDED_ROW : ''}`}>
       {image ? <img src={image} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" /> : <span className="app-icon-tile shrink-0">{claim ? <TrendingUp className="w-5 h-5" /> : <FileText className="w-5 h-5" />}</span>}
       <span className="min-w-0 flex-1">
-       <span className="block text-xs text-secondary-500 mb-0.5">{claim ? 'Result' : 'Evidence'}</span>
+       <span className="flex items-center gap-2 text-xs text-secondary-500 mb-0.5">{claim ? 'Result' : 'Evidence'}{isNew && <JustAddedBadge />}</span>
        <span className="block text-sm font-semibold text-secondary-900 break-words">{ev ? ev.title || 'Untitled evidence' : `${claim?.value}${metric?.metric_type === 'percentage' ? '%' : ''} ${metric?.title || 'Result'}`}</span>
        <span className="block text-xs text-secondary-500 mt-1">{[locationLabel, dateLabel].filter(Boolean).join(' · ')}</span>
        <span className={`inline-flex items-center gap-1 text-xs mt-2 ${pending ? 'text-amber-700' : 'text-secondary-500'}`}>{pending && <Clock className="w-3 h-3" />}{status}</span>

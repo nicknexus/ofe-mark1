@@ -14,6 +14,7 @@ export type FirecrawlMapLink = {
 
 type FirecrawlScrapeData = {
     markdown?: string;
+    links?: string[];
     metadata?: Record<string, any>;
     branding?: Record<string, any>;
 };
@@ -24,6 +25,7 @@ export type ScrapedPage = {
     description: string;
     markdown: string;
     metadata: Record<string, any>;
+    links?: string[];
 };
 
 export class SiteCrawlError extends Error {
@@ -44,6 +46,7 @@ const DEFAULT_MAX_PAGES = 5;
 const MAX_PAGE_MARKDOWN_CHARS = 6000;
 export const MAX_TOTAL_CONTEXT_CHARS = 26000;
 const MIN_TOTAL_CONTEXT_CHARS = 1500;
+const THIN_CONTEXT_CHARS = 3000;
 
 const HIGH_SIGNAL_PATTERNS = [
     /about/i,
@@ -573,7 +576,7 @@ async function scrapeOne(
     url: string,
     label: string,
     traceId: string,
-    opts: { serverTimeoutMs?: number; clientTimeoutMs?: number } = {}
+    opts: { serverTimeoutMs?: number; clientTimeoutMs?: number; withLinks?: boolean; fullPage?: boolean } = {}
 ): Promise<ScrapedPage | null> {
     const startedAt = Date.now();
     const serverTimeoutMs = opts.serverTimeoutMs ?? 25000;
@@ -583,8 +586,8 @@ async function scrapeOne(
             '/scrape',
             {
                 url,
-                formats: ['markdown'],
-                onlyMainContent: true,
+                formats: opts.withLinks ? ['markdown', 'links'] : ['markdown'],
+                onlyMainContent: !opts.fullPage,
                 onlyCleanContent: true,
                 maxAge: 172800000,
                 removeBase64Images: true,
@@ -597,10 +600,16 @@ async function scrapeOne(
         const data = response.data || {};
         const metadata = data.metadata || {};
         const markdown = data.markdown || '';
+        const statusCode = Number(metadata.statusCode);
+        if (statusCode >= 400) {
+            logWarn(traceId, 'SCRAPE', 'page returned error status', { label, statusCode });
+            return null;
+        }
         logStep(traceId, 'SCRAPE', 'page scraped', {
             label,
             ms: Date.now() - startedAt,
             markdownChars: markdown.length,
+            ...(opts.withLinks ? { links: data.links?.length || 0 } : {}),
         });
         return {
             url,
@@ -608,6 +617,7 @@ async function scrapeOne(
             description: cleanText(metadata.description || metadata.ogDescription, 500),
             markdown,
             metadata,
+            links: data.links,
         };
     } catch (error) {
         logWarn(traceId, 'SCRAPE', 'page scrape failed', {
@@ -623,16 +633,56 @@ export async function scrapeUrls(
     urls: string[],
     traceId: string,
     homepageUrl: string,
-    opts: { serverTimeoutMs?: number; allowHomepageRetry?: boolean } = {}
-): Promise<{ pages: ScrapedPage[]; homepageOk: boolean }> {
-    if (urls.length === 0) return { pages: [], homepageOk: false };
+    opts: { serverTimeoutMs?: number; allowHomepageRetry?: boolean; maxPages?: number } = {}
+): Promise<{ pages: ScrapedPage[]; homepageOk: boolean; attempted: number }> {
+    if (urls.length === 0) return { pages: [], homepageOk: false, attempted: 0 };
     const allowHomepageRetry = opts.allowHomepageRetry ?? true;
+    const maxPages = opts.maxPages ?? envMaxPages();
+    // JS-rendered sites (SPAs) often have no sitemap, so /map only finds the homepage.
+    // The rendered homepage's own links are the fallback discovery source.
+    const needsLinks = urls.length < maxPages;
 
     const tasks = urls.map((url, i) => {
         const label = `${i + 1}/${urls.length} ${summarizeUrl(url)}`;
-        return scrapeOne(url, label, traceId, { serverTimeoutMs: opts.serverTimeoutMs }).then((page) => ({ url, page }));
+        return scrapeOne(url, label, traceId, {
+            serverTimeoutMs: opts.serverTimeoutMs,
+            withLinks: needsLinks && url === homepageUrl,
+        }).then((page) => ({ url, page }));
     });
     const settled = await Promise.all(tasks);
+    let attempted = urls.length;
+
+    // Follow-ups run in parallel so the extra round trip stays inside one request budget.
+    const homepage = settled.find((s) => s.url === homepageUrl)?.page;
+    const homepageLinks = homepage?.links || [];
+    const extra = needsLinks && homepageLinks.length > 0
+        ? selectHighSignalUrls(homepageUrl, homepageLinks, maxPages).filter((url) => !urls.includes(url)).slice(0, maxPages - urls.length)
+        : [];
+    // onlyMainContent can strip most of a single-page site; take the whole page instead.
+    const firstPassChars = settled.reduce((s, x) => s + (x.page?.markdown.length || 0), 0);
+    const rescrapeFull = !!homepage && firstPassChars < THIN_CONTEXT_CHARS;
+    if (extra.length > 0) {
+        logStep(traceId, 'SCRAPE', 'scraping pages linked from rendered homepage', {
+            homepageLinks: homepageLinks.length,
+            extra: extra.map(summarizeUrl),
+        });
+    }
+    if (rescrapeFull) logStep(traceId, 'SCRAPE', 'content thin; rescraping homepage as full page', { firstPassChars });
+    attempted += extra.length;
+    const [more, full] = await Promise.all([
+        Promise.all(extra.map((url, i) =>
+            scrapeOne(url, `link ${i + 1}/${extra.length} ${summarizeUrl(url)}`, traceId, { serverTimeoutMs: opts.serverTimeoutMs })
+                .then((page) => ({ url, page }))
+        )),
+        rescrapeFull
+            ? scrapeOne(homepageUrl, `full ${summarizeUrl(homepageUrl)}`, traceId, { serverTimeoutMs: opts.serverTimeoutMs, fullPage: true })
+            : Promise.resolve(null),
+    ]);
+    settled.push(...more);
+    if (full && homepage && full.markdown.length > homepage.markdown.length) {
+        const index = settled.findIndex((s) => s.page === homepage);
+        settled[index] = { url: homepageUrl, page: full };
+    }
 
     const pages: ScrapedPage[] = [];
     let homepageOk = false;
@@ -673,7 +723,7 @@ export async function scrapeUrls(
         }
     }
 
-    return { pages, homepageOk };
+    return { pages, homepageOk, attempted };
 }
 
 /** Restricts client-supplied page URLs to the site being scanned. */

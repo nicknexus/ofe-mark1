@@ -1,9 +1,36 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { AuthenticatedRequest, authenticateUser } from '../middleware/auth';
 import { EvidenceService } from '../services/evidenceService';
 import { MatchService } from '../services/matchService';
+import { WritingAssistError, WritingAssistService } from '../services/writingAssistService';
 
 const router = express.Router();
+
+// Per-instance memory store: a cost guard against loops, not a hard quota.
+const cleanupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV !== 'production',
+    keyGenerator: (req) => (req as AuthenticatedRequest).user?.id || req.ip || 'anon',
+    message: { error: 'Too many cleanups. Try again later.' },
+});
+
+router.post('/clean-description', authenticateUser, cleanupLimiter, async (req: AuthenticatedRequest, res) => {
+    try {
+        const text = await WritingAssistService.cleanUpDescription(req.body?.text);
+        res.json({ text });
+    } catch (error) {
+        if (error instanceof WritingAssistError) {
+            res.status(error.status).json({ error: error.message });
+            return;
+        }
+        console.error('[evidence] clean-description error:', error);
+        res.status(500).json({ error: 'Could not clean up the description. Try again.' });
+    }
+});
 
 // Get all evidence
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {

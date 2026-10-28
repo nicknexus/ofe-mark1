@@ -23,7 +23,20 @@ export interface TimelineRowProps {
    * narrower, giving the data columns most of the width; evidence needs more
    * room for the title. */
   layout?: RowLayout
+  /** Created in the save the user just finished. */
+  isNew?: boolean
 }
+
+export function JustAddedBadge() {
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary-100 text-primary-900 ring-1 ring-primary-300 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">
+      Just added
+    </span>
+  )
+}
+
+/** Row/card treatment for records from the save the user just finished. */
+export const JUST_ADDED_ROW = '!bg-primary-50 shadow-[inset_4px_0_0_theme(colors.primary.600)]'
 
 /** Desktop column spans per layout (mobile stays 8/4 for item/status). */
 const COLS: Record<RowLayout, { item: string; metric: string; where: string; by: string; conn: string; status: string }> = {
@@ -74,6 +87,7 @@ export default function TimelineRow({
   actions,
   index = 0,
   layout = 'evidence',
+  isNew = false,
 }: TimelineRowProps) {
   const entrance = rowEntrance(index)
   const c = COLS[layout]
@@ -84,13 +98,14 @@ export default function TimelineRow({
     <motion.div
       initial={entrance.initial}
       animate={entrance.animate}
-      className={`px-4 md:px-6 py-4 ${style.row} ${style.rowHover} transition-colors duration-200 cursor-pointer group grid grid-cols-12 gap-3 md:gap-4 items-center`}
+      className={`px-4 md:px-6 py-4 ${style.row} ${style.rowHover} ${isNew ? JUST_ADDED_ROW : ''} transition-colors duration-200 cursor-pointer group grid grid-cols-12 gap-3 md:gap-4 items-center`}
       onClick={onClick}
     >
       {/* Item (mobile also stacks the metric + date beneath the title) */}
       <div className={`col-span-8 ${c.item} min-w-0 flex items-center gap-3`}>
         {leading != null && <div className="flex-shrink-0">{leading}</div>}
         <div className="min-w-0">
+          {isNew && <div className="mb-1"><JustAddedBadge /></div>}
           <div className="font-medium text-gray-800 truncate">{title}</div>
           {subtitle && <div className="text-sm text-gray-500 truncate mt-0.5">{subtitle}</div>}
           <div className="mt-1 flex items-center gap-2 md:hidden">

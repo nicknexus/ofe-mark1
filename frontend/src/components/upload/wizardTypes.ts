@@ -1,14 +1,16 @@
 import { Evidence } from '../../types'
 import { buildLogPlan, validateLogDraft } from './logDraft'
-import type { LogMetricRow } from './logDraft'
+import type { LogDetails, LogMetricRow } from './logDraft'
 
 export type WizardKind = 'evidence' | 'claim' | 'both'
 
-export type WizardStepId = 'entry' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
+export type WizardStepId = 'choose' | 'type' | 'mode' | 'entry' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
 
 export interface WizardFile {
  /** Undefined follows every metric card; an empty array saves unassigned. */
  rowIds?: string[]
+ /** Log flow: this file's own scope, layered over its metric or master scope. */
+ overrides?: Partial<LogDetails>
  /** uploadId from the upload manager. */
  id: string
  name: string

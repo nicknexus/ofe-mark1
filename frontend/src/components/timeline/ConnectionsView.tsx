@@ -16,6 +16,7 @@ import {
 import { rowEntrance, easeOut } from './motion'
 import { getKPIColor } from '../metricsDashboard/metricColorPalette'
 import { getStatusStyle } from './statusStyles'
+import { JustAddedBadge, JUST_ADDED_ROW } from './TimelineRow'
 
 const TYPE_ICONS = {
   visual_proof: Camera,
@@ -283,6 +284,8 @@ interface ConnectionsViewProps {
   /** Live counts from the program page. The timeline payload lags behind adds. */
   knownMetricCount?: number
   knownLocationCount?: number | null
+  /** Records created in the save the user just finished. */
+  newIds?: Set<string>
 }
 
 /**
@@ -311,6 +314,7 @@ export default function ConnectionsView({
   onQuickSetup,
   knownMetricCount,
   knownLocationCount,
+  newIds,
 }: ConnectionsViewProps) {
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
@@ -431,10 +435,13 @@ export default function ConnectionsView({
           connectedEvidence.length > 0 ? 'connected' : pendingOnly ? 'pending' : 'not_connected'
         )
 
+        const isNew = !!newIds && (newIds.has(claim.id!) || connectedEvidence.some(ev => newIds.has(ev.id!)))
+
         const entrance = rowEntrance(claimIndex)
         return (
           <motion.div key={claim.id} initial={entrance.initial} animate={entrance.animate}>
-            <AppCard padded>
+            <AppCard padded className={isNew ? `${JUST_ADDED_ROW} !border-primary-300` : undefined}>
+              {isNew && <div className="mb-2"><JustAddedBadge /></div>}
               <div className={`flex flex-col gap-3 md:grid ${GRID_COLS} md:items-center md:gap-0`}>
                 {/* Claim (left) — actions live inside the card so its visual
                     center is exactly where the connector line originates */}

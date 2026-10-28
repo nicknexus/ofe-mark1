@@ -1496,6 +1496,13 @@ class ApiService {
  })
  }
 
+ async cleanUpDescription(text: string): Promise<{ text: string }> {
+ return this.request('/evidence/clean-description', {
+ method: 'POST',
+ body: JSON.stringify({ text })
+ })
+ }
+
  async siteScanScrape(websiteUrl: string, urls: string[]): Promise<{ context: string; pages: number }> {
  return this.request('/onboarding/site-scan/scrape', {
  method: 'POST',

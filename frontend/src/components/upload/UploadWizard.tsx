@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowLeft, ArrowRight, Check, TrendingUp, FileText, Clock } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Check, TrendingUp, FileText, Layers, Clock, LayoutGrid, ListChecks } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
 import { useUploadManager } from '../../context/UploadContext'
@@ -41,14 +41,15 @@ import {
  wizardEvidenceMetricIds,
 } from './wizardTypes'
 import LogEntryStep from './LogEntryStep'
-import LogReviewStep from './LogReviewStep'
-import { buildLogPlan, newLogRow, saveLogPlan } from './logDraft'
+import LogReviewStep, { LogScopeSummary } from './LogReviewStep'
+import { buildLogPlan, evidenceMetricError, newLogRow, saveLogPlan } from './logDraft'
 import WizardMetricStep from './WizardMetricStep'
 import WizardScopeStep from './WizardScopeStep'
 import WizardClaimStep from './WizardClaimStep'
 import WizardClaimsStep from './WizardClaimsStep'
 import WizardEvidenceStep from './WizardEvidenceStep'
 import WizardReviewStep from './WizardReviewStep'
+import { Spinner } from '../ui'
 import CreateKPIModal from '../CreateKPIModal'
 import LocationModal from '../LocationModal'
 import { getLocalDateString } from '../../utils'
@@ -91,11 +92,39 @@ const ACCENT_STYLES = {
  },
 } as const
 
+// "Both" leads: recording the result together with its proof is the flow we
+// want most users to take — they connect automatically.
+const KIND_OPTIONS: Array<{ kind: WizardKind; label: string; description: string; icon: typeof TrendingUp; badge?: string }> = [
+ {
+ kind: 'both',
+ label: 'Claim + Evidence',
+ description: 'Record a result and upload its proof in one go. They\'re connected automatically.',
+ icon: Layers,
+ badge: 'Recommended',
+ },
+ {
+ kind: 'evidence',
+ label: 'Evidence only',
+ description: 'Upload photos, documents, receipts or testimonies. They connect to matching claims.',
+ icon: FileText,
+ },
+ {
+ kind: 'claim',
+ label: 'Impact claim only',
+ description: 'Record a measured result for one of your metrics. Evidence can be added later.',
+ icon: TrendingUp,
+ },
+]
+
 interface UploadWizardProps {
  initiativeId: string
  programTitle?: string
  canCreateClaim: boolean
  canCreateEvidence: boolean
+ /** Classic flow: claim-only gets a Simple/Advanced choice; Advanced closes the wizard and opens the claim board. */
+ onAdvancedClaim?: () => void
+ /** Classic flow: evidence-only gets a Simple/Advanced choice; Advanced opens the batch organizer. */
+ onAdvancedEvidence?: () => void
  /** Everything the wizard needs to preview connections; from the Timeline payload. */
  kpis: KPI[]
  locations: Location[]
@@ -119,7 +148,10 @@ interface UploadWizardProps {
    *  and prefill the claim's scope so the new evidence auto-connects to it. */
   evidenceForClaim?: TimelineClaim
   onClose: () => void
-  onCreated: () => void
+  /** May return a promise; the wizard stays open until it settles so the list underneath is fresh on reveal. */
+  onCreated: () => void | Promise<void>
+  /** Fired the moment a new log is saved (before Done), so the parent can prefetch. */
+  onSaved?: () => void
 }
 
 /** Prefill the wizard state from the record being edited. */
@@ -190,6 +222,21 @@ function stateFromClaimScope(claim?: TimelineClaim): Partial<WizardState> {
 }
 
 const STEP_META: Record<WizardStepId, { label: string | ((s: WizardState) => string); title: (s: WizardState) => string; subtitle: (s: WizardState) => string }> = {
+ choose: {
+ label: 'Start',
+ title: () => 'How do you want to log?',
+ subtitle: () => 'Both save the same results and evidence.',
+ },
+ type: {
+ label: 'Type',
+ title: () => 'What does this log contain?',
+ subtitle: () => 'A log is one record of work: claims, evidence, or both together',
+ },
+ mode: {
+ label: 'How',
+ title: (s) => s.kind === 'claim' ? 'How do you want to add claims?' : 'How do you want to upload evidence?',
+ subtitle: () => 'Simple walks you through step by step; Advanced is the power tool for bulk work',
+ },
  entry: {
  label: 'Add log',
  title: () => 'Add log',
@@ -228,7 +275,7 @@ const STEP_META: Record<WizardStepId, { label: string | ((s: WizardState) => str
  title: (s) => s.editing ? 'Review & save changes' : 'Review & save',
  subtitle: (s) => s.editing
  ? 'Check the updated details before saving'
- : 'Check what will be created and what it will connect to',
+ : s.logRows ? '' : 'Check what will be created and what it will connect to',
  },
 }
 
@@ -241,6 +288,8 @@ export default function UploadWizard({
  programTitle,
  canCreateClaim,
  canCreateEvidence,
+ onAdvancedClaim,
+ onAdvancedEvidence,
   kpis: kpisProp,
   locations: locationsProp,
   tags: tagsProp,
@@ -256,6 +305,7 @@ export default function UploadWizard({
   evidenceForClaim,
   onClose,
   onCreated,
+  onSaved,
 }: UploadWizardProps) {
   const { queueUpload, cancelUpload, setPanelSuppressed } = useUploadManager()
   const { requiresEvidenceApproval } = useTeam()
@@ -272,6 +322,14 @@ export default function UploadWizard({
   // Add-evidence-for-a-claim implies evidence kind + the claim's metric locked.
   const startKind = initialKind ?? (evidenceForClaim ? 'evidence' : undefined)
   const lockedMetric = lockedMetricId ?? evidenceForClaim?.kpi_id
+  const showChooser = !isEdit && !startKind
+  const [flow, setFlow] = useState<'workspace' | 'classic'>('workspace')
+
+  const availableKinds = KIND_OPTIONS.filter(o =>
+    o.kind === 'evidence' ? canCreateEvidence
+      : o.kind === 'claim' ? canCreateClaim
+        : canCreateClaim && canCreateEvidence
+  )
 
   const [state, setState] = useState<WizardState>(() => ({
     ...INITIAL_WIZARD_STATE,
@@ -295,6 +353,7 @@ export default function UploadWizard({
   }))
  const [stepIndex, setStepIndex] = useState(0)
  const [stepError, setStepError] = useState<string | null>(null)
+ const [showFieldErrors, setShowFieldErrors] = useState(false)
  const [submitting, setSubmitting] = useState(false)
  const [saveProgress, setSaveProgress] = useState({ saved: 0, total: 0 })
  const [savedResult, setSavedResult] = useState<{ claims: number; evidence: number } | null>(null)
@@ -321,8 +380,10 @@ export default function UploadWizard({
  const savedEvidenceKeysRef = useRef(new Set<string>())
  const ownedUploadUrlsRef = useRef(new Set<string>())
  const hasPartialSave = savedClaimsRef.current.size > 0 || savedEvidenceKeysRef.current.size > 0
+ const submittingRef = useRef(false)
  const discardOrphanUploads = useCallback(() => {
-   if (cleanedRef.current || savedRef.current) return
+   // A save in flight may still attach these files; leaving a rare orphan beats evidence pointing at deleted files.
+   if (cleanedRef.current || savedRef.current || submittingRef.current) return
    cleanedRef.current = true
    for (const f of stateRef.current.files) {
      // Files already attached to the record being edited are not orphans.
@@ -333,18 +394,54 @@ export default function UploadWizard({
    }
  }, [cancelUpload])
 
- const handleClose = useCallback(() => {
+ const [closing, setClosing] = useState(false)
+ const handleClose = useCallback(async () => {
    discardOrphanUploads()
-   if (savedRef.current || savedClaimsRef.current.size || savedEvidenceKeysRef.current.size) onCreated()
+   if (savedRef.current || savedClaimsRef.current.size || savedEvidenceKeysRef.current.size) {
+     const pending = onCreated()
+     if (pending) {
+       setClosing(true)
+       await pending.catch(() => {})
+     }
+   }
    onClose()
  }, [discardOrphanUploads, onClose, onCreated])
 
  // Safety net for any teardown path that doesn't route through handleClose.
  useEffect(() => () => discardOrphanUploads(), [discardOrphanUploads])
 
- const steps: WizardStepId[] = editClaim
-  ? ['scope', 'claim', 'review']
-  : editEvidence ? ['metric', 'scope', 'evidence', 'review'] : ['entry', 'review']
+ // Phone: skip Simple/Advanced in the classic flow.
+ const [isPhone, setIsPhone] = useState(
+   () => typeof window !== 'undefined' && window.innerWidth < 768,
+ )
+ useEffect(() => {
+   const onResize = () => setIsPhone(window.innerWidth < 768)
+   window.addEventListener('resize', onResize)
+   return () => window.removeEventListener('resize', onResize)
+ }, [])
+
+ const hasModeChoice =
+   !isPhone &&
+   ((state.kind === 'claim' && !!onAdvancedClaim) ||
+     (state.kind === 'evidence' && !!onAdvancedEvidence))
+
+ const steps: WizardStepId[] = useMemo(() => {
+   if (editClaim) return ['scope', 'claim', 'review']
+   if (editEvidence) return ['metric', 'scope', 'evidence', 'review']
+   const list: WizardStepId[] = showChooser ? ['choose'] : []
+   if (flow === 'workspace') return [...list, 'entry', 'review']
+   if (availableKinds.length > 1) list.push('type')
+   if (hasModeChoice) list.push('mode')
+   if (state.kind === 'both') list.push('scope', 'claim', 'evidence')
+   else {
+     if (!lockedMetric) list.push('metric')
+     list.push('scope')
+     if (includesClaim(state.kind)) list.push('claim')
+     if (includesEvidence(state.kind)) list.push('evidence')
+   }
+   list.push('review')
+   return list
+ }, [editClaim, editEvidence, showChooser, flow, availableKinds.length, hasModeChoice, state.kind, lockedMetric])
 
   const step = steps[Math.min(stepIndex, steps.length - 1)]
 
@@ -352,7 +449,7 @@ export default function UploadWizard({
   // Single-kind flows are branded end-to-end (including Simple/Advanced);
   // the "both" flow switches color on its claim and evidence steps.
   const accent: StepAccent =
-    state.entryMode ? null
+    state.entryMode || step === 'choose' || step === 'type' ? null
       : state.kind === 'claim' ? 'claim'
         : state.kind === 'evidence' ? 'evidence'
           : step === 'claim' ? 'claim'
@@ -523,10 +620,18 @@ export default function UploadWizard({
    }
  }
 
+ const entryError = (snapshot: WizardState) => validateAll(snapshot, kpis)
+ || (!canCreateClaim && buildLogPlan(snapshot).claims.length ? "You don't have permission to add claims. Ask an account admin to give you access." : null)
+ || (canCreateEvidence && !canCreateClaim && !evidenceForClaim ? evidenceMetricError(snapshot, lockedMetric ? 1 : kpis.length) : null)
+
+ useEffect(() => {
+ if (showFieldErrors && step === 'entry') setStepError(entryError(state))
+ }, [showFieldErrors, step, state, kpis])
+
  const validateCurrent = (): string | null => {
  const snapshot = stateRef.current
  switch (step) {
- case 'entry': return validateAll(snapshot, kpis)
+ case 'entry': return entryError(snapshot)
  case 'metric': return validateMetricStep(snapshot)
  case 'scope': return validateScopeStep(snapshot)
  case 'claim': return validateClaimStep(snapshot, kpis)
@@ -545,6 +650,7 @@ export default function UploadWizard({
  const error = validateCurrent()
  if (error) {
  setStepError(error)
+ if (step === 'entry') setShowFieldErrors(true)
  return
  }
  advance()
@@ -555,6 +661,21 @@ export default function UploadWizard({
  setStepIndex(i => Math.max(i - 1, 0))
  }
 
+ const workspaceStartRef = useRef({ logRows: state.logRows, kind: state.kind })
+ const handleChooseFlow = (next: 'workspace' | 'classic') => {
+ setFlow(next)
+ setShowFieldErrors(false)
+ update(next === 'workspace'
+  ? { kind: workspaceStartRef.current.kind, logRows: stateRef.current.logRows ?? workspaceStartRef.current.logRows, entryMode: true }
+  : { logRows: undefined, entryMode: false, kind: availableKinds.length === 1 ? availableKinds[0].kind : null })
+ advance()
+ }
+
+ const handleChooseKind = (kind: WizardKind) => {
+ update({ kind })
+ advance()
+ }
+
  const handleSubmit = async () => {
  if (submitting) return
  const error = validateAll(state, kpis)
@@ -563,6 +684,7 @@ export default function UploadWizard({
  return
  }
  setSubmitting(true)
+ submittingRef.current = true
  try {
  const { start, end } = wizardDates(state)
  const isRange = state.dateMode === 'range' && end !== start
@@ -632,6 +754,7 @@ export default function UploadWizard({
  savedRef.current = true
  state.files.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
  setSavedResult({ claims: plan.claims.length, evidence: plan.evidence.length })
+ onSaved?.()
  return
  }
 
@@ -722,6 +845,7 @@ export default function UploadWizard({
  savedRef.current = true
  state.files.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
  setSavedResult({ claims: createdClaimIds.length, evidence: evidenceRecordCount })
+ onSaved?.()
  } catch (error) {
  const message = error instanceof Error ? error.message : 'Failed to save'
  if (savedClaimsRef.current.size || savedEvidenceKeysRef.current.size) {
@@ -729,6 +853,7 @@ export default function UploadWizard({
  }
  notify.error(message)
  } finally {
+ submittingRef.current = false
  setSubmitting(false)
  }
  }
@@ -744,6 +869,8 @@ export default function UploadWizard({
  ? 'Record results for your metrics. Evidence can be added later.'
  : meta.subtitle(state)
  const workspaceStep = step === 'entry'
+ const centeredStep = step === 'choose' || step === 'type'
+ const pickerStep = centeredStep || step === 'mode'
  const kpiTotals = useMemo(() => {
    const totals: Record<string, number> = {}
    for (const claim of existingClaims) {
@@ -766,7 +893,9 @@ export default function UploadWizard({
     {savedResult.evidence > 0 && requiresEvidenceApproval && <p className="text-sm text-secondary-500">Your evidence is waiting for approval.</p>}
     {savedResult.evidence > 0 && wizardEvidenceMetricIds(state).length === 0 && <p className="text-sm text-secondary-500">A metric can be assigned from the evidence details.</p>}
    </div>
-   <button type="button" onClick={handleClose} className="app-btn app-btn-primary w-full mt-6">Done</button>
+   <button type="button" onClick={handleClose} disabled={closing} className="app-btn app-btn-primary w-full mt-6">
+    {closing ? <><Spinner className="w-4 h-4" /> Loading your logs</> : 'Done'}
+   </button>
   </div>
  </div>
  )
@@ -829,7 +958,7 @@ export default function UploadWizard({
 
  {/* Body */}
  <div ref={bodyScrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
- <div className={workspaceStep ? 'w-full px-4 sm:px-6 py-4' : wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : 'max-w-3xl mx-auto px-5 md:px-8 py-8'}>
+ <div className={workspaceStep ? 'w-full px-4 sm:px-6 py-4' : step === 'review' && state.logRows ? 'max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6' : wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : 'max-w-3xl mx-auto px-5 md:px-8 py-8'}>
  <AnimatePresence mode="wait">
  <motion.div
  key={step}
@@ -844,13 +973,126 @@ export default function UploadWizard({
  {accentStyle.label}
  </span>
  )}
- {workspaceStep ? <h1 className="sr-only">Add log{programTitle ? ` to ${programTitle}` : ''}</h1> : <>
- {programTitle && <p className="text-xs font-medium text-secondary-500 mb-1">{programTitle}</p>}
- <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${accentStyle ? accentStyle.title : 'text-gray-800'}`}>
+ {workspaceStep ? <h1 className="sr-only">Add log{programTitle ? ` to ${programTitle}` : ''}</h1> : step === 'review' && state.logRows ? (
+ <div className="grid items-center gap-4 lg:grid-cols-3 mb-4">
+  <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-800">{meta.title(state)}</h1>
+  <LogScopeSummary className="lg:col-span-2" state={state} locations={locations} tags={tags} beneficiaryGroups={beneficiaryGroups} />
+ </div>
+ ) : <>
+ {programTitle && <p className={`text-xs font-medium text-secondary-500 mb-1 ${centeredStep ? 'text-center' : ''}`}>{programTitle}</p>}
+ <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${accentStyle ? accentStyle.title : 'text-gray-800'} ${centeredStep ? 'text-center' : ''}`}>
  {meta.title(state)}
  </h1>
- <p className={`text-sm text-gray-500 mt-1.5 ${wideStep ? 'mb-4' : 'mb-6'}`}>{subtitle}</p>
+ {subtitle ? <p className={`text-sm text-gray-500 mt-1.5 ${centeredStep ? 'text-center mb-8' : wideStep ? 'mb-4' : 'mb-6'}`}>{subtitle}</p> : <div className="mb-4" />}
  </>}
+
+ {step === 'choose' && (
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 max-w-2xl mx-auto">
+ {([
+  { id: 'workspace', icon: LayoutGrid, label: 'Log workspace', badge: 'New', description: 'Everything on one screen. Enter results for any metric, drop in files, and set scope once.' },
+  { id: 'classic', icon: ListChecks, label: 'Classic step-by-step', description: 'One question at a time. Includes the Advanced claim board and evidence batch organizer.' },
+ ] as const).map(option => (
+  <button key={option.id} type="button" onClick={() => handleChooseFlow(option.id)}
+   className="app-card-interactive relative text-left p-6 md:p-7 hover:-translate-y-0.5">
+   {'badge' in option && <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-primary-500 text-white text-[10px] font-semibold uppercase tracking-wide">{option.badge}</span>}
+   <div className={`app-icon-tile mb-4 ${option.id === 'workspace' ? 'app-icon-tile-accent' : ''}`}><option.icon className="w-5 h-5" /></div>
+   <p className="text-base font-semibold text-gray-800 mb-1.5">{option.label}</p>
+   <p className="text-sm text-gray-500 leading-relaxed">{option.description}</p>
+  </button>
+ ))}
+ </div>
+ )}
+
+ {step === 'type' && (
+ <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 max-w-3xl mx-auto">
+ {availableKinds.map(option => {
+ const isSelected = state.kind === option.kind
+ const cardStyle = option.kind === 'claim'
+ ? {
+ tile: 'bg-claim-100',
+ icon: 'text-claim-700',
+ card: isSelected
+ ? 'border-claim-500 bg-claim-50 shadow-card'
+ : 'border-gray-200 bg-white hover:border-claim-300',
+ }
+ : option.kind === 'evidence'
+ ? {
+ tile: 'bg-primary-100',
+ icon: 'text-primary-800',
+ card: isSelected
+ ? 'border-primary-500 bg-primary-50 shadow-card'
+ : 'border-gray-200 bg-white hover:border-primary-300',
+ }
+ : {
+ tile: 'bg-gradient-to-br from-claim-100 to-primary-100',
+ icon: 'text-secondary-700',
+ card: isSelected
+ ? 'border-primary-500 bg-gradient-to-br from-claim-50 to-primary-50 shadow-card'
+ : 'border-gray-200 bg-white hover:border-primary-300',
+ }
+ return (
+ <button
+ key={option.kind}
+ type="button"
+ onClick={() => handleChooseKind(option.kind)}
+ className={`relative text-left p-7 md:p-8 rounded-3xl border-2 transition-all hover:-translate-y-1 hover:shadow-card-hover ${cardStyle.card}`}
+ >
+ {option.badge && (
+ <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-primary-500 text-white text-[10px] font-semibold uppercase tracking-wide">
+ {option.badge}
+ </span>
+ )}
+ <div className={`w-14 h-14 rounded-2xl ${cardStyle.tile} flex items-center justify-center mb-5`}>
+ <option.icon className={`w-7 h-7 ${cardStyle.icon}`} />
+ </div>
+ <p className="text-lg font-semibold text-gray-800 mb-2">{option.label}</p>
+ <p className="text-sm text-gray-500 leading-relaxed">{option.description}</p>
+ </button>
+ )
+ })}
+ </div>
+ )}
+
+ {step === 'mode' && (
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+ <button
+ type="button"
+ onClick={advance}
+ className={`relative text-left p-6 md:p-7 rounded-3xl border-2 border-gray-200 bg-white ${accentStyle?.hoverBorder || 'hover:border-primary-300'} hover:-translate-y-0.5 hover:shadow-card-hover transition-all`}
+ >
+ <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full ${accentStyle?.solidBadge || 'bg-primary-500'} text-white text-[10px] font-semibold uppercase tracking-wide`}>
+ Recommended
+ </span>
+ <div className={`w-12 h-12 rounded-2xl ${accentStyle?.tile || 'bg-primary-100'} flex items-center justify-center mb-4`}>
+ <Check className={`w-6 h-6 ${accentStyle?.tileIcon || 'text-primary-800'}`} />
+ </div>
+ <p className="text-base font-semibold text-gray-800 mb-1.5">Simple</p>
+ <p className="text-sm text-gray-500 leading-relaxed">
+ A guided flow, one question at a time. Best for adding one {state.kind === 'claim' ? 'result' : 'batch of files'}.
+ </p>
+ </button>
+ <button
+ type="button"
+ // Parent decides whether to unmount the wizard; calling onClose here
+ // would tear down self-fetching wrappers before they can swap modals.
+ onClick={() => {
+ if (state.kind === 'claim') onAdvancedClaim?.()
+ else onAdvancedEvidence?.()
+ }}
+ className={`text-left p-6 md:p-7 rounded-3xl border-2 border-gray-200 bg-white ${accentStyle?.hoverBorder || 'hover:border-primary-300'} hover:-translate-y-0.5 hover:shadow-card-hover transition-all`}
+ >
+ <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+ <Layers className="w-6 h-6 text-gray-600" />
+ </div>
+ <p className="text-base font-semibold text-gray-800 mb-1.5">Advanced</p>
+ <p className="text-sm text-gray-500 leading-relaxed">
+ {state.kind === 'claim'
+ ? 'The full claim board. Add many claims across metrics at once.'
+ : 'The batch organizer. Sort many files into multiple evidence records.'}
+ </p>
+ </button>
+ </div>
+ )}
 
  {step === 'entry' && (
  <LogEntryStep
@@ -863,6 +1105,7 @@ export default function UploadWizard({
  onCreateMetric={canManageStructure ? () => setKpiModalOpen(true) : undefined}
  onCreateLocation={canManageStructure ? () => setLocationModalOpen(true) : undefined}
  onCreateTag={canManageStructure ? handleInlineCreateTag : undefined}
+ showErrors={showFieldErrors}
  />
  )}
 
@@ -921,7 +1164,7 @@ export default function UploadWizard({
  {step === 'review' && (
  <>
  {/* Review gate: flagged members' evidence goes to the approval queue */}
- {requiresEvidenceApproval && wizardHasEvidence(state) && !isEdit && (
+ {requiresEvidenceApproval && wizardHasEvidence(state) && !isEdit && !state.logRows && (
  <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-3 mb-4 max-w-2xl">
  <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
  <p className="text-xs text-amber-700">
@@ -954,7 +1197,7 @@ export default function UploadWizard({
  <div className="min-w-0 mr-4">
  {stepError && <p role="alert" className="text-xs text-red-600">{stepError}</p>}
  {submitting && <p role="status" className="text-xs text-secondary-600">Saving {saveProgress.saved} of {saveProgress.total} items. Keep this window open.</p>}
- {!stepError && !submitting && state.logRows && <p className="text-xs text-secondary-500">{buildLogPlan(state).claims.length} results · {state.files.length} files</p>}
+ {!stepError && !submitting && state.logRows && !pickerStep && <p className="text-xs text-secondary-500">{buildLogPlan(state).claims.length} results · {state.files.length} files</p>}
  </div>
  <div className="flex items-center gap-2 flex-shrink-0">
  {stepIndex > 0 && (
@@ -963,7 +1206,7 @@ export default function UploadWizard({
  Back
  </button>
  )}
- {!isLastStep ? (
+ {pickerStep ? null : !isLastStep ? (
  <button onClick={goNext} className={`app-btn app-btn-sm ${accentStyle ? accentStyle.button : 'app-btn-primary'}`}>
  {step === 'entry' ? 'Review log' : 'Next'}
  <ArrowRight className="w-4 h-4" />
@@ -976,6 +1219,22 @@ export default function UploadWizard({
  )}
  </div>
  </div>
+
+ {submitting && !isEdit && (
+ <div role="status" aria-live="polite" className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-white/60">
+  <div className="app-card shadow-app-modal p-6 w-full max-w-sm flex flex-col items-center text-center">
+   <Spinner className="w-9 h-9 mb-4" />
+   <p className="text-base font-semibold text-gray-800">Saving your log</p>
+   {saveProgress.total > 0 ? <>
+    <p className="text-sm text-secondary-500 mt-1">{saveProgress.saved} of {saveProgress.total} items saved</p>
+    <div className="w-full h-1.5 rounded-full bg-gray-100 mt-4 overflow-hidden">
+     <div className="h-full rounded-full bg-primary-600 transition-[width] duration-300" style={{ width: `${Math.max(6, (saveProgress.saved / saveProgress.total) * 100)}%` }} />
+    </div>
+   </> : <p className="text-sm text-secondary-500 mt-1">This only takes a moment.</p>}
+   <p className="app-help mt-4">Keep this window open.</p>
+  </div>
+ </div>
+ )}
 
  {kpiModalOpen && (
  <CreateKPIModal

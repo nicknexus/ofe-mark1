@@ -11,6 +11,7 @@ const FILE_TYPES = EVIDENCE_TYPE_ORDER.map(value => ({
  label: EVIDENCE_TYPE_STYLE[value].shortLabel,
  icon: EVIDENCE_TYPE_STYLE[value].icon,
  color: EVIDENCE_TYPE_STYLE[value].text,
+ box: EVIDENCE_TYPE_STYLE[value].iconBox,
 }))
 const TYPE_META = (t: Evidence['type']) => FILE_TYPES.find(ft => ft.value === t) || FILE_TYPES[1]
 
@@ -29,10 +30,12 @@ interface FileDropListProps {
  onSetFileType?: (fileId: string, type: Evidence['type']) => void
  /** Bulk-apply a type to every file (the "set all" bar). */
  onSetAllTypes?: (type: Evidence['type']) => void
+ /** Square type picker on every tile without grouping the list. */
+ alwaysShowType?: boolean
 }
 
 /** Drop zone + uploading file tiles, shared by the wizard and quick-add dialogs. */
-export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes, renderFileDetails, onFileClick, expandedFileId }: FileDropListProps) {
+export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes, renderFileDetails, onFileClick, expandedFileId, alwaysShowType = false }: FileDropListProps) {
  const fileInputRef = useRef<HTMLInputElement>(null)
  // Per-row type dropdown, positioned via portal so it never clips inside the
  // scrollable modal body.
@@ -57,7 +60,7 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
     {file.previewUrl ? (
      <img src={file.previewUrl} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100 flex-shrink-0" />
     ) : (
-     <div className="p-2 rounded-lg bg-gray-100 flex-shrink-0">
+     <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
       <FileText className="w-4 h-4 text-gray-500" />
      </div>
     )}
@@ -79,7 +82,18 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
    <div className="flex items-center gap-2.5 px-3 py-2">
     {onFileClick ? <button type="button" onClick={() => onFileClick(file.id)} aria-expanded={expandedFileId === file.id} aria-label={`Assign ${file.name} to metrics`} className="flex items-center gap-2.5 min-w-0 flex-1 text-left rounded-lg hover:bg-gray-50 focus-visible:outline focus-visible:outline-primary-500">{identity}</button>
      : <div className="flex items-center gap-2.5 min-w-0 flex-1">{identity}</div>}
-    {withTypeBox && file.status !== 'error' && (
+    {alwaysShowType && file.status !== 'error' && (
+     <button
+      type="button"
+      onClick={(e) => (menu?.fileId === file.id ? setMenu(null) : openMenu(file.id, e))}
+      aria-label={`${file.name}: ${meta.label}. Change file type`}
+      title={`Type: ${meta.label}. Click to change`}
+      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-shadow ${meta.box} ${menu?.fileId === file.id ? 'ring-2 ring-offset-1 ring-gray-300' : 'hover:ring-2 hover:ring-gray-200'}`}
+     >
+      <meta.icon className="w-4 h-4" />
+     </button>
+    )}
+    {withTypeBox && !alwaysShowType && file.status !== 'error' && (
      <button
       type="button"
       onClick={(e) => (menu?.fileId === file.id ? setMenu(null) : openMenu(file.id, e))}
@@ -180,11 +194,33 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryF
      </div>
     </>
    ) : (
-    files.length > 0 && (
+    files.length > 0 && (<>
+     {alwaysShowType && onSetAllTypes && (
+      <div className="mt-3">
+       <p className="text-[11px] font-medium text-gray-500 mb-1">Set all to</p>
+       <div className="grid grid-cols-2 gap-1">
+        {FILE_TYPES.map(t => {
+         const active = files.every(f => f.status === 'error' || f.type === t.value)
+         return (
+          <button
+           key={t.value}
+           type="button"
+           onClick={() => onSetAllTypes(t.value)}
+           aria-pressed={active}
+           className={`flex items-center gap-1.5 h-7 rounded-md border pl-1 pr-2 text-[11px] font-medium transition-colors ${active ? 'border-primary-600 bg-primary-50 text-gray-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
+          >
+           <span className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${t.box}`}><t.icon className="w-3 h-3" /></span>
+           <span className="truncate">{t.label}</span>
+          </button>
+         )
+        })}
+       </div>
+      </div>
+     )}
      <div className="space-y-1.5 mt-2">
-      {files.map(file => fileTile(file, false))}
+      {files.map(file => fileTile(file, alwaysShowType))}
      </div>
-    )
+    </>)
    )}
 
    {/* Per-row type dropdown (portal, so it escapes the scroll container). */}

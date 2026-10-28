@@ -477,9 +477,9 @@ export class DemoGenerationService {
 
         const scrapeStart = Date.now();
         logStep(traceId, '2/6 SCRAPE', 'scraping selected pages in parallel', { count: selectedUrls.length });
-        const { pages: scrapedPages, homepageOk } = await scrapeUrls(selectedUrls, traceId, websiteUrl);
+        const { pages: scrapedPages, homepageOk, attempted } = await scrapeUrls(selectedUrls, traceId, websiteUrl, { maxPages });
         logStep(traceId, '2/6 SCRAPE', 'scrape step done', { ms: Date.now() - scrapeStart });
-        assertEnoughContent(scrapedPages, selectedUrls.length, traceId, homepageOk);
+        assertEnoughContent(scrapedPages, attempted, traceId, homepageOk);
 
         const packedContext = packScrapedContext(scrapedPages);
         logStep(traceId, '3/6 EXTRACT', 'packed context', {

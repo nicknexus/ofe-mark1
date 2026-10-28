@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { INITIAL_WIZARD_STATE, WizardState, validateAll } from './wizardTypes'
-import { buildLogPlan, fileRows, newLogRow, rowDetails, saveLogPlan, LogSaveProgress, matchingLogClaimKeys, setLogRowResult, setLogFileRow } from './logDraft'
+import { buildLogPlan, fileRows, newLogRow, rowDetails, saveLogPlan, LogSaveProgress, matchingLogClaimKeys, setLogRowResult, setLogFileRow, logFieldIssues, evidenceMetricError } from './logDraft'
 
 const row = (id: string, kpiId = id) => ({ ...newLogRow(kpiId, id), value: '10' })
 const file = (id: string, rowIds?: string[]): WizardState['files'][number] => ({ id, name: `${id}.jpg`, size: 10, uploadedSize: 8, status: 'done', progress: 100, url: `https://example.test/${id}.jpg`, type: 'visual_proof', rowIds })
@@ -114,6 +114,16 @@ test('each file keeps its own assignment; unassigned never acquires result links
  assert.equal(fileRows(withNewRow, state.files[1]).length, 1)
 })
 
+test('a file scope overrides its evidence record without changing results or other files', () => {
+ const state = draft({ files: [file('photo'), { ...file('receipt'), overrides: { evidenceTitle: 'Kit receipts', locationIds: ['north'], dateSingle: '2026-09-30' } }] })
+ const plan = buildLogPlan(state)
+ assert.deepEqual(plan.evidence.map(e => [e.payload.title, e.payload.location_ids, e.payload.date_represented]), [
+  ['October workshop', ['centre'], '2026-10-01'], ['Kit receipts', ['north'], '2026-09-30'],
+ ])
+ assert.deepEqual(plan.evidence[1].claimKeys, plan.evidence[0].claimKeys)
+ assert.ok(plan.claims.every(c => c.payload.location_id === 'centre'))
+})
+
 test('a shared upload is separated across differing scopes without broad cross-product matches', () => {
  const state = draft({ logRows: [row('students'), { ...row('kits'), overrides: { locationIds: ['north'], dateSingle: '2026-10-02' } }], files: [file('shared')] })
  const plan = buildLogPlan(state)
@@ -152,7 +162,9 @@ test('tag allocation totals are checked, including blank, zero and decimal value
 })
 
 test('evidence only, results only, scoped overrides and unfinished uploads validate independently', () => {
- assert.equal(validateAll(draft({ logRows: [], locationIds: [], files: [file('later')] })), null)
+ assert.equal(validateAll(draft({ logRows: [], files: [file('later')] })), null)
+ assert.match(validateAll(draft({ logRows: [], locationIds: [], files: [file('later')] }))!, /location for the evidence/)
+ assert.equal(validateAll(draft({ logRows: [], locationIds: [], files: [{ ...file('later'), overrides: { locationIds: ['north'] } }] })), null)
  assert.equal(validateAll(draft({ logRows: [{ ...row('zero'), value: '0' }], evidenceTitle: '' })), null)
  assert.match(validateAll(draft({ logRows: [] }))!, /Add files/)
  assert.match(validateAll(draft({ files: [{ ...file('pending'), status: 'uploading' }] }))!, /finish/)
@@ -183,7 +195,7 @@ test('save retries skip confirmed results and evidence and pin only selected res
  const evidencePayloads: any[] = []
  let fail = true
  const api = {
-  async createKPIUpdate(id: string) { claims.push(id); return { id: `saved-${id}` } },
+  async createKPIUpdatesBatch(updates: any[]) { return updates.map(u => { claims.push(u.kpi_id); return { id: `saved-${u.kpi_id}`, kpi_id: u.kpi_id } }) },
   async createEvidence(payload: any) {
    if (payload.kpi_ids.includes('kits') && fail) { fail = false; throw new Error('Temporary failure') }
    evidencePayloads.push(payload)
@@ -202,12 +214,66 @@ test('save retries skip confirmed results and evidence and pin only selected res
  assert.deepEqual(reports.at(-1), [4, 4])
 })
 
+test('batched results map back to the right scope when one metric has several scopes', async () => {
+ const state = draft({ logRows: [row('s1', 'students'), row('k1', 'kits'), { ...row('s2', 'students'), value: '7', overrides: { locationIds: ['north'] } }], files: [file('north', ['s2'])] })
+ const plan = buildLogPlan(state, 'program')
+ const progress: LogSaveProgress = { claims: new Map(), evidence: new Set(), ownedUrls: new Set() }
+ let linked: string[] = []
+ await saveLogPlan(plan, {
+  // Mirrors the server: rows come back grouped by metric in first-seen order.
+  async createKPIUpdatesBatch(updates) {
+   const order = [...new Set(updates.map(u => u.kpi_id))]
+   return order.flatMap(kpi => updates.filter(u => u.kpi_id === kpi)).map(u => ({ id: `${u.kpi_id}-${u.value}`, kpi_id: u.kpi_id }))
+  },
+  async createEvidence(payload) { linked = payload.kpi_update_ids || []; return { id: 'evidence' } },
+ }, progress, () => {})
+ const byRow = Object.fromEntries(plan.claims.map(c => [c.rowId, progress.claims.get(c.key)]))
+ assert.deepEqual(byRow, { s1: 'students-10', k1: 'kits-10', s2: 'students-7' })
+ assert.deepEqual(linked, ['students-7'])
+})
+
+test('a failed evidence save waits for the others before reporting', async () => {
+ const state = draft({ files: [file('a', ['students']), { ...file('b', ['kits']), type: 'documentation' }, { ...file('c', ['kits']), type: 'financials' }] })
+ const plan = buildLogPlan(state, 'program')
+ const progress: LogSaveProgress = { claims: new Map(), evidence: new Set(), ownedUrls: new Set() }
+ let finished = 0
+ await assert.rejects(saveLogPlan(plan, {
+  async createKPIUpdatesBatch(updates) { return updates.map(u => ({ id: `id-${u.kpi_id}`, kpi_id: u.kpi_id })) },
+  async createEvidence(payload) {
+   if (payload.type === 'visual_proof') throw new Error('Boom')
+   await new Promise(r => setTimeout(r, 20))
+   finished++
+   return { id: payload.type }
+  },
+ }, progress, () => {}), /Boom/)
+ assert.equal(finished, plan.evidence.length - 1)
+ assert.equal(progress.evidence.size, plan.evidence.length - 1)
+})
+
 test('evidence added from a result preserves the explicit pin even with no new result', async () => {
  const plan = buildLogPlan(draft({ logRows: [newLogRow('students', 's')], files: [file('photo')] }))
  let pinned: string[] = []
  await saveLogPlan(plan, {
-  async createKPIUpdate() { throw new Error('No new claim expected') },
+  async createKPIUpdatesBatch() { throw new Error('No new claim expected') },
   async createEvidence(payload) { pinned = payload.kpi_update_ids || []; return { id: 'evidence' } },
  }, { claims: new Map(), evidence: new Set(), ownedUrls: new Set() }, () => {}, 'existing-result')
  assert.deepEqual(pinned, ['existing-result'])
+})
+
+test('field issues point at the scope that owns the missing value', () => {
+ const state = draft({
+  locationIds: [],
+  logRows: [row('students'), { ...row('kits'), value: '', keepForEvidence: true, overrides: { evidenceTitle: '' } }],
+  files: [file('photo', ['kits']), { ...file('receipt', ['students']), overrides: { dateSingle: '' } }],
+ })
+ const issues = logFieldIssues(state)
+ assert.deepEqual(issues.shared, ['location'])
+ assert.deepEqual(issues.rows, { kits: ['title'] })
+ assert.deepEqual(issues.files, { receipt: ['date'] })
+})
+
+test('evidence-only logs need a metric tag when metrics exist', () => {
+ assert.match(evidenceMetricError(draft({ logRows: [], files: [file('photo')] }), 3)!, /at least one metric/)
+ assert.equal(evidenceMetricError(draft({ logRows: [], files: [file('photo')] }), 0), null)
+ assert.equal(evidenceMetricError(draft({ logRows: [{ ...newLogRow('students', 's'), keepForEvidence: true }], files: [file('photo')] }), 3), null)
 })

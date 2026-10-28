@@ -32,6 +32,8 @@ import TimelineFilterBar from '../timeline/TimelineFilterBar'
 import UploadWizard from '../upload/UploadWizard'
 import ClaimsView from '../timeline/ClaimsView'
 import AllLogsView from '../timeline/AllLogsView'
+import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
+import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 import EvidenceView from '../timeline/EvidenceView'
 import EvidenceViewModeToggle from '../timeline/EvidenceViewModeToggle'
 import type { EvidenceViewMode } from '../timeline/EvidenceViewModeToggle'
@@ -136,12 +138,14 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
  const [addEvidenceTarget, setAddEvidenceTarget] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [isWizardOpen, setIsWizardOpen] = useState(false)
+ // Advanced flows picked from the classic wizard's Simple/Advanced step
+ const [advancedUpload, setAdvancedUpload] = useState<'claim' | 'evidence' | null>(null)
  const listRef = useRef<HTMLDivElement>(null)
  const scrollAfterCreate = useRef(false)
  const [evidenceMode, setEvidenceMode] = useState<EvidenceViewMode>('list')
 
  const rawView = searchParams.get('view')
- const view: TimelineView = rawView === 'evidence' || rawView === 'claims' || rawView === 'connections' ? rawView : 'all'
+ const view: TimelineView = rawView === 'evidence' || rawView === 'claims' || rawView === 'all' ? rawView : 'connections'
  // When locked to a metric, force the metric filter so every view/count is scoped.
  const filters = useMemo(() => {
  const base = filtersFromParams(searchParams)
@@ -150,7 +154,7 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
 
  const setView = (next: TimelineView) => {
  const params = new URLSearchParams(searchParams)
- if (next === 'all') params.delete('view')
+ if (next === 'connections') params.delete('view')
  else params.set('view', next)
  setSearchParams(params, { replace: true })
  }
@@ -161,14 +165,12 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  setSearchParams(params, { replace: true })
  }
 
- const load = useCallback(async () => {
- if (!initiativeId) return
- try {
+ const fetchTimeline = useCallback(async (): Promise<TimelineResponse> => {
  const timeline = await apiService.getInitiativeTimeline(initiativeId)
  // Normalise defensively: a backend older than this frontend (or a
  // cached/partial payload) may omit arrays, and every view assumes
  // they exist. Missing pieces degrade to empty instead of crashing.
- const normalised: TimelineResponse = {
+ return {
  kpis: timeline?.kpis || [],
  claims: timeline?.claims || [],
  evidence: timeline?.evidence || [],
@@ -176,6 +178,12 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  contributors: timeline?.contributors || {},
  stats: timeline?.stats || { total: 0, connected: 0, not_connected: 0, claims_total: 0, evidence_total: 0 },
  }
+ }, [initiativeId])
+
+ const load = useCallback(async () => {
+ if (!initiativeId) return
+ try {
+ const normalised = await fetchTimeline()
  setData(normalised)
  writeSWR(`timeline:${initiativeId}`, normalised)
  } catch (error) {
@@ -185,7 +193,7 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  } finally {
  setLoading(false)
  }
- }, [initiativeId])
+ }, [initiativeId, fetchTimeline])
 
  useEffect(() => {
  // Only show the skeleton when there is nothing cached to paint.
@@ -236,22 +244,52 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  onRefresh?.()
  }, [initiativeId, load, onRefresh])
 
- const handleLogCreated = () => {
+ // IDs present before a save; anything new after the refresh is what the user just added.
+ const idsBeforeSave = useRef<Set<string> | null>(null)
+ const [newIds, setNewIds] = useState<Set<string>>(new Set())
+
+ // Fetched while the success screen is up, applied on Done so new rows are there on reveal, not popping in.
+ const prefetchedAfterSave = useRef<Promise<TimelineResponse | null> | null>(null)
+ const handleLogSaved = () => {
+  apiService.clearCache(`/initiatives/${initiativeId}/timeline`)
+  apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+  prefetchedAfterSave.current = fetchTimeline().catch(() => null)
+ }
+
+ const handleLogCreated = async () => {
+  if (data) idsBeforeSave.current = new Set([...data.claims, ...data.evidence].map(r => r.id!))
+  const pending = prefetchedAfterSave.current
+  prefetchedAfterSave.current = null
+  const fresh = pending ? await pending : null
   const params = new URLSearchParams(searchParams)
   applyFiltersToParams(params, EMPTY_TIMELINE_FILTERS)
   params.delete('view')
   setSearchParams(params, { replace: true })
   scrollAfterCreate.current = true
-  return refresh()
+  if (!fresh) return refresh()
+  setData(fresh)
+  writeSWR(`timeline:${initiativeId}`, fresh)
+  onRefresh?.()
  }
 
  useEffect(() => {
  if (!scrollAfterCreate.current || loading) return
+ const before = idsBeforeSave.current
+ if (before && data) {
+  const added = [...data.claims, ...data.evidence].map(r => r.id!).filter(id => !before.has(id))
+  if (added.length) setNewIds(new Set(added))
+  idsBeforeSave.current = null
+ }
+ // Lists are newest-first, so the new log is at the top. Wait out the view-swap animation first.
+ const timer = window.setTimeout(() => {
  scrollAfterCreate.current = false
- requestAnimationFrame(() => {
  const el = listRef.current
- if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
- })
+ if (!el) return
+ // Embedded on the program page the page scrolls, not this list.
+ if (el.scrollHeight > el.clientHeight) el.scrollTo({ top: 0, behavior: 'smooth' })
+ else el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+ }, 350)
+ return () => window.clearTimeout(timer)
  }, [data, loading])
 
  const handleOpenClaim = (claim: TimelineClaim, kpi: KPI | undefined) => {
@@ -509,12 +547,14 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
             >
               {view === 'all' ? (
                 <AllLogsView
+                  newIds={newIds}
                   claims={data.claims} evidence={data.evidence} kpis={data.kpis}
                   locations={locations} filters={filters}
                   onOpenClaim={handleOpenClaim} onOpenEvidence={handleOpenEvidence}
                 />
               ) : view === 'claims' ? (
                 <ClaimsView
+                  newIds={newIds}
                   claims={data.claims}
                   kpis={data.kpis}
                   locations={locations}
@@ -530,6 +570,7 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
                 />
               ) : view === 'evidence' ? (
                 <EvidenceView
+                  newIds={newIds}
                   evidence={data.evidence}
                   kpis={data.kpis}
                   locations={locations}
@@ -543,6 +584,7 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
                 />
               ) : (
                 <ConnectionsView
+                  newIds={newIds}
                   claims={data.claims}
                   evidence={data.evidence}
                   kpis={data.kpis}
@@ -580,7 +622,28 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  onStructureChanged={refresh}
  existingClaims={data.claims}
  existingEvidence={data.evidence}
+ onAdvancedClaim={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('claim') }}
+ onAdvancedEvidence={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('evidence') }}
  onClose={() => setIsWizardOpen(false)}
+ onSaved={handleLogSaved}
+ onCreated={handleLogCreated}
+ />
+ )}
+
+ {advancedUpload === 'claim' && data && (
+ <ImpactClaimUploadModal
+ isOpen
+ initiativeId={initiativeId}
+ onClose={() => setAdvancedUpload(null)}
+ onCreated={handleLogCreated}
+ />
+ )}
+
+ {advancedUpload === 'evidence' && (
+ <EvidenceUploadModal
+ isOpen
+ initiativeId={initiativeId}
+ onClose={() => setAdvancedUpload(null)}
  onCreated={handleLogCreated}
  />
  )}
@@ -617,6 +680,7 @@ export default function TimelineTab({ initiativeId, programTitle, onRefresh, loc
  existingEvidence={data.evidence}
  evidenceForClaim={addEvidenceTarget.claim}
  onClose={() => setAddEvidenceTarget(null)}
+ onSaved={handleLogSaved}
  onCreated={handleLogCreated}
  />
  )}

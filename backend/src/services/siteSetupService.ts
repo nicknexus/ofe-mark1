@@ -694,11 +694,11 @@ export class SiteSetupService {
         const urls = filterSameSiteUrls(websiteUrl, input.urls, envMaxPages());
         const traceId = newTraceId();
         logStep(traceId, 'SETUP', 'scrape requested', { userId, websiteUrl, count: urls.length });
-        const { pages, homepageOk } = await scrapeUrls(urls, traceId, websiteUrl, {
+        const { pages, homepageOk, attempted } = await scrapeUrls(urls, traceId, websiteUrl, {
             serverTimeoutMs: 22000,
             allowHomepageRetry: false,
         });
-        assertEnoughContent(pages, urls.length, traceId, homepageOk);
+        assertEnoughContent(pages, attempted, traceId, homepageOk);
         return { context: packScrapedContext(pages), pages: pages.length };
     }
 

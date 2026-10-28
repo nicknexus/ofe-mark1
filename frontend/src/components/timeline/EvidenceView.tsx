@@ -13,7 +13,7 @@ import {
   needsFirstLogSetup,
   sortByMode,
 } from '../../utils/timeline'
-import TimelineRow, { TimelineRowHeader } from './TimelineRow'
+import TimelineRow, { JustAddedBadge, TimelineRowHeader } from './TimelineRow'
 import MetricChip from './MetricChip'
 import { EvidenceTypeLabel } from './EvidenceTypeCounts'
 import type { EvidenceViewMode } from './EvidenceViewModeToggle'
@@ -34,12 +34,14 @@ interface EvidenceViewProps {
   mode: EvidenceViewMode
   onOpenEvidence: (evidence: TimelineEvidence) => void
   onQuickSetup?: () => void
+  /** Records created in the save the user just finished. */
+  newIds?: Set<string>
   knownMetricCount?: number
   knownLocationCount?: number | null
 }
 
-/** All evidence in the initiative, oldest first so a new log sits at the bottom. */
-export default function EvidenceView({ evidence, kpis, locations, contributors, filters, mode, onOpenEvidence, onQuickSetup, knownMetricCount, knownLocationCount }: EvidenceViewProps) {
+/** All evidence in the initiative, newest first so a new log sits at the top. */
+export default function EvidenceView({ evidence, kpis, locations, contributors, filters, mode, onOpenEvidence, onQuickSetup, knownMetricCount, knownLocationCount, newIds }: EvidenceViewProps) {
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
 
@@ -105,9 +107,10 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
               <button
                 key={ev.id}
                 onClick={() => onOpenEvidence(ev)}
-                className={`app-card-interactive overflow-hidden text-left flex flex-col border ${style.card}`}
+                className={`app-card-interactive overflow-hidden text-left flex flex-col border ${style.card} ${newIds?.has(ev.id!) ? '!border-primary-600 ring-2 ring-primary-200' : ''}`}
               >
                 <div className="relative aspect-[4/3] bg-gray-100 flex items-center justify-center">
+                  {newIds?.has(ev.id!) && <span className="absolute top-2 left-2"><JustAddedBadge /></span>}
                   {thumbnailUrl ? (
                     <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
                   ) : (
@@ -168,6 +171,7 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
           return (
             <TimelineRow
               key={ev.id}
+              isNew={!!newIds?.has(ev.id!)}
               leading={
                 thumbnailUrl ? (
                   <img
