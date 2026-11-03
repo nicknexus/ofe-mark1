@@ -142,7 +142,7 @@ const PartnersSection = () => {
             Priority access.
           </h2>
           <p className="text-lg text-foreground/70 leading-relaxed">
-            Charities on Nexus unlock exclusive access to our partners the moment they sign on.
+            Charities on Nexus unlock exclusive offers from our partners the moment they sign on.
           </p>
         </Reveal>
       </div>
