@@ -136,46 +136,49 @@ export class PublicService {
             return { organizations: [], initiatives: [], locationMatches: [] };
         }
 
-        // Search organizations (exclude demo / sandbox orgs from listing)
-        const { data: orgs } = await supabase
-            .from('organizations')
-            .select('id, name, slug, description, logo_url, created_at')
-            .eq('is_public', true)
-            .eq('is_demo', false)
-            .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-            .order('name')
-            .limit(20);
+        // The three searches are independent; run them together.
+        const [{ data: orgs }, { data: inits }, { data: locs }] = await Promise.all([
+            // Search organizations (exclude demo / sandbox orgs from listing)
+            supabase
+                .from('organizations')
+                .select('id, name, slug, description, logo_url, created_at')
+                .eq('is_public', true)
+                .eq('is_demo', false)
+                .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+                .order('name')
+                .limit(20),
 
-        // Search initiatives (with org info including logo)
-        // If org is public, all its initiatives are visible
-        const { data: inits } = await supabase
-            .from('initiatives')
-            .select(`
-                id, title, description, region, location, slug, coordinates, created_at, organization_id,
-                organizations!inner(id, name, slug, logo_url, is_public, is_demo)
-            `)
-            .eq('organizations.is_public', true)
-            .eq('organizations.is_demo', false)
-            .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,region.ilike.%${searchTerm}%`)
-            .order('title')
-            .limit(20);
+            // Search initiatives (with org info including logo)
+            // If org is public, all its initiatives are visible
+            supabase
+                .from('initiatives')
+                .select(`
+                    id, title, description, region, location, slug, coordinates, created_at, organization_id,
+                    organizations!inner(id, name, slug, logo_url, is_public, is_demo)
+                `)
+                .eq('organizations.is_public', true)
+                .eq('organizations.is_demo', false)
+                .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,region.ilike.%${searchTerm}%`)
+                .order('title')
+                .limit(20),
 
-        // Search locations (returns initiatives that have matching locations).
-        // Locations are org-global now; we join through initiative_locations to
-        // surface the initiatives each matching location is linked to.
-        const { data: locs } = await supabase
-            .from('locations')
-            .select(`
-                id, name, description, latitude, longitude,
-                initiative_locations(
-                    initiatives(
-                        id, title, description, region, slug, is_public, organization_id,
-                        organizations!inner(id, name, slug, logo_url, is_public, is_demo)
+            // Search locations (returns initiatives that have matching locations).
+            // Locations are org-global now; we join through initiative_locations to
+            // surface the initiatives each matching location is linked to.
+            supabase
+                .from('locations')
+                .select(`
+                    id, name, description, latitude, longitude,
+                    initiative_locations(
+                        initiatives(
+                            id, title, description, region, slug, is_public, organization_id,
+                            organizations!inner(id, name, slug, logo_url, is_public, is_demo)
+                        )
                     )
-                )
-            `)
-            .ilike('name', `%${searchTerm}%`)
-            .limit(20);
+                `)
+                .ilike('name', `%${searchTerm}%`)
+                .limit(20),
+        ]);
 
         // Format results
         const organizations: PublicOrganization[] = (orgs || []).map(o => ({
@@ -188,6 +191,16 @@ export class PublicService {
         }));
 
         // Plan gate: drop initiative hits that are hidden by the org's plan.
+        // Warm the per-org entitlement cache in parallel so the checks below are hits.
+        const gateOrgIds = new Set<string>();
+        for (const i of (inits || []) as any[]) gateOrgIds.add(i.organization_id);
+        for (const l of (locs || []) as any[]) {
+            for (const link of l.initiative_locations || []) {
+                if (link?.initiatives?.organization_id) gateOrgIds.add(link.initiatives.organization_id);
+            }
+        }
+        await Promise.all([...gateOrgIds].map((id) => EntitlementService.getForOrg(id)));
+
         const initRows: any[] = [];
         for (const i of (inits || []) as any[]) {
             if (await EntitlementService.isInitiativeAllowed(i.organization_id, i.id)) {
@@ -273,7 +286,16 @@ export class PublicService {
     // ORGANIZATIONS
     // ============================================
 
-    static async getAllOrganizations(): Promise<PublicOrganization[]> {
+    static getAllOrganizations(): Promise<PublicOrganization[]> {
+        const hit = this.orgListCache;
+        if (hit && hit.until > Date.now()) return hit.value;
+        const value = this.fetchAllOrganizations();
+        this.orgListCache = { until: Date.now() + this.PUBLIC_LIST_TTL_MS, value };
+        value.catch(() => { this.orgListCache = null; });
+        return value;
+    }
+
+    private static async fetchAllOrganizations(): Promise<PublicOrganization[]> {
         // Exclude demo / sandbox orgs from the /explore listing — they are
         // reachable only by direct share link.
         const { data, error } = await supabase
@@ -1908,7 +1930,22 @@ export class PublicService {
      * live aggregate stats. Bounded to a handful of queries regardless of how
      * many orgs exist (no N+1).
      */
-    static async getShowcase(limit = 12): Promise<{
+    private static showcaseCache = new Map<number, { until: number; value: Promise<any> }>();
+    private static orgListCache: { until: number; value: Promise<PublicOrganization[]> } | null = null;
+    // Matches the public-route live-org TTL: visibility changes show up within a minute.
+    private static readonly PUBLIC_LIST_TTL_MS = 60_000;
+
+    /** Memoized (TTL + in-flight dedupe) wrapper; the build is ~10 sequential queries. */
+    static getShowcase(limit = 12): ReturnType<typeof PublicService.buildShowcase> {
+        const hit = this.showcaseCache.get(limit);
+        if (hit && hit.until > Date.now()) return hit.value;
+        const value = this.buildShowcase(limit);
+        this.showcaseCache.set(limit, { until: Date.now() + this.PUBLIC_LIST_TTL_MS, value });
+        value.catch(() => this.showcaseCache.delete(limit));
+        return value;
+    }
+
+    private static async buildShowcase(limit = 12): Promise<{
         stats: { organizations: number; initiatives: number; stories: number; locations: number; countries: number };
         stories: any[];
         impact_claims: any[];

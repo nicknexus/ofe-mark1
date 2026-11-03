@@ -90,6 +90,7 @@ router.get('/search', async (req, res) => {
 router.get('/organizations', async (req, res) => {
     try {
         const organizations = await PublicService.getAllOrganizations();
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
         res.json(organizations);
     } catch (error) {
         console.error('Get organizations error:', error);

@@ -89,23 +89,22 @@ const ProblemsSection = ({ onGetStarted }: ProblemsSectionProps) => {
                   : "border-border/60";
               return (
                 <StaggerItem key={stage.step} className="relative z-10 flex">
-                  <motion.div
+                  <div
                     className={`relative rounded-2xl border-2 bg-white p-5 flex flex-col w-full min-h-[300px] ${borderClass} ${
-                      isAccent || isWarning ? "shadow-glass-lg" : "shadow-glass"
+                      isAccent ? "" : isWarning ? "shadow-glass-lg" : "shadow-glass"
                     }`}
-                    {...(isAccent
-                      ? {
-                          animate: {
-                            boxShadow: [
-                              "0 0 0 0 rgba(192,223,161,0)",
-                              "0 0 0 6px rgba(192,223,161,0.28)",
-                              "0 0 0 0 rgba(192,223,161,0)",
-                            ],
-                          },
-                          transition: { duration: 2.6, repeat: Infinity, ease: "easeInOut" },
-                        }
-                      : {})}
                   >
+                    {isAccent && (
+                      // Pulse opacity on a separate layer: animating box-shadow
+                      // repaints the card every frame.
+                      <motion.span
+                        aria-hidden
+                        className="pointer-events-none absolute -inset-[2px] rounded-2xl shadow-[0_0_0_6px_rgba(192,223,161,0.28)]"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: [0, 1, 0] }}
+                        transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                    )}
                     <div className="flex items-center gap-2 mb-2 min-w-0">
                       <span
                         className={`text-3xl font-fraunces font-light shrink-0 ${
@@ -154,7 +153,7 @@ const ProblemsSection = ({ onGetStarted }: ProblemsSectionProps) => {
                         </li>
                       ))}
                     </ul>
-                  </motion.div>
+                  </div>
                 </StaggerItem>
               );
             })}

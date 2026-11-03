@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import {
     Search, Building2, Target, MapPin, Loader2, ArrowRight, ArrowLeft, Globe2,
@@ -8,8 +8,23 @@ import {
     publicApi, PublicOrganization, SearchResult, ShowcaseImpactClaim,
 } from '../services/publicApi'
 import { supabase } from '../services/supabase'
-import ImpactGlobe from '../components/landing/ImpactGlobe'
 import { easeOut } from '../components/landing/motion'
+import { resizedStorageImage } from '../utils/storageImage'
+
+// Start fetching the globe chunk as soon as this page's module loads, in
+// parallel with the data requests, instead of after they resolve.
+const globeImport = import('../components/landing/ImpactGlobe')
+const ImpactGlobe = lazy(() => globeImport)
+
+// Logos render in 36-44px tiles; originals are full-size uploads.
+function logoSrc(url: string) {
+    return resizedStorageImage(url, { width: 96, height: 96 })
+}
+function logoFallback(original: string) {
+    return (e: React.SyntheticEvent<HTMLImageElement>) => {
+        if (e.currentTarget.src !== original) e.currentTarget.src = original
+    }
+}
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -50,6 +65,9 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
     const [loadingInitial, setLoadingInitial] = useState(true)
     const [isLoggedIn, setIsLoggedIn] = useState(false)
     const [claims, setClaims] = useState<ShowcaseImpactClaim[]>([])
+    // The globe waits for claims so it doesn't flash its demo pins first.
+    const [claimsSettled, setClaimsSettled] = useState(false)
+    const searchSeqRef = useRef(0)
 
     // Globe focus: auto-cycling spotlight, overridden while hovering a list row.
     const [spotIdx, setSpotIdx] = useState(0)
@@ -66,34 +84,40 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
     }, [])
 
     useEffect(() => {
+        // Independent: the org list shouldn't wait on the (slower) showcase.
         let alive = true
         setLoadingInitial(true)
-        Promise.allSettled([publicApi.getOrganizations(), publicApi.getShowcase(24)]).then(([orgsRes, showcaseRes]) => {
-            if (!alive) return
-            if (orgsRes.status === 'fulfilled') setInitialOrgs(orgsRes.value)
-            else console.error('Failed to load organizations:', orgsRes.reason)
-            if (showcaseRes.status === 'fulfilled') {
-                setClaims(showcaseRes.value?.impact_claims ?? [])
-            }
-            setLoadingInitial(false)
-        })
+        publicApi.getOrganizations()
+            .then((orgs) => { if (alive) setInitialOrgs(orgs) })
+            .catch((err) => console.error('Failed to load organizations:', err))
+            .finally(() => { if (alive) setLoadingInitial(false) })
+        publicApi.getShowcase(24)
+            .then((res) => { if (alive) setClaims(res?.impact_claims ?? []) })
+            .catch(() => {})
+            .finally(() => { if (alive) setClaimsSettled(true) })
         return () => { alive = false }
     }, [])
 
     useEffect(() => {
         if (debouncedQuery.trim()) performSearch(debouncedQuery)
-        else setResults(null)
+        else {
+            searchSeqRef.current++
+            setResults(null)
+            setLoading(false)
+        }
     }, [debouncedQuery])
 
     const performSearch = async (query: string) => {
+        // Drop responses that arrive after a newer search started.
+        const seq = ++searchSeqRef.current
         try {
             setLoading(true)
             const searchResults = await publicApi.search(query)
-            setResults(searchResults)
+            if (seq === searchSeqRef.current) setResults(searchResults)
         } catch (error) {
             console.error('Search failed:', error)
         } finally {
-            setLoading(false)
+            if (seq === searchSeqRef.current) setLoading(false)
         }
     }
 
@@ -187,17 +211,6 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
     const hasResults = results && (results.organizations.length > 0 || results.initiatives.length > 0 || results.locationMatches.length > 0)
     const showInitialOrgs = !searchQuery.trim() && !loading
 
-    if (loadingInitial && initialOrgs.length === 0) {
-        return (
-            <div className={`landing-page ${embedded ? 'min-h-0 py-24' : 'min-h-screen'} relative flex items-center justify-center bg-gradient-to-br from-steel-light to-ink-soft`}>
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 text-seafoam animate-spin mx-auto mb-4" />
-                    <p className="text-sm text-white/60 font-figtree">Charting the atlas…</p>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className={`landing-page ${embedded ? 'min-h-0 pb-4' : 'min-h-screen lg:h-screen lg:overflow-hidden'} font-figtree relative animate-fadeIn flex flex-col`}>
             {/* Dark atlas backdrop — same palette as the landing "Why it matters" band */}
@@ -216,7 +229,7 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                         <div className="bg-white/5 backdrop-blur-xl rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between border border-white/10">
                             <Link to="/" className="flex items-center gap-2 group">
                                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform duration-300 overflow-hidden bg-white/90">
-                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                    <img src="/nexus-logo-96.webp" alt="Nexus" width={86} height={96} className="w-full h-full object-contain" />
                                 </div>
                                 <span className="text-lg sm:text-xl font-newsreader font-extralight text-white">Nexus Impacts</span>
                             </Link>
@@ -265,12 +278,16 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-3/4 h-3/4 rounded-full bg-[radial-gradient(circle,rgba(151,199,203,0.14)_0%,transparent_65%)]" />
                             </div>
-                            <ImpactGlobe
-                                locations={globeLocations.length > 0 ? globeLocations : undefined}
-                                enableZoom
-                                focusLocation={focusLocation}
-                                initialAltitude={1.45}
-                            />
+                            {claimsSettled && (
+                                <Suspense fallback={null}>
+                                    <ImpactGlobe
+                                        locations={globeLocations.length > 0 ? globeLocations : undefined}
+                                        enableZoom
+                                        focusLocation={focusLocation}
+                                        initialAltitude={1.45}
+                                    />
+                                </Suspense>
+                            )}
 
                             {/* Spotlight card for the featured claim */}
                             <div className="absolute inset-x-0 bottom-0 flex justify-center pointer-events-none px-4">
@@ -293,7 +310,13 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                                                 <div className="flex items-center gap-3">
                                                     <span className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-white">
                                                         {activeClaim.org_logo_url ? (
-                                                            <img src={activeClaim.org_logo_url} alt="" className="w-full h-full object-cover" />
+                                                            <img
+                                                                src={logoSrc(activeClaim.org_logo_url)}
+                                                                onError={logoFallback(activeClaim.org_logo_url)}
+                                                                alt=""
+                                                                decoding="async"
+                                                                className="w-full h-full object-cover"
+                                                            />
                                                         ) : (
                                                             <Globe2 className="w-4 h-4 text-seafoam" />
                                                         )}
@@ -334,7 +357,8 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search organizations, programs, places…"
-                                autoFocus={!embedded}
+                                // Desktop only: on phones autofocus pops the keyboard over the globe.
+                                autoFocus={!embedded && typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches}
                                 className="w-full pl-11 pr-12 py-3.5 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 text-sm sm:text-base text-white placeholder-white/40 focus:border-seafoam/60 focus:ring-2 focus:ring-seafoam/30 focus:outline-none transition-all"
                             />
                             {loading ? (
@@ -417,9 +441,23 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-lg sm:text-xl font-fraunces font-light text-white">All organizations</h2>
-                                    <span className="text-xs text-seafoam px-2.5 py-1 bg-seafoam/10 border border-seafoam/20 rounded-full">{initialOrgs.length}</span>
+                                    {!loadingInitial && (
+                                        <span className="text-xs text-seafoam px-2.5 py-1 bg-seafoam/10 border border-seafoam/20 rounded-full">{initialOrgs.length}</span>
+                                    )}
                                 </div>
-                                {initialOrgs.length === 0 ? (
+                                {loadingInitial && initialOrgs.length === 0 ? (
+                                    <div className="space-y-1.5" aria-busy="true">
+                                        {Array.from({ length: 6 }).map((_, i) => (
+                                            <div key={i} className="flex items-center gap-3.5 p-3.5">
+                                                <div className="w-11 h-11 rounded-xl bg-white/10 animate-pulse flex-shrink-0" />
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="h-3.5 w-2/5 rounded bg-white/10 animate-pulse" />
+                                                    <div className="h-2.5 w-3/4 rounded bg-white/5 animate-pulse" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : initialOrgs.length === 0 ? (
                                     <div className="bg-white/5 backdrop-blur-xl p-12 rounded-2xl text-center border border-white/10">
                                         <Building2 className="w-10 h-10 text-white/20 mx-auto mb-4" />
                                         <p className="text-sm text-white/50">No public organizations available yet.</p>
@@ -466,7 +504,9 @@ function ResultSection({ title, icon: Icon, count, children }: { title: string; 
 function RowLogo({ url, fallback }: { url?: string; fallback: React.ReactNode }) {
     return (
         <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-white border border-white/10">
-            {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : fallback}
+            {url ? (
+                <img src={logoSrc(url)} onError={logoFallback(url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            ) : fallback}
         </div>
     )
 }
@@ -490,7 +530,14 @@ function OrgRow({ org, pinCount, onEnter }: {
             />
             <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden border border-white/10 bg-white">
                 {org.logo_url ? (
-                    <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover" />
+                    <img
+                        src={logoSrc(org.logo_url)}
+                        onError={logoFallback(org.logo_url)}
+                        alt={org.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover"
+                    />
                 ) : (
                     <Building2 className="w-5 h-5" style={{ color: accent }} />
                 )}

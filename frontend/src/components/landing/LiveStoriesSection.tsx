@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Building2, MapPin, Calendar, Play, ChevronLeft, ChevronRight } from "lucide-react";
@@ -6,10 +6,15 @@ import { format } from "date-fns";
 import { publicApi, type ShowcaseStory } from "../../services/publicApi";
 import { Reveal } from "./Reveal";
 import { easeOut } from "./motion";
+import { resizedStorageImage } from "../../utils/storageImage";
 
 const AUTOPLAY_MS = 3000;
 
-function resolveThumb(story: ShowcaseStory): { kind: "img" | "video" | "none"; src?: string } {
+function resolveThumb(story: ShowcaseStory): {
+  kind: "img" | "video" | "none";
+  src?: string;
+  fallback?: string;
+} {
   const url = story.media_url;
   if (!url) return { kind: "none" };
   const yt = url.match(
@@ -19,7 +24,10 @@ function resolveThumb(story: ShowcaseStory): { kind: "img" | "video" | "none"; s
   // Vimeo URLs aren't direct video files; vumbnail resolves the poster image.
   const vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return { kind: "img", src: `https://vumbnail.com/${vimeo[1]}.jpg` };
-  if (story.media_type === "photo") return { kind: "img", src: url };
+  // Cards are 320x~430; originals are full camera resolution.
+  if (story.media_type === "photo") {
+    return { kind: "img", src: resizedStorageImage(url, { width: 640, height: 860 }), fallback: url };
+  }
   if (story.media_type === "video") return { kind: "video", src: url };
   return { kind: "none" };
 }
@@ -30,9 +38,11 @@ function safeDate(value?: string) {
   return isNaN(d.getTime()) ? "" : format(d, "MMM d, yyyy");
 }
 
-function StoryCard({ story }: { story: ShowcaseStory }) {
+const StoryCard = memo(function StoryCard({ story }: { story: ShowcaseStory }) {
   const thumb = resolveThumb(story);
   const [imgError, setImgError] = useState(false);
+  const [useFallback, setUseFallback] = useState(false);
+  const imgSrc = useFallback ? thumb.fallback : thumb.src;
   const to =
     story.org_slug && story.initiative_slug
       ? `/org/${story.org_slug}/${story.initiative_slug}/story/${story.id}`
@@ -49,11 +59,14 @@ function StoryCard({ story }: { story: ShowcaseStory }) {
       <div className="relative flex-1 min-h-0 overflow-hidden bg-gradient-to-br from-sage-light/40 to-accent/10">
         {thumb.kind === "img" && !imgError && (
           <img
-            src={thumb.src}
+            src={imgSrc}
             alt={story.title}
             loading="eager"
             decoding="async"
-            onError={() => setImgError(true)}
+            onError={() => {
+              if (!useFallback && thumb.fallback && thumb.fallback !== thumb.src) setUseFallback(true);
+              else setImgError(true);
+            }}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         )}
@@ -120,7 +133,7 @@ function StoryCard({ story }: { story: ShowcaseStory }) {
       </div>
     </Link>
   );
-}
+});
 
 const SkeletonCard = () => (
   <div className="flex flex-col h-full rounded-2xl overflow-hidden bg-white border border-border/60 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28)]">
@@ -196,7 +209,6 @@ const LiveStoriesSection = () => {
           return;
         }
         setStories(shuffle(list));
-        prefetchThumbs(list);
         setStatus("ready");
       })
       .catch(() => alive && setStatus("empty"));
@@ -204,6 +216,31 @@ const LiveStoriesSection = () => {
       alive = false;
     };
   }, []);
+
+  // Render the real track (72 eager images) only once the section is close,
+  // so it doesn't compete with the hero on initial load.
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setNear(true);
+        observer.disconnect();
+      },
+      { rootMargin: "800px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (near && stories.length) prefetchThumbs(stories);
+  }, [near, stories]);
 
   const n = stories.length;
   // Triple the list so there's always a full screen of cards on both sides of
@@ -246,7 +283,7 @@ const LiveStoriesSection = () => {
       cancelAnimationFrame(raf);
       ro?.disconnect();
     };
-  }, [status, inView, n]);
+  }, [status, inView, near, n]);
 
   // Visibility gate — no autoplay work while off screen.
   useEffect(() => {
@@ -270,7 +307,7 @@ const LiveStoriesSection = () => {
     return () => cancelAnimationFrame(id);
   }, [animate]);
 
-  const autoplayActive = status === "ready" && inView && !paused && !hovered && !reduceMotion && n > 1;
+  const autoplayActive = status === "ready" && near && inView && !paused && !hovered && !reduceMotion && n > 1;
 
   useEffect(() => {
     if (!autoplayActive) return;
@@ -328,7 +365,7 @@ const LiveStoriesSection = () => {
           </h2>
         </Reveal>
 
-        {status === "loading" ? (
+        {status === "loading" || !near ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-[520px]">

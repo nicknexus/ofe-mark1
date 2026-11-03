@@ -1,5 +1,5 @@
 // v2 – desktop update banner
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { AppToaster } from './components/ui'
 import { AuthService } from './services/auth'
@@ -15,11 +15,7 @@ import { OnboardingProvider } from './context/OnboardingContext'
 import { StorageProvider } from './context/StorageContext'
 import { TeamProvider } from './context/TeamContext'
 import { UploadProvider } from './context/UploadContext'
-import InteractiveTutorial from './components/InteractiveTutorial'
-import LayoutIntro from './components/LayoutIntro'
-import FloatingUploadPanel from './components/FloatingUploadPanel'
 import TrialBanner from './components/TrialBanner'
-import MobileApp from './components/MobileApp'
 import { isStandalone as checkStandalone } from './utils/pwa'
 import { useVersionCheck } from './hooks/useVersionCheck'
 import PWALoadingScreen from './components/pwa/PWALoadingScreen'
@@ -27,48 +23,76 @@ import PWAAuthPage from './components/pwa/PWAAuthPage'
 import InstallPrompt from './components/pwa/InstallPrompt'
 import UpdateBanner from './components/pwa/UpdateBanner'
 
-// Pages
-import HomePage from './pages/HomePage'
-import AuthPage from './pages/AuthPage'
-import Dashboard from './pages/Dashboard'
-import OverviewPage from './pages/OverviewPage'
-import SiteSetupPage from './pages/SiteSetupPage'
-import ContentOrgPage from './pages/ContentOrgPage'
-import ContentPublicPage from './pages/ContentPublicPage'
-import ContentEmbedPage from './pages/ContentEmbedPage'
-import ShareTeamPage from './pages/ShareTeamPage'
-import ContentCreatePage from './pages/ContentCreatePage'
-import LocationsPage from './pages/LocationsPage'
-import InitiativePage from './pages/InitiativePage'
-import TagDetailPage from './pages/TagDetailPage'
-import AllTagsPage from './pages/AllTagsPage'
-import AllMetricsPage from './pages/AllMetricsPage'
-import AccountPage from './pages/AccountPage'
-import PublicOrganizationPage from './pages/PublicOrganizationPage'
-import PublicOrgContextPage from './pages/PublicOrgContextPage'
-import OrgContextPage from './pages/OrgContextPage'
-import PublicInitiativePage from './pages/PublicInitiativePage'
-import PublicMetricPage from './pages/PublicMetricPage'
-import PublicGlobalMetricPage from './pages/PublicGlobalMetricPage'
-import PublicStoryPage from './pages/PublicStoryPage'
-import PublicEvidencePage from './pages/PublicEvidencePage'
-import PublicImpactClaimPage from './pages/PublicImpactClaimPage'
-import PublicBeneficiaryGroupPage from './pages/PublicBeneficiaryGroupPage'
-import ExplorePage from './pages/ExplorePage'
-import TrialActivationPage from './pages/TrialActivationPage'
-import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
-import TeamSettingsPage from './pages/TeamSettingsPage'
-import InviteAcceptPage from './pages/InviteAcceptPage'
-import AdminDemosPage from './pages/admin/AdminDemosPage'
-import TermsOfServicePage from './pages/TermsOfServicePage'
-import PublicTermsPage from './pages/PublicTermsPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import OfferCheckoutPage from './pages/OfferCheckoutPage'
-import EmbedPage from './pages/EmbedPage'
-import Layout from './components/Layout'
 import PublicScrollToTop from './components/public/PublicScrollToTop'
 
+// Route-level code splitting: each page/shell is its own chunk so the homepage
+// doesn't download the whole authenticated app.
+const InteractiveTutorial = lazy(() => import('./components/InteractiveTutorial'))
+const LayoutIntro = lazy(() => import('./components/LayoutIntro'))
+const FloatingUploadPanel = lazy(() => import('./components/FloatingUploadPanel'))
+const MobileApp = lazy(() => import('./components/MobileApp'))
+const Layout = lazy(() => import('./components/Layout'))
+
+// Pages
+const HomePage = lazy(() => import('./pages/HomePage'))
+const AuthPage = lazy(() => import('./pages/AuthPage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const OverviewPage = lazy(() => import('./pages/OverviewPage'))
+const SiteSetupPage = lazy(() => import('./pages/SiteSetupPage'))
+const ContentOrgPage = lazy(() => import('./pages/ContentOrgPage'))
+const ContentPublicPage = lazy(() => import('./pages/ContentPublicPage'))
+const ContentEmbedPage = lazy(() => import('./pages/ContentEmbedPage'))
+const ShareTeamPage = lazy(() => import('./pages/ShareTeamPage'))
+const ContentCreatePage = lazy(() => import('./pages/ContentCreatePage'))
+const LocationsPage = lazy(() => import('./pages/LocationsPage'))
+const InitiativePage = lazy(() => import('./pages/InitiativePage'))
+const TagDetailPage = lazy(() => import('./pages/TagDetailPage'))
+const AllTagsPage = lazy(() => import('./pages/AllTagsPage'))
+const AllMetricsPage = lazy(() => import('./pages/AllMetricsPage'))
+const AccountPage = lazy(() => import('./pages/AccountPage'))
+const PublicOrganizationPage = lazy(() => import('./pages/PublicOrganizationPage'))
+const PublicOrgContextPage = lazy(() => import('./pages/PublicOrgContextPage'))
+const OrgContextPage = lazy(() => import('./pages/OrgContextPage'))
+const PublicInitiativePage = lazy(() => import('./pages/PublicInitiativePage'))
+const PublicMetricPage = lazy(() => import('./pages/PublicMetricPage'))
+const PublicGlobalMetricPage = lazy(() => import('./pages/PublicGlobalMetricPage'))
+const PublicStoryPage = lazy(() => import('./pages/PublicStoryPage'))
+const PublicEvidencePage = lazy(() => import('./pages/PublicEvidencePage'))
+const PublicImpactClaimPage = lazy(() => import('./pages/PublicImpactClaimPage'))
+const PublicBeneficiaryGroupPage = lazy(() => import('./pages/PublicBeneficiaryGroupPage'))
+const ExplorePage = lazy(() => import('./pages/ExplorePage'))
+const TrialActivationPage = lazy(() => import('./pages/TrialActivationPage'))
+const SubscriptionExpiredPage = lazy(() => import('./pages/SubscriptionExpiredPage'))
+const TeamSettingsPage = lazy(() => import('./pages/TeamSettingsPage'))
+const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'))
+const AdminDemosPage = lazy(() => import('./pages/admin/AdminDemosPage'))
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'))
+const PublicTermsPage = lazy(() => import('./pages/PublicTermsPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const OfferCheckoutPage = lazy(() => import('./pages/OfferCheckoutPage'))
+const EmbedPage = lazy(() => import('./pages/EmbedPage'))
+
 const ACTIVE_ORG_KEY = 'nexus-active-org-id'
+
+// Blank page-height placeholder while a route chunk loads; a spinner would
+// flash for what is usually a sub-100ms wait.
+const RouteFallback = () => <div className="min-h-screen" />
+
+/**
+ * Whether a Supabase session might exist (stored, or arriving via an auth
+ * redirect). When false we can render the logged-out homepage immediately
+ * instead of waiting on the auth check.
+ */
+function mayHaveSession() {
+ try {
+  if (/[#&?](access_token|refresh_token|code|token_hash|error_description)=/.test(window.location.hash + window.location.search)) {
+   return true
+  }
+  return Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+ } catch {
+  return true
+ }
+}
 
 function RedirectKeepSearch({ to }: { to: string }) {
  const { search } = useLocation()
@@ -87,9 +111,11 @@ function RedirectInitiativeToProgram() {
 
 function AppRouter({ children }: { children: React.ReactNode }) {
  return (
- <Router>
+ // v7_startTransition keeps the current page on screen while the next route's
+ // chunk loads, instead of flashing the Suspense fallback.
+ <Router future={{ v7_startTransition: true }}>
  <PublicScrollToTop />
- {children}
+ <Suspense fallback={<RouteFallback />}>{children}</Suspense>
  </Router>
  )
 }
@@ -117,7 +143,7 @@ function useIsMobile() {
 
 function App() {
  const [user, setUser] = useState<User | null>(null)
- const [loading, setLoading] = useState(true)
+ const [loading, setLoading] = useState(mayHaveSession)
  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
  const [checkingSubscription, setCheckingSubscription] = useState(false)
  const [pendingInvite, setPendingInvite] = useState<PendingInviteCheck | null>(null)
@@ -948,4 +974,14 @@ function App() {
  )
 }
 
-export default App
+// Outer boundary for lazy gate pages rendered outside AppRouter (Terms, trial,
+// subscription expired).
+function AppWithSuspense() {
+ return (
+  <Suspense fallback={<RouteFallback />}>
+   <App />
+  </Suspense>
+ )
+}
+
+export default AppWithSuspense

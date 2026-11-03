@@ -9,6 +9,11 @@ import { publicApi, type ShowcaseImpactClaim } from "../../services/publicApi";
 import type { GlobeLocation } from "./ImpactGlobe";
 import { OrganizationGlobeErrorBoundary } from "../public/organization/OrganizationGlobeErrorBoundary";
 import { DEMO_BOOKING_URL } from "./constants";
+import { resizedStorageImage } from "../../utils/storageImage";
+
+const fallbackToOriginal = (original: string) => (e: React.SyntheticEvent<HTMLImageElement>) => {
+  if (e.currentTarget.src !== original) e.currentTarget.src = original;
+};
 
 const ImpactGlobe = lazy(() => import("./ImpactGlobe"));
 
@@ -159,7 +164,7 @@ const FloatingCard = ({
         style={claim.org_logo_url ? undefined : { backgroundColor: `${accent}26` }}
       >
         {claim.org_logo_url ? (
-          <img src={claim.org_logo_url} alt="" className="w-full h-full object-contain p-1.5" />
+          <img src={claim.org_logo_url} alt="" decoding="async" className="w-full h-full object-contain p-1.5" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Building2 className="w-6 h-6 text-foreground/70" />
@@ -195,10 +200,12 @@ const FloatingCard = ({
           {claim.evidence_image_url && (
             <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-white/40">
               <img
-                src={claim.evidence_image_url}
+                src={resizedStorageImage(claim.evidence_image_url, { width: 160, height: 160 })}
+                onError={fallbackToOriginal(claim.evidence_image_url)}
                 alt=""
                 className="w-full h-full object-cover"
                 loading="lazy"
+                decoding="async"
               />
             </div>
           )}
@@ -221,8 +228,10 @@ const HeroSection = () => {
 
   useEffect(() => {
     let alive = true;
+    // Same limit as LiveStoriesSection so both share one request. `limit`
+    // only caps stories server-side; impact claims are always the top 24.
     publicApi
-      .getShowcase(9)
+      .getShowcase(24)
       .then((res) => {
         if (!alive) return;
         if (res.impact_claims?.length) {

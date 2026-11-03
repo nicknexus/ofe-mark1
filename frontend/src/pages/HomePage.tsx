@@ -2,39 +2,29 @@ import { lazy, Suspense, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { LandingNavbar, HeroSection } from '../components/landing';
-import { publicApi } from '../services/publicApi';
+import WalkthroughSection from '../components/landing/WalkthroughSection';
+import ProblemsSection from '../components/landing/ProblemsSection';
+import PartnersSection from '../components/landing/PartnersSection';
+import LiveStoriesSection from '../components/landing/LiveStoriesSection';
+import WhyItMattersSection from '../components/landing/WhyItMattersSection';
+import PricingSection from '../components/landing/PricingSection';
+import CTASection from '../components/landing/CTASection';
+import Footer from '../components/landing/Footer';
 
-// Warm the lazy chunk + data for the live-stories section during idle time,
-// so scrolling into it never triggers a mid-scroll fetch/parse stutter.
-function warmLiveStories() {
-  const run = () => {
-    import('../components/landing/LiveStoriesSection');
-    publicApi.getShowcase(24).catch(() => {});
-  };
+// The landing sections are a few KB each, so they ship with this page; lazy
+// boundaries per section only caused spinner-to-content layout jumps. Explore
+// promo stays split because it pulls in Leaflet + Recharts.
+const loadExplorePromo = () => import('../components/landing/ExplorePromoSection');
+const ExplorePromoSection = lazy(loadExplorePromo);
+
+// Fetch it during idle time so it's ready before the user scrolls to it.
+function warmExplorePromo() {
   const ric = (window as any).requestIdleCallback as
     | ((cb: () => void, opts?: { timeout: number }) => number)
     | undefined;
-  if (ric) ric(run, { timeout: 2500 });
-  else setTimeout(run, 300);
+  if (ric) ric(() => loadExplorePromo(), { timeout: 2500 });
+  else setTimeout(loadExplorePromo, 300);
 }
-
-// Lazy load below-the-fold sections for faster initial load
-const WalkthroughSection = lazy(() => import('../components/landing/WalkthroughSection'));
-const ProblemsSection = lazy(() => import('../components/landing/ProblemsSection'));
-const ExplorePromoSection = lazy(() => import('../components/landing/ExplorePromoSection'));
-const LiveStoriesSection = lazy(() => import('../components/landing/LiveStoriesSection'));
-const WhyItMattersSection = lazy(() => import('../components/landing/WhyItMattersSection'));
-// const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
-const PricingSection = lazy(() => import('../components/landing/PricingSection'));
-const CTASection = lazy(() => import('../components/landing/CTASection'));
-const Footer = lazy(() => import('../components/landing/Footer'));
-
-// Simple loading placeholder
-const SectionLoader = () => (
-  <div className="py-20 flex items-center justify-center">
-    <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-  </div>
-);
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -42,7 +32,7 @@ export default function HomePage() {
   const handleSignUp = () => navigate('/login?signup=true');
 
   useEffect(() => {
-    warmLiveStories();
+    warmExplorePromo();
   }, []);
 
   return (
@@ -55,33 +45,18 @@ export default function HomePage() {
       </div>
       <LandingNavbar onSignIn={handleSignIn} onGetStarted={handleSignUp} />
       <HeroSection />
-      <Suspense fallback={<SectionLoader />}>
-        <WalkthroughSection />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <ProblemsSection onGetStarted={handleSignUp} />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
+      <WalkthroughSection />
+      <ProblemsSection onGetStarted={handleSignUp} />
+      <PartnersSection />
+      <Suspense fallback={<div className="min-h-[640px]" />}>
         <ExplorePromoSection />
       </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <LiveStoriesSection />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <WhyItMattersSection />
-      </Suspense>
-      {/* <Suspense fallback={<SectionLoader />}>
-        <TestimonialsSection />
-      </Suspense> */}
-      <Suspense fallback={<SectionLoader />}>
-        <PricingSection onGetStarted={handleSignUp} />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <CTASection onGetStarted={handleSignUp} />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <Footer />
-      </Suspense>
+      <LiveStoriesSection />
+      <WhyItMattersSection />
+      {/* <TestimonialsSection /> */}
+      <PricingSection onGetStarted={handleSignUp} />
+      <CTASection onGetStarted={handleSignUp} />
+      <Footer />
     </main>
     </MotionConfig>
   );

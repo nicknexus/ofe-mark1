@@ -57,21 +57,20 @@ const LandingNavbar = ({ onSignIn, onGetStarted }: LandingNavbarProps) => {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       >
-        <motion.div
-          className="max-w-7xl mx-auto"
-          animate={{ paddingTop: scrolled ? 8 : 16, paddingBottom: scrolled ? 8 : 16 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+        <div
+          className={`max-w-7xl mx-auto transition-[padding] duration-300 ease-out ${
+            scrolled ? "py-2" : "py-4"
+          }`}
         >
-          <motion.div
-            className="glass rounded-2xl px-4 sm:px-6 flex items-center justify-between"
-            animate={{
-              paddingTop: scrolled ? 8 : 12,
-              paddingBottom: scrolled ? 8 : 12,
+          <div
+            className={`glass rounded-2xl px-4 sm:px-6 flex items-center justify-between transition-[padding,box-shadow] duration-300 ease-out ${
+              scrolled ? "py-2" : "py-3"
+            }`}
+            style={{
               boxShadow: scrolled
                 ? "0 8px 30px -8px rgba(70, 83, 96, 0.18)"
                 : "0 4px 16px -8px rgba(70, 83, 96, 0.08)",
             }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
           >
             <a href="/" className="flex items-center gap-2 group">
               <motion.div
@@ -79,7 +78,7 @@ const LandingNavbar = ({ onSignIn, onGetStarted }: LandingNavbarProps) => {
                 whileHover={{ scale: 1.08, rotate: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 15 }}
               >
-                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                <img src="/nexus-logo-96.webp" alt="Nexus" width={86} height={96} className="w-full h-full object-contain" />
               </motion.div>
               <span className="text-lg sm:text-xl font-fraunces font-extralight text-foreground">Nexus Impacts</span>
             </a>
@@ -121,8 +120,8 @@ const LandingNavbar = ({ onSignIn, onGetStarted }: LandingNavbarProps) => {
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </motion.nav>
 
       {/* Mobile Menu Overlay */}

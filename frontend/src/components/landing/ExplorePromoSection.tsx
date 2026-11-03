@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import { motion, AnimatePresence, useInView, type PanInfo } from "framer-motion";
 import {
   ArrowRight, TrendingUp,
   BookOpen, MapPin, Camera, Calendar, ChevronLeft, ChevronRight,
@@ -119,7 +119,7 @@ function StorySlide() {
   return (
     <div className="glass-card rounded-2xl overflow-hidden border border-transparent h-[430px] flex flex-col">
       <div className="flex-1 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
-        <img src="/stories.jpg" alt="Life changing moment" className="w-full h-full object-cover" />
+        <img src="/stories.jpg" alt="Life changing moment" decoding="async" className="w-full h-full object-cover" />
       </div>
       <div className="p-5">
         <h3 className="font-semibold text-foreground mb-2 text-base">
@@ -236,7 +236,7 @@ function EvidenceSlide() {
   return (
     <div className="glass-card rounded-2xl overflow-hidden border border-transparent h-[430px] flex flex-col">
       <div className="flex-1 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
-        <img src="/evidence.png" alt="Visual evidence" className="w-full h-full object-cover" />
+        <img src="/evidence.webp" alt="Visual evidence" decoding="async" className="w-full h-full object-cover" />
       </div>
       <div className="p-5">
         <div className="flex items-start justify-between mb-2">
@@ -287,13 +287,21 @@ const ExplorePromoSection = () => {
   const goPrev = () => paginate(activeIndex - 1, -1);
   const goNext = () => paginate(activeIndex + 1, 1);
 
+  // Off-screen autoplay would keep remounting the Leaflet map (tile fetches)
+  // and the chart for nobody.
+  const sectionRef = useRef<HTMLElement>(null);
+  const inView = useInView(sectionRef);
+  const running = !paused && inView;
+
+  // Restart on every slide change so manual navigation and the progress bar
+  // stay in sync with the next auto-advance.
   useEffect(() => {
-    if (paused) return;
-    const timer = setInterval(() => {
+    if (!running) return;
+    const timer = setTimeout(() => {
       setActive(([prev]) => [(prev + 1) % slides.length, 1]);
     }, AUTOPLAY_INTERVAL);
-    return () => clearInterval(timer);
-  }, [paused]);
+    return () => clearTimeout(timer);
+  }, [running, activeIndex]);
 
   const handleDragEnd = (_e: unknown, info: PanInfo) => {
     if (info.offset.x < -SWIPE_THRESHOLD) goNext();
@@ -303,7 +311,7 @@ const ExplorePromoSection = () => {
   const ActiveSlide = slideComponents[activeIndex];
 
   return (
-    <section className="py-16 md:py-24 relative overflow-hidden">
+    <section ref={sectionRef} className="py-16 md:py-24 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-background via-accent/5 to-background" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-6">
@@ -425,12 +433,12 @@ const ExplorePromoSection = () => {
                     <Icon className="w-3.5 h-3.5 relative z-10" />
                     <span className="hidden sm:inline relative z-10">{slide.label}</span>
                     {/* Autoplay progress bar on the active tab */}
-                    {isActive && !paused && (
+                    {isActive && running && (
                       <motion.span
                         key={`${slide.key}-progress`}
-                        className="absolute bottom-0 left-0 h-0.5 bg-accent-foreground/50 rounded-full z-10"
-                        initial={{ width: "0%" }}
-                        animate={{ width: "100%" }}
+                        className="absolute bottom-0 left-0 h-0.5 w-full origin-left bg-accent-foreground/50 rounded-full z-10"
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: 1 }}
                         transition={{ duration: AUTOPLAY_INTERVAL / 1000, ease: "linear" }}
                       />
                     )}

@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react'
+import React, { ReactNode, Suspense } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { User } from '../types'
@@ -48,7 +48,9 @@ export default function Layout({ user, children }: LayoutProps) {
         animate={{ backgroundColor: content ? '#42505B' : '#F7F8FA' }}
         transition={{ duration: reduce ? 0 : content ? 0.8 : 0.55, ease: PAGE_EASE }}
       >
-        <PageFade content={content}>{children}</PageFade>
+        <PageFade content={content}>
+          <Suspense fallback={<div className="min-h-screen" />}>{children}</Suspense>
+        </PageFade>
       </motion.main>
     </div>
   )

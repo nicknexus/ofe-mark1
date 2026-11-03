@@ -368,12 +368,27 @@ class PublicApiService {
  this.currentOrgSlug = null
  }
 
+ private inflight: Map<string, Promise<any>> = new Map()
+
  private async request<T>(endpoint: string, skipCache: boolean = false): Promise<T> {
  // Check cache first (unless skipCache is true)
  if (!skipCache && this.cache.has(endpoint)) {
  return this.cache.get(endpoint) as T
  }
+ if (!skipCache && this.inflight.has(endpoint)) {
+ return this.inflight.get(endpoint) as Promise<T>
+ }
 
+ const pending = this.fetchAndCache<T>(endpoint)
+ this.inflight.set(endpoint, pending)
+ try {
+ return await pending
+ } finally {
+ this.inflight.delete(endpoint)
+ }
+ }
+
+ private async fetchAndCache<T>(endpoint: string): Promise<T> {
  const response = await fetch(`${API_BASE_URL}/api/public${endpoint}`)
 
  if (!response.ok) {

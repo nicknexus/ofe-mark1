@@ -1,7 +1,6 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
-import AdminApp from './admin/AdminApp.tsx'
 import SupportModeBanner from './components/SupportModeBanner.tsx'
 import './index.css'
 import 'leaflet/dist/leaflet.css'
@@ -25,10 +24,14 @@ if ('serviceWorker' in navigator) {
 const isAdminRoute =
  window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
 
+const AdminApp = lazy(() => import('./admin/AdminApp.tsx'))
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
  <React.StrictMode>
  {isAdminRoute ? (
+ <Suspense fallback={null}>
  <AdminApp />
+ </Suspense>
  ) : (
  <>
  <App />

@@ -47,6 +47,19 @@ const defaultArcs = [
   { startLat: 30.0444, startLng: 31.2357, endLat: 19.4326, endLng: -99.1332, altitude: 0.25, dashLength: 0.5, animateTime: 2500 },
 ];
 
+// Natural Earth 110m countries, trimmed to geometry + name with 2-decimal coords.
+let countriesPromise: Promise<{ features: any[] }> | null = null;
+function loadCountries() {
+  countriesPromise ??= fetch("/geo/countries-110m.json").then((res) => {
+    if (!res.ok) throw new Error(`countries ${res.status}`);
+    return res.json();
+  });
+  countriesPromise.catch(() => {
+    countriesPromise = null;
+  });
+  return countriesPromise;
+}
+
 // Location type for custom locations
 export interface GlobeLocation {
   lat: number;
@@ -199,25 +212,43 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   const labelSize = Math.max(0.35, Math.min(1.4, altitude * 0.7));
   const labelDotRadius = Math.max(0.18, Math.min(0.5, altitude * 0.28));
 
-  // Use a smaller, cached GeoJSON (110m is already the smallest)
   useEffect(() => {
-    // Only fetch if not already cached in sessionStorage
-    const cached = sessionStorage.getItem('globe-countries');
-    if (cached) {
-      setCountries(JSON.parse(cached));
-      setIsLoaded(true);
-      return;
-    }
-
-    fetch("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
-      .then((res) => res.json())
+    let alive = true;
+    loadCountries()
       .then((data) => {
-        sessionStorage.setItem('globe-countries', JSON.stringify(data));
+        if (!alive) return;
         setCountries(data);
         setIsLoaded(true);
       })
       .catch(console.error);
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  // Stop rendering while off screen or in a background tab; the render loop
+  // otherwise runs every frame for the life of the page.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !isLoaded) return;
+    let onScreen = true;
+    const sync = () => {
+      const globe = globeRef.current;
+      if (!globe) return;
+      if (onScreen && document.visibilityState === "visible") globe.resumeAnimation?.();
+      else globe.pauseAnimation?.();
+    };
+    const io = new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      sync();
+    });
+    io.observe(el);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, [isLoaded]);
 
   useEffect(() => {
     if (!containerRef.current) return;
