@@ -99,6 +99,13 @@ function RedirectKeepSearch({ to }: { to: string }) {
  return <Navigate to={`${to}${search}`} replace />
 }
 
+function RedirectStudioLegacy() {
+ const { pathname, search } = useLocation()
+ const rest = pathname.replace(/^\/share\/content\/?/, '').replace(/\/$/, '')
+ const to = rest ? `/studio/${rest}` : '/studio'
+ return <Navigate to={`${to}${search}`} replace />
+}
+
 /** Legacy /initiatives/:id → /programs/:id (keeps search + optional metrics child). */
 function RedirectInitiativeToProgram() {
  const { id, kpiId } = useParams()
@@ -920,8 +927,11 @@ function App() {
  <Route path="share/org" element={<ContentOrgPage />} />
  <Route path="share/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
  <Route path="share/embed" element={<ContentEmbedPage />} />
- <Route path="share/content/*" element={<ContentCreatePage />} />
- <Route path="share/create" element={<RedirectKeepSearch to="/share/content" />} />
+ <Route path="studio" element={<ContentCreatePage />} />
+ <Route path="studio/*" element={<ContentCreatePage />} />
+ <Route path="share/content" element={<RedirectStudioLegacy />} />
+ <Route path="share/content/*" element={<RedirectStudioLegacy />} />
+ <Route path="share/create" element={<RedirectKeepSearch to="/studio" />} />
  <Route path="share/team" element={<ShareTeamPage />} />
  <Route path="share/context" element={<OrgContextPage />} />
  <Route path="context" element={<RedirectKeepSearch to="/share/context" />} />
@@ -930,7 +940,7 @@ function App() {
  <Route path="content/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
  <Route path="content/public" element={<RedirectKeepSearch to="/share/public" />} />
  <Route path="content/embed" element={<RedirectKeepSearch to="/share/embed" />} />
- <Route path="content/create" element={<RedirectKeepSearch to="/share/content" />} />
+ <Route path="content/create" element={<RedirectKeepSearch to="/studio" />} />
  <Route path="settings/team" element={<TeamSettingsPage />} />
  {user.is_admin && (
  <Route path="admin/demos" element={<AdminDemosPage />} />

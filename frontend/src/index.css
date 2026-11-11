@@ -469,6 +469,79 @@
         @apply text-sm text-secondary-500 mt-1 max-w-sm;
     }
 
+    /* Content Studio shell: dark green sidebar, warm paper canvas, quiet panels.
+       The composer (.content-studio) stays on the dark band. */
+    .studio-sidebar {
+        background: #14352A;
+        color: #F4F7F2;
+    }
+
+    .studio-nav-link {
+        @apply flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium text-white/70 transition-colors;
+    }
+
+    .studio-nav-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+    }
+
+    .studio-nav-link-active {
+        background: #2A6B4A;
+        color: white;
+    }
+
+    .studio-nav-link-active:hover {
+        background: #2A6B4A;
+        color: white;
+    }
+
+    .studio-panel {
+        background: #fff;
+        border-radius: 22px;
+        border: 1px solid rgba(20, 53, 42, 0.06);
+        box-shadow: 0 1px 2px rgba(20, 53, 42, 0.04);
+    }
+
+    .studio-hero {
+        background:
+            radial-gradient(120% 90% at 100% 0%, rgba(192, 223, 161, 0.22), transparent 52%),
+            #14352A;
+        border-radius: 28px;
+        color: #F4F7F2;
+    }
+
+    .studio-hero-btn {
+        @apply inline-flex items-center gap-2 h-11 px-4 rounded-xl text-sm font-semibold;
+        background: white;
+        color: #14352A;
+    }
+
+    .studio-hero-btn:hover {
+        background: #F4F7F2;
+    }
+
+    .studio-hero-btn-mint {
+        background: #C0DFA1;
+        color: #14352A;
+    }
+
+    .studio-hero-btn-mint:hover {
+        background: #D1E7BF;
+    }
+
+    .studio-pill {
+        @apply inline-flex items-center h-8 px-3 rounded-full text-[13px] font-medium;
+        background: white;
+        color: #3d4352;
+        border: 1px solid rgba(20, 53, 42, 0.08);
+    }
+
+    .studio-pill-on {
+        background: #14352A;
+        color: white;
+        border-color: #14352A;
+    }
+
     /* Content studio: every content screen sits on the landing dark band.
        Dialogs (.fixed) and social mocks (.channel-preview) stay light. */
     .content-studio {

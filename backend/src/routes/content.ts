@@ -2,6 +2,9 @@ import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { ContentService } from '../services/contentService'
 import { ContentIdeasService } from '../services/contentIdeasService'
+import { UploadPostService } from '../services/uploadPostService'
+import { socialCaption } from '../services/uploadPostCaption'
+import { TeamService } from '../services/teamService'
 import { ContentChannel, ContentJourneyStatus, ContentPostFormat, ContentPostKind, ContentSourceType, ContentStoryType } from '../types'
 
 const router = Router()
@@ -532,6 +535,192 @@ router.patch('/journeys/:id', authenticateUser, async (req: AuthenticatedRequest
             requestedOrgId
         )
         res.json(journey)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+function connectRedirect(req: AuthenticatedRequest): string {
+    const origin = req.get('origin') || ''
+    const allowed = [process.env.FRONTEND_URL, process.env.APP_URL, 'http://localhost:3000']
+        .filter((value): value is string => !!value)
+        .map(value => value.replace(/\/+$/, ''))
+    const base = allowed.includes(origin) ? origin : (allowed[0] || 'http://localhost:3000')
+    return `${base}/studio/accounts`
+}
+
+router.get('/social/account', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, req.headers['x-organization-id'] as string | undefined)
+        const account = await UploadPostService.account()
+        const connections = account.configured
+            ? await UploadPostService.connections(organizationId).catch(() => ({}))
+            : {}
+        res.json({ ...account, connections })
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { organizationId, org } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        if (!(await TeamService.canEditOrgSettings(req.user!.id, organizationId))) {
+            res.status(403).json({ error: 'Only an owner or admin can connect accounts.', code: 'FORBIDDEN' })
+            return
+        }
+        const platform = req.body?.platform
+        if (platform !== 'instagram' && platform !== 'facebook' && platform !== 'linkedin') {
+            res.status(400).json({ error: 'platform must be instagram, facebook, or linkedin' })
+            return
+        }
+        const url = await UploadPostService.connectUrl(organizationId, org.name || 'Organization', platform, connectRedirect(req))
+        res.json({ url })
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.delete('/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        if (!(await TeamService.canEditOrgSettings(req.user!.id, organizationId))) {
+            res.status(403).json({ error: 'Only an owner or admin can disconnect accounts.', code: 'FORBIDDEN' })
+            return
+        }
+        const platform = req.body?.platform
+        if (platform !== 'instagram' && platform !== 'facebook' && platform !== 'linkedin') {
+            res.status(400).json({ error: 'platform must be instagram, facebook, or linkedin' })
+            return
+        }
+        const result = await UploadPostService.disconnect(organizationId, platform)
+        res.json(result)
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        if (!(await TeamService.canEditOrgSettings(req.user!.id, organizationId))) {
+            res.status(403).json({ error: 'Only an owner or admin can send posts.', code: 'FORBIDDEN' })
+            return
+        }
+        const platforms = Array.isArray(req.body?.platforms) ? req.body.platforms : []
+        const allowed = platforms.filter((platform: string) => platform === 'instagram' || platform === 'facebook' || platform === 'linkedin')
+        if (!allowed.length) {
+            res.status(400).json({ error: 'Pick at least one connected account.' })
+            return
+        }
+        const [pkg] = await ContentService.listPackages(req.user!.id, requestedOrgId, { packageId: req.params.id })
+        if (!pkg) {
+            res.status(404).json({ error: 'Post not found' })
+            return
+        }
+        const text = socialCaption([pkg.hook, pkg.body, pkg.cta])
+        if (!text.trim()) {
+            res.status(400).json({ error: 'Write a headline or body before posting.' })
+            return
+        }
+        const images = (Array.isArray(pkg.media) ? pkg.media : [])
+            .map((item: { image_url?: string }) => item?.image_url)
+            .filter((url: string | undefined): url is string => !!url && url.startsWith('https://'))
+        if (!images.length && pkg.image_url?.startsWith('https://')) images.push(pkg.image_url)
+        if (allowed.includes('instagram') && !images.length) {
+            res.status(400).json({ error: 'Instagram needs a public photo on the post.' })
+            return
+        }
+        const linked = await UploadPostService.connections(organizationId)
+        const scheduledAt = typeof req.body?.scheduled_at === 'string' && req.body.scheduled_at ? req.body.scheduled_at : undefined
+        const timezone = typeof req.body?.timezone === 'string' && req.body.timezone ? req.body.timezone : 'UTC'
+        const username = UploadPostService.profileUsername(organizationId)
+        const results = []
+        for (const platform of allowed) {
+            if (!linked[platform]?.connected) {
+                results.push({ platform, ok: false, error: `${platform} is not connected` })
+                continue
+            }
+            const requestId = `pkg_${pkg.id}_${platform}_${scheduledAt || 'now'}`.slice(0, 120)
+            const sourceType = pkg.visual_source_type || (Array.isArray(pkg.media) ? pkg.media[0]?.source_type : null)
+            const sourceId = pkg.visual_source_id || (Array.isArray(pkg.media) ? pkg.media[0]?.source_id : null)
+            try {
+                const sent = await UploadPostService.publish({
+                    profileUsername: username,
+                    platform,
+                    text,
+                    idempotencyKey: requestId,
+                    requestId,
+                    externalId: requestId,
+                    scheduledDate: scheduledAt,
+                    timezone: scheduledAt ? timezone : undefined,
+                    imageUrls: images,
+                })
+                let status: 'accepted' | 'scheduled' | 'published' | 'failed' = scheduledAt ? 'scheduled' : 'accepted'
+                let postUrl: string | null = null
+                let failure: string | null = null
+                let sentAt = new Date().toISOString()
+                if (!scheduledAt) {
+                    const found = await UploadPostService.findUpload(requestId).catch(() => null)
+                    if (found?.postUrl) {
+                        status = 'published'
+                        postUrl = found.postUrl
+                        sentAt = found.sentAt || sentAt
+                    } else if (found?.status === 'failed') {
+                        status = 'failed'
+                        failure = found.error
+                    }
+                }
+                const receipt = await ContentService.rememberSocialSend({
+                    organizationId,
+                    userId: req.user!.id,
+                    packageId: pkg.id,
+                    sourceType,
+                    sourceId,
+                    imageUrl: images[0] || pkg.image_url || null,
+                    platform,
+                    status,
+                    postUrl,
+                    error: failure,
+                    requestId: sent.requestId,
+                    jobId: sent.jobId,
+                    externalId: requestId,
+                    sentAt,
+                    scheduledAt: scheduledAt || null,
+                })
+                results.push({
+                    platform,
+                    ok: receipt.status !== 'failed',
+                    status: receipt.status,
+                    error: receipt.error,
+                    postUrl: receipt.post_url,
+                    sentAt: receipt.created_at,
+                    requestId: sent.requestId,
+                    jobId: sent.jobId,
+                })
+            } catch (error) {
+                const err = error as Error
+                await ContentService.rememberSocialSend({
+                    organizationId,
+                    userId: req.user!.id,
+                    packageId: pkg.id,
+                    sourceType,
+                    sourceId,
+                    imageUrl: images[0] || pkg.image_url || null,
+                    platform,
+                    status: 'failed',
+                    error: err.message,
+                    externalId: requestId,
+                    sentAt: new Date().toISOString(),
+                    scheduledAt: scheduledAt || null,
+                })
+                results.push({ platform, ok: false, status: 'failed', error: err.message })
+            }
+        }
+        res.json({ results })
     } catch (error) {
         sendError(res, error)
     }

@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase'
+import { UploadPostService, type UploadReceipt } from './uploadPostService'
 import { openai, isOpenAIConfigured } from '../utils/openai'
 import { composeBrandedPng, parseGraphicAspect, parseGraphicLayout, type GraphicChrome, type GraphicCopy } from '../utils/contentCompose'
 import { masterWriterPrompt, refineMasterPrompt, versionsWriterPrompt } from '../prompts/nexusCopyFramework'
@@ -16,6 +17,7 @@ import {
     ContentOverlay,
     ContentPackage,
     ContentPost,
+    ContentPublication,
     ContentPostFormat,
     ContentPostKind,
     ContentSource,
@@ -264,6 +266,75 @@ function asSourceRefs(value: unknown): ContentSourceRef[] {
 function isMissingRelation(error: { code?: string; message?: string } | null | undefined): boolean {
     const message = error?.message || ''
     return error?.code === '42P01' || /does not exist/i.test(message) || /schema cache/i.test(message)
+}
+
+const recordingReceipts = new Set<string>()
+
+function receiptPayload(overlay: unknown): Record<string, unknown> | null {
+    if (!overlay || typeof overlay !== 'object') return null
+    const raw = (overlay as { upload_post?: unknown }).upload_post
+    if (!raw || typeof raw !== 'object') return null
+    return raw as Record<string, unknown>
+}
+
+function publicationFromPost(post: Pick<ContentPost, 'channel' | 'overlay' | 'created_at'>): ContentPublication | null {
+    const raw = receiptPayload(post.overlay)
+    if (!raw) return null
+    const platform = post.channel
+    if (platform !== 'instagram' && platform !== 'facebook' && platform !== 'linkedin') return null
+    const status = raw.status
+    if (status !== 'accepted' && status !== 'scheduled' && status !== 'published' && status !== 'failed') return null
+    return {
+        platform,
+        status,
+        created_at: typeof raw.sent_at === 'string' ? raw.sent_at : post.created_at,
+        scheduled_at: typeof raw.scheduled_at === 'string' ? raw.scheduled_at : null,
+        post_url: typeof raw.post_url === 'string' ? raw.post_url : null,
+        error: typeof raw.error === 'string' ? raw.error : null,
+    }
+}
+
+function publicationFromUpload(item: UploadReceipt): ContentPublication {
+    return {
+        platform: item.platform,
+        status: item.status,
+        created_at: item.sentAt,
+        scheduled_at: item.scheduledAt,
+        post_url: item.postUrl,
+        error: item.error,
+    }
+}
+
+function dedupePublications(items: ContentPublication[]): ContentPublication[] {
+    const rank = { failed: 0, accepted: 1, scheduled: 2, published: 3 }
+    const byPlatform = new Map<string, ContentPublication>()
+    for (const item of items) {
+        const prev = byPlatform.get(item.platform)
+        if (!prev) {
+            byPlatform.set(item.platform, item)
+            continue
+        }
+        const better = rank[item.status] > rank[prev.status]
+            || (rank[item.status] === rank[prev.status] && !!item.post_url && !prev.post_url)
+            || (rank[item.status] === rank[prev.status] && item.created_at > prev.created_at && !prev.post_url)
+        if (better) byPlatform.set(item.platform, item)
+    }
+    return [...byPlatform.values()]
+}
+
+function receiptOverlay(item: UploadReceipt) {
+    return {
+        upload_post: {
+            status: item.status,
+            post_url: item.postUrl,
+            error: item.error,
+            request_id: item.requestId,
+            job_id: item.jobId,
+            external_id: item.externalId,
+            sent_at: item.sentAt,
+            scheduled_at: item.scheduledAt,
+        },
+    }
 }
 
 function schemaMissing(table: string): Error {
@@ -1281,8 +1352,10 @@ email_body: donor-email depth, line breaks, no emojis.`,
             list.push(post)
             byPackage.set(post.package_id, list)
         }
-        return packages.map(pkg => {
-            const versions = byPackage.get(pkg.id) || []
+        const mapped = packages.map(pkg => {
+            const rows = byPackage.get(pkg.id) || []
+            const versions = rows.filter(row => !publicationFromPost(row))
+            const publications = dedupePublications(rows.map(publicationFromPost).filter((row): row is ContentPublication => !!row))
             const image_url = pkg.image_url || versions[0]?.image_url || null
             const media = Array.isArray(pkg.media) && pkg.media.length
                 ? pkg.media
@@ -1292,8 +1365,152 @@ email_body: donor-email depth, line breaks, no emojis.`,
             const newestVersion = versions.reduce((max, v) => (v.created_at > max ? v.created_at : max), '')
             const channels_stale = !!(versions.length && pkg.edited_at && newestVersion &&
                 new Date(pkg.edited_at).getTime() > new Date(newestVersion).getTime())
-            return { ...pkg, image_url: media[0]?.image_url || image_url, media, versions, channels_stale }
+            return { ...pkg, image_url: media[0]?.image_url || image_url, media, versions, channels_stale, publications }
         })
+        await this.mergeUploadHistory(organizationId, mapped)
+        return mapped
+    }
+
+    /**
+     * Stores one Upload Post send on content_posts via overlay.upload_post.
+     * Channel regeneration must not delete these rows.
+     */
+    static async rememberSocialSend(input: {
+        organizationId: string
+        userId?: string | null
+        packageId: string
+        sourceType?: string | null
+        sourceId?: string | null
+        imageUrl?: string | null
+        platform: 'instagram' | 'facebook' | 'linkedin'
+        status: ContentPublication['status']
+        postUrl?: string | null
+        error?: string | null
+        requestId?: string | null
+        jobId?: string | null
+        externalId: string
+        sentAt: string
+        scheduledAt?: string | null
+    }): Promise<ContentPublication> {
+        const item: UploadReceipt = {
+            externalId: input.externalId,
+            packageId: input.packageId,
+            platform: input.platform,
+            status: input.status,
+            postUrl: input.postUrl || null,
+            error: input.error || null,
+            requestId: input.requestId || null,
+            jobId: input.jobId || null,
+            sentAt: input.sentAt,
+            scheduledAt: input.scheduledAt || null,
+        }
+        const publication = publicationFromUpload(item)
+        try {
+            UploadPostService.clearUploadCache()
+            const { data: rows, error: loadError } = await supabase
+                .from('content_posts')
+                .select('id, channel, overlay, created_at, package_id')
+                .eq('organization_id', input.organizationId)
+                .eq('package_id', input.packageId)
+                .eq('channel', input.platform)
+            if (loadError) throw loadError
+            const prior = ((rows || []) as ContentPost[]).find(row => {
+                const raw = receiptPayload(row.overlay)
+                return raw?.external_id === input.externalId
+            })
+            if (prior) {
+                if (input.postUrl || input.status === 'failed') {
+                    await supabase.from('content_posts').update({ overlay: receiptOverlay(item) }).eq('id', prior.id)
+                }
+                return publication
+            }
+            if (!input.sourceType || !input.sourceId) return publication
+            if (recordingReceipts.has(input.externalId)) return publication
+            recordingReceipts.add(input.externalId)
+            const { kind, format } = channelKind(input.platform)
+            const { error: insertError } = await supabase.from('content_posts').insert({
+                organization_id: input.organizationId,
+                kind,
+                format,
+                source_type: input.sourceType,
+                source_id: input.sourceId,
+                image_url: input.imageUrl || null,
+                overlay: receiptOverlay(item),
+                created_by: input.userId || null,
+                package_id: input.packageId,
+                channel: input.platform,
+                status: 'ready',
+                created_at: input.sentAt,
+            })
+            if (insertError) {
+                recordingReceipts.delete(input.externalId)
+                throw insertError
+            }
+        } catch (error) {
+            console.error('social receipt', error instanceof Error ? error.message : error)
+        }
+        return publication
+    }
+
+    /** Pulls Upload Post history so a send still shows if the first write was missed. */
+    private static async mergeUploadHistory(organizationId: string, packages: ContentPackage[]): Promise<void> {
+        let uploads: UploadReceipt[] = []
+        try {
+            uploads = await UploadPostService.uploadsForProfile(UploadPostService.profileUsername(organizationId))
+        } catch {
+            return
+        }
+        const byId = new Map(packages.map(pkg => [pkg.id, pkg]))
+        const wanted = uploads.filter(item => byId.has(item.packageId))
+        if (!wanted.length) return
+        const { data: rows, error } = await supabase
+            .from('content_posts')
+            .select('id, package_id, channel, overlay, created_at')
+            .eq('organization_id', organizationId)
+            .in('package_id', packages.map(pkg => pkg.id))
+        if (error) return
+        const existing = new Map<string, ContentPost>()
+        for (const row of (rows || []) as ContentPost[]) {
+            const raw = receiptPayload(row.overlay)
+            if (typeof raw?.external_id === 'string') existing.set(raw.external_id, row)
+        }
+        for (const item of wanted) {
+            const pkg = byId.get(item.packageId)
+            if (!pkg) continue
+            const prior = existing.get(item.externalId)
+            if (prior) {
+                const current = publicationFromPost(prior)
+                if (current && item.postUrl && current.post_url !== item.postUrl) {
+                    await supabase.from('content_posts').update({ overlay: receiptOverlay(item) }).eq('id', prior.id)
+                }
+                pkg.publications = dedupePublications([...(pkg.publications || []), publicationFromUpload(item)])
+                continue
+            }
+            const sourceType = pkg.visual_source_type || pkg.media?.[0]?.source_type
+            const sourceId = pkg.visual_source_id || pkg.media?.[0]?.source_id
+            if (sourceType && sourceId && !recordingReceipts.has(item.externalId)) {
+                recordingReceipts.add(item.externalId)
+                const { kind, format } = channelKind(item.platform)
+                const { error: insertError } = await supabase.from('content_posts').insert({
+                    organization_id: organizationId,
+                    kind,
+                    format,
+                    source_type: sourceType,
+                    source_id: sourceId,
+                    image_url: pkg.image_url || pkg.media?.[0]?.image_url || null,
+                    overlay: receiptOverlay(item),
+                    package_id: pkg.id,
+                    channel: item.platform,
+                    status: 'ready',
+                    created_at: item.sentAt,
+                })
+                if (insertError) {
+                    recordingReceipts.delete(item.externalId)
+                    console.error('social receipt', insertError.message)
+                }
+            }
+            pkg.publications = dedupePublications([...(pkg.publications || []), publicationFromUpload(item)])
+        }
     }
 
     /** Saves the master only (the public-page post). Channel versions are separate. */
@@ -1467,12 +1684,23 @@ email_body: donor-email depth, line breaks, no emojis.`,
         source.overlay = await this.loadOverlay(source)
 
         const valid = (versions || []).filter(v => CHANNELS.includes(v?.channel))
-        const { error: clearError } = await supabase
+        const { data: existingPosts, error: existingError } = await supabase
             .from('content_posts')
-            .delete()
+            .select('id, overlay')
             .eq('package_id', packageId)
             .eq('organization_id', organizationId)
-        if (clearError) throw new Error(`Failed to replace versions: ${clearError.message}`)
+        if (existingError) throw new Error(`Failed to replace versions: ${existingError.message}`)
+        const dropIds = ((existingPosts || []) as { id: string; overlay: unknown }[])
+            .filter(row => !receiptPayload(row.overlay))
+            .map(row => row.id)
+        if (dropIds.length) {
+            const { error: clearError } = await supabase
+                .from('content_posts')
+                .delete()
+                .in('id', dropIds)
+                .eq('organization_id', organizationId)
+            if (clearError) throw new Error(`Failed to replace versions: ${clearError.message}`)
+        }
 
         const rows = valid.map(version => {
             const { kind, format } = channelKind(version.channel)

@@ -1807,6 +1807,43 @@ class ApiService {
  })
  }
 
+ async getSocialAccount(fresh = false): Promise<{
+ configured: boolean
+ mutations: boolean
+ email: string | null
+ plan: string | null
+ usage: { count: number | null; limit: number | null }
+ connections: Record<string, { connected: boolean; label: string | null }>
+ }> {
+ const query = fresh ? `?t=${Date.now()}` : ''
+ return this.request(`/content/social/account${query}`)
+ }
+
+ async connectSocial(platform: 'instagram' | 'facebook' | 'linkedin'): Promise<{ url: string }> {
+ return this.request('/content/social/connect', {
+ method: 'POST',
+ body: JSON.stringify({ platform }),
+ })
+ }
+
+ async disconnectSocial(platform: 'instagram' | 'facebook' | 'linkedin'): Promise<{ removedProfile: boolean }> {
+ return this.request('/content/social/connect', {
+ method: 'DELETE',
+ body: JSON.stringify({ platform }),
+ })
+ }
+
+ async publishSocial(id: string, input: {
+ platforms: Array<'instagram' | 'facebook' | 'linkedin'>
+ scheduled_at?: string
+ timezone?: string
+ }): Promise<{ results: Array<{ platform: string; ok: boolean; status?: 'accepted' | 'scheduled' | 'published' | 'failed'; error?: string | null; postUrl?: string | null; sentAt?: string }> }> {
+ return this.request(`/content/packages/${id}/social`, {
+ method: 'POST',
+ body: JSON.stringify(input),
+ })
+ }
+
  async publishContentPackage(id: string, published: boolean): Promise<ContentPackage> {
  return this.request<ContentPackage>(`/content/packages/${id}/publish`, {
  method: 'PATCH',

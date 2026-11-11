@@ -2,14 +2,17 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
+  PenLine,
   LayoutDashboard,
   BarChart3,
+  Calendar,
+  Library,
+  Link2,
   Tag,
   MapPin,
   Globe,
   BookOpen,
   Code2,
-  Sparkles,
   Settings,
   GraduationCap,
   Compass,
@@ -29,6 +32,7 @@ import { useTutorial } from '../context/TutorialContext'
 import { notify } from '../lib/notify'
 import { getSupportContext } from '../admin/support'
 import { dropdownPop } from './timeline/motion'
+import { isStudioMode, studioNavActive } from '../pages/studio/studioPaths'
 
 interface AppSidebarProps {
   user: User
@@ -63,7 +67,14 @@ const CONTENT_ITEMS = [
   { to: '/share/org', label: 'Organization', icon: Building2 },
   { to: '/share/context', label: 'Context', icon: BookOpen },
   { to: '/share/embed', label: 'Embed', icon: Code2 },
-  { to: '/share/content', label: 'Content', icon: Sparkles },
+] as const
+
+const STUDIO_ITEMS = [
+  { to: '/studio', label: 'Studio', icon: PenLine },
+  { to: '/studio/library', label: 'Library', icon: Library },
+  { to: '/studio/calendar', label: 'Calendar', icon: Calendar },
+  { to: '/studio/insights', label: 'Insights', icon: BarChart3 },
+  { to: '/studio/accounts', label: 'Accounts', icon: Link2 },
 ] as const
 
 function pathActive(pathname: string, to: string) {
@@ -169,6 +180,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
   const canEditShare = isOwner || isAdmin
   const needsPublicNudge = canEditShare && !!activeOrganization && !activeOrganization.is_public && !isDemoOrg
 
+  const studioMode = isStudioMode(pathname)
   const programsOpen = pathActive(pathname, '/tracking/programs')
   const libraryOpen =
     pathname.startsWith('/metrics') ||
@@ -223,33 +235,75 @@ export default function AppSidebar({ user }: AppSidebarProps) {
       : null
 
   return (
-    <div className="fixed left-0 top-0 w-56 h-screen bg-white border-r border-gray-200/70 flex flex-col z-30 desktop-sidebar">
-      <div className="flex-shrink-0 px-3 pt-3 pb-2 bg-white">
-        <Link to="/" className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors min-w-0">
+    <div className={`fixed left-0 top-0 w-56 h-screen flex flex-col z-30 desktop-sidebar ${
+      studioMode ? 'studio-sidebar' : 'bg-white border-r border-gray-200/70'
+    }`}>
+      <div className={`flex-shrink-0 px-3 pt-3 pb-2 ${studioMode ? '' : 'bg-white'}`}>
+        <Link to={studioMode ? '/studio' : '/home'} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors min-w-0 ${
+          studioMode ? 'hover:bg-white/10' : 'hover:bg-gray-50'
+        }`}>
           <img src="/Nexuslogo.png" alt="" className="h-7 w-auto flex-shrink-0" />
-          <span className="text-[15px] font-newsreader font-extralight text-secondary-900 truncate leading-none pt-0.5">Nexus Impacts</span>
+          <span className={`text-[15px] font-newsreader font-extralight truncate leading-none pt-0.5 ${
+            studioMode ? 'text-[#F4F7F2]' : 'text-secondary-900'
+          }`}>Nexus Impacts</span>
         </Link>
+        <div
+          className={`mt-2.5 flex p-0.5 rounded-full ${studioMode ? 'bg-black/30 ring-1 ring-white/10' : 'bg-[#EEF2EA]'}`}
+          role="tablist"
+          aria-label="App"
+        >
+          <Link
+            to="/home"
+            role="tab"
+            aria-selected={!studioMode}
+            className={`flex-1 h-7 rounded-full text-[11px] font-semibold tracking-tight inline-flex items-center justify-center gap-1 transition-all ${
+              studioMode
+                ? 'text-white/60 hover:text-white'
+                : 'bg-white text-[#14352A] shadow-[0_1px_2px_rgba(20,53,42,0.12)]'
+            }`}
+          >
+            <SoftHome className="w-3.5 h-3.5" />
+            Nexus
+          </Link>
+          <Link
+            to="/studio"
+            role="tab"
+            aria-selected={studioMode}
+            className={`flex-1 h-7 rounded-full text-[11px] font-semibold tracking-tight inline-flex items-center justify-center gap-1 transition-all ${
+              studioMode
+                ? 'bg-[#C0DFA1] text-[#14352A] shadow-[0_1px_2px_rgba(0,0,0,0.25)]'
+                : 'text-[#3d5c49] hover:text-[#14352A]'
+            }`}
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            Studio
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 scrollbar-thin">
-      <div className="pb-3 border-b border-gray-100" ref={orgMenuRef}>
+      <div className={`pb-3 border-b ${studioMode ? 'border-white/10' : 'border-gray-100'}`} ref={orgMenuRef}>
         <div className="h-9">
         {teamLoading ? (
-          <div className="h-9 rounded-xl bg-gray-100 animate-pulse" />
+          <div className={`h-9 rounded-xl animate-pulse ${studioMode ? 'bg-white/10' : 'bg-gray-100'}`} />
         ) : hasMultipleOrgs ? (
           <div className="relative">
             <button
               type="button"
               onClick={() => setOrgMenuOpen(v => !v)}
               className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-colors ${
-                isSharedMember ? 'bg-purple-50 hover:bg-purple-100' : 'hover:bg-gray-50'
+                studioMode
+                  ? 'hover:bg-white/10'
+                  : isSharedMember ? 'bg-purple-50 hover:bg-purple-100' : 'hover:bg-gray-50'
               }`}
             >
-              {isSharedMember ? <Users className="w-4 h-4 text-purple-600 flex-shrink-0" /> : <Building2 className="w-4 h-4 text-gray-500 flex-shrink-0" />}
-              <span className={`flex-1 min-w-0 text-[13px] font-semibold truncate ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
+              {isSharedMember ? <Users className={`w-4 h-4 flex-shrink-0 ${studioMode ? 'text-white/80' : 'text-purple-600'}`} /> : <Building2 className={`w-4 h-4 flex-shrink-0 ${studioMode ? 'text-white/70' : 'text-gray-500'}`} />}
+              <span className={`flex-1 min-w-0 text-[13px] font-semibold truncate ${
+                studioMode ? 'text-white' : isSharedMember ? 'text-purple-800' : 'text-gray-900'
+              }`}>
                 {activeOrganization?.name || 'Select organization'}
               </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${studioMode ? 'text-white/50' : 'text-gray-400'} ${orgMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             {orgMenuOpen && (
               <div className="absolute top-full mt-1 left-0 right-0 app-card overflow-hidden z-50 p-1.5">
@@ -275,9 +329,9 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             )}
           </div>
         ) : (
-          <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl ${isSharedMember ? 'bg-purple-50' : ''}`}>
-            {isSharedMember ? <Users className="w-4 h-4 text-purple-600 flex-shrink-0" /> : <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-            <span className={`text-[13px] font-semibold truncate ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
+          <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl ${!studioMode && isSharedMember ? 'bg-purple-50' : ''}`}>
+            {isSharedMember ? <Users className={`w-4 h-4 flex-shrink-0 ${studioMode ? 'text-white/80' : 'text-purple-600'}`} /> : <Building2 className={`w-4 h-4 flex-shrink-0 ${studioMode ? 'text-white/60' : 'text-gray-400'}`} />}
+            <span className={`text-[13px] font-semibold truncate ${studioMode ? 'text-white' : isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
               {activeOrganization?.name || 'Organization'}
             </span>
           </div>
@@ -304,7 +358,9 @@ export default function AppSidebar({ user }: AppSidebarProps) {
               <Link
                 to="/share/public"
                 className={`flex items-center gap-1.5 min-w-0 ${
-                  activeOrganization.is_public ? 'text-impact-700' : 'text-amber-700'
+                  studioMode
+                    ? activeOrganization.is_public ? 'text-[#C0DFA1]' : 'text-amber-200'
+                    : activeOrganization.is_public ? 'text-impact-700' : 'text-amber-700'
                 } text-[11px] font-medium`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOrganization.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
@@ -316,7 +372,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
                   target="_blank"
                   rel="noreferrer"
                   title="Open public page"
-                  className="p-1 rounded-md text-impact-600 hover:bg-impact-50 flex-shrink-0"
+                  className={`p-1 rounded-md flex-shrink-0 ${studioMode ? 'text-[#C0DFA1] hover:bg-white/10' : 'text-impact-600 hover:bg-impact-50'}`}
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
@@ -327,6 +383,25 @@ export default function AppSidebar({ user }: AppSidebarProps) {
       </div>
 
       <div className="py-3">
+        {studioMode ? (
+          <div className="space-y-0.5">
+            {STUDIO_ITEMS.map(item => {
+              const Icon = item.icon
+              const active = studioNavActive(pathname, item.to)
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`studio-nav-link ${active ? 'studio-nav-link-active' : ''}`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        ) : (
+        <>
         <NavRow to="/home" label="Home" icon={SoftHome} active={pathActive(pathname, '/home')} />
 
         <p className={`px-3 pt-5 pb-1.5 text-[13px] font-bold tracking-wide ${
@@ -392,7 +467,6 @@ export default function AppSidebar({ user }: AppSidebarProps) {
               active={pathActive(pathname, item.to)}
               nested
               nudge={item.to === '/share/public' && needsPublicNudge}
-              beta={item.to === '/share/content'}
               accent="claim"
             />
           ))}
@@ -416,24 +490,30 @@ export default function AppSidebar({ user }: AppSidebarProps) {
           )}
           <NavRow to="/account" label="Settings" icon={Settings} active={pathActive(pathname, '/account')} nested />
         </div>
+        </>
+        )}
       </div>
 
       </div>
 
-      <div className="p-3 border-t border-gray-100 flex-shrink-0">
+      <div className={`p-3 border-t flex-shrink-0 ${studioMode ? 'border-white/10' : 'border-gray-100'}`}>
         <div className="relative" ref={settingsRef}>
           <button
             type="button"
             onClick={() => setSettingsOpen(v => !v)}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors text-left"
+            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-xl transition-colors text-left ${
+              studioMode ? 'hover:bg-white/10' : 'hover:bg-gray-50'
+            }`}
             title={displayName}
           >
-            <div className="w-8 h-8 rounded-full bg-secondary-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+            <div className={`w-8 h-8 rounded-full text-[11px] font-semibold flex items-center justify-center flex-shrink-0 ${
+              studioMode ? 'bg-[#C0DFA1] text-[#14352A]' : 'bg-secondary-600 text-white'
+            }`}>
               {initials || <UserIcon className="w-4 h-4" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-800 truncate">{displayName}</p>
-              <p className="text-[11px] text-gray-400 truncate">{user.email}</p>
+              <p className={`text-xs font-semibold truncate ${studioMode ? 'text-white' : 'text-gray-800'}`}>{displayName}</p>
+              <p className={`text-[11px] truncate ${studioMode ? 'text-white/50' : 'text-gray-400'}`}>{user.email}</p>
             </div>
           </button>
 

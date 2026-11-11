@@ -490,6 +490,17 @@ export interface ContentPackage {
     edited_at?: string | null;
     channels_stale?: boolean;
     versions?: ContentPost[];
+    publications?: ContentPublication[];
+}
+
+/** A real Upload Post send. Not an old generated caption. */
+export interface ContentPublication {
+    platform: 'instagram' | 'facebook' | 'linkedin';
+    status: 'accepted' | 'scheduled' | 'published' | 'failed';
+    created_at: string;
+    scheduled_at?: string | null;
+    post_url?: string | null;
+    error?: string | null;
 }
 
 export interface ContentMediaItem {

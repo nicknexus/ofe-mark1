@@ -926,6 +926,16 @@ export interface ContentPackage {
  edited_at?: string | null
  channels_stale?: boolean
  versions?: ContentPost[]
+ publications?: ContentPublication[]
+}
+
+export interface ContentPublication {
+ platform: 'instagram' | 'facebook' | 'linkedin'
+ status: 'accepted' | 'scheduled' | 'published' | 'failed'
+ created_at: string
+ scheduled_at?: string | null
+ post_url?: string | null
+ error?: string | null
 } 
 // "Set up from your website" draft. Ids (p0, m0, l0) are client-side keys
 // used for cross-references until /onboarding/site-scan/apply persists them.

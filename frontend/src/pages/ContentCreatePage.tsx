@@ -1,16 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { Lock, Sparkles } from 'lucide-react'
 import UpgradeModal from '../components/UpgradeModal'
+import { PageLoader } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
 import { SubscriptionService } from '../services/subscription'
 import ContentEngine, { StudioBoot } from '../components/content/ContentEngine'
+import { isStudioComposer } from './studio/studioPaths'
+import StudioHome from './studio/StudioHome'
+import StudioLibrary from './studio/StudioLibrary'
+import { StudioAccounts, StudioCalendar, StudioInsights } from './studio/StudioSoon'
+
+const featureCache = new Map<string, { free: boolean; gated: boolean }>()
 
 export default function ContentCreatePage() {
+  const { pathname } = useLocation()
   const { isOwner, activeOrganization } = useTeam()
-  const [isFree, setIsFree] = useState(false)
-  const [gated, setGated] = useState(false)
-  const [featuresLoaded, setFeaturesLoaded] = useState(false)
+  const orgKey = `${activeOrganization?.id || ''}:${activeOrganization?.is_demo ? 1 : 0}`
+  const cachedFeatures = featureCache.get(orgKey)
+  const [isFree, setIsFree] = useState(cachedFeatures?.free ?? false)
+  const [gated, setGated] = useState(cachedFeatures?.gated ?? false)
+  const [featuresLoaded, setFeaturesLoaded] = useState(!!cachedFeatures)
   const [showUpgrade, setShowUpgrade] = useState(false)
 
   useEffect(() => {
@@ -19,6 +29,7 @@ export default function ContentCreatePage() {
       .then(f => {
         if (cancelled) return
         const locked = !f.contentStudio && !activeOrganization?.is_demo
+        featureCache.set(orgKey, { free: f.tier === 'free', gated: locked })
         setIsFree(f.tier === 'free')
         setGated(locked)
         setFeaturesLoaded(true)
@@ -27,9 +38,15 @@ export default function ContentCreatePage() {
         if (!cancelled) setFeaturesLoaded(true)
       })
     return () => { cancelled = true }
-  }, [activeOrganization?.id, activeOrganization?.is_demo])
+  }, [orgKey, activeOrganization?.is_demo])
 
-  if (!featuresLoaded) return <StudioBoot />
+  if (!featuresLoaded) {
+    return isStudioComposer(pathname) ? <StudioBoot /> : (
+      <div className="min-h-screen flex items-center justify-center">
+        <PageLoader />
+      </div>
+    )
+  }
 
   if (gated) {
     return (
@@ -45,7 +62,18 @@ export default function ContentCreatePage() {
     )
   }
 
-  return <ContentEngine />
+  return <StudioRoutes />
+}
+
+function StudioRoutes() {
+  const { pathname } = useLocation()
+  if (isStudioComposer(pathname)) return <ContentEngine />
+  if (pathname === '/studio/library') return <StudioLibrary />
+  if (pathname === '/studio/calendar') return <StudioCalendar />
+  if (pathname === '/studio/insights') return <StudioInsights />
+  if (pathname === '/studio/accounts') return <StudioAccounts />
+  if (pathname === '/studio' || pathname === '/studio/') return <StudioHome />
+  return <Navigate to="/studio" replace />
 }
 
 function GatedEmpty({

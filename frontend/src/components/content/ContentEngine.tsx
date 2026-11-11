@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
   Check,
   Bookmark,
+  Calendar,
   Camera,
   ChevronLeft,
   ChevronRight,
@@ -42,6 +43,7 @@ import { ContentWorkspace, NewMenu, PostToolbar, StudioBar, filterPosts, type Ki
 import { useTeam } from '../../context/TeamContext'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
+import { useSocialAccount } from '../../pages/studio/useSocialAccount'
 import { formatDate } from '../../utils'
 import { triggerDownload } from '../../utils/contentExport'
 import {
@@ -52,6 +54,8 @@ import {
   Skeleton,
   Spinner,
 } from '../ui'
+import { patchStudioPackage } from '../../pages/studio/useStudioLibrary'
+import SocialPostPreview, { socialCaption } from '../studio/SocialPostPreview'
 import type {
   ContentChannel,
   ContentChannelVersion,
@@ -59,6 +63,7 @@ import type {
   ContentMaster,
   ContentMediaItem,
   ContentPackage,
+  ContentPublication,
   ContentSource,
   ContentSourceRef,
   ContentUsageFilter,
@@ -86,7 +91,7 @@ type View =
   | { view: 'capture' }
   | { view: 'todos' }
 
-const BASE = '/share/content'
+const BASE = '/studio'
 const FLOW_STEPS: Step[] = ['moment', 'material', 'working', 'master']
 const POST_STEPS: Step[] = ['post', 'master', 'material', 'working']
 
@@ -402,8 +407,8 @@ function WorkingStage({ label }: { label: string }) {
 
 export function StudioBoot() {
   return (
-    <div className="content-studio h-screen flex items-center justify-center">
-      <Spinner className="app-spinner-blue w-8 h-8" />
+    <div className="h-screen flex items-center justify-center">
+      <Spinner className="w-8 h-8" />
     </div>
   )
 }
@@ -441,6 +446,7 @@ export default function ContentEngine() {
   const [postKind, setPostKind] = useState<KindFilter>('all')
   const [postStatus, setPostStatus] = useState<StatusFilter>('all')
   const [postSocial, setPostSocial] = useState<SocialFilter>('all')
+  const { account: socialAccount, ready: socialReady } = useSocialAccount()
   const [journeyFilter, setJourneyFilter] = useState<JourneyFilter>('all')
   const [ideas, setIdeas] = useState<ContentIdea[]>([])
   const [ideasState, setIdeasState] = useState<'loading' | 'ready' | 'refreshing' | 'off'>('loading')
@@ -762,6 +768,33 @@ export default function ContentEngine() {
     }
     if (route.view === 'new' || route.view === 'update') {
       const fromIdea = location.state as { idea?: ContentIdea; photos?: ContentSource[] } | null
+      const studioStart = (location.state as { studioStart?: 'diy' | 'nexus' } | null)?.studioStart
+      if (route.view === 'new' && studioStart === 'diy') {
+        resetDraft()
+        setProgramFilter('')
+        setStep('material')
+        return
+      }
+      if (route.view === 'new' && studioStart === 'nexus') {
+        resetDraft()
+        setBackStep('moment')
+        setWorkingLabel('Picking the strongest story')
+        setStep('working')
+        let cancelled = false
+        apiService.recommendContent('moment')
+          .then(next => {
+            if (cancelled) return
+            applyMaster(next)
+            setExtraContext('')
+            setStep('master')
+          })
+          .catch(error => {
+            if (cancelled) return
+            fail(error, 'Could not pick a story')
+            setStep('moment')
+          })
+        return () => { cancelled = true }
+      }
       if (fromIdea?.idea && current === 'idea') {
         resetDraft()
         setDraftIdea(fromIdea.idea)
@@ -980,14 +1013,15 @@ export default function ContentEngine() {
   }
 
   const togglePublish = async () => {
-    if (!post?.published_at) return
+    if (!post) return
+    const nextPublished = !post.published_at
     setPublishing(true)
     try {
-      const next = await apiService.publishContentPackage(post.id, false)
+      const next = await apiService.publishContentPackage(post.id, nextPublished)
       setPost(next)
       upsertPackage(next)
       if (journeyId) loadJourneys()
-      notify.success('Moved to drafts')
+      notify.success(nextPublished ? 'Marked for your Nexus page' : 'Removed from your Nexus page')
     } catch (error) {
       fail(error, 'Could not update')
     } finally {
@@ -1111,11 +1145,9 @@ export default function ContentEngine() {
     step === 'journey' ? 'Add updates as it happens. Save each one as a draft for now.'
       : step === 'idea' ? 'A story worth capturing. Who to find, what to ask, and how to get the photo.'
         : step === 'material' ? (journey ? `Pick photos for the next update to ${journey.title}.` : 'Pick or upload photos. The first one is the cover.')
-          : step === 'post' ? (published
-            ? 'On your public page already. Social posts are optional versions of it.'
-            : 'Saved as a draft for now. Social posts are optional versions of it.')
-            : step === 'master' ? 'Save this as a draft. Social versions come after.'
-              : 'Moments and journeys, saved as drafts. Social posts when you want them.'
+          : step === 'post' ? 'This is what goes out. The button names every account it will use.'
+            : step === 'master' ? 'Review the story. Save it when the headline, body, and call to action are right.'
+              : 'A post is one story. Nexus can write it, or you can.'
 
   const chooser = step === 'moment' || step === 'working'
   const library = step === 'home' || step === 'journeys' || step === 'capture' || step === 'todos'
@@ -1131,7 +1163,7 @@ export default function ContentEngine() {
     setPostSocial('all')
   }
   const openStudio = (tab: 'posts' | 'journeys' | 'capture') => {
-    const path = tab === 'posts' ? BASE : tab === 'journeys' ? `${BASE}/journeys` : `${BASE}/capture`
+    const path = tab === 'posts' ? `${BASE}/library` : tab === 'journeys' ? `${BASE}/journeys` : `${BASE}/capture`
     if (location.pathname !== path) navigate(path)
   }
   const openCreate = () => {
@@ -1167,10 +1199,21 @@ export default function ContentEngine() {
     if (revealed) stepIntro.current = true
   }, [revealed])
 
+  const darkStudio = step === 'capture' || step === 'todos' || step === 'idea' || step === 'journeys' || step === 'journey' || step === 'home'
+  const headerTitle = step === 'master'
+    ? 'Craft your post'
+    : step === 'post'
+    ? 'Your post'
+    : step === 'material'
+      ? 'Choose a photo'
+      : step === 'moment'
+        ? 'Create a post'
+        : 'Content'
+
   if (!revealed) return <StudioBoot />
 
   return (
-    <div className="content-studio relative h-screen overflow-hidden flex flex-col">
+    <div className={`${darkStudio ? 'content-studio' : ''} relative h-screen overflow-hidden flex flex-col`}>
       <motion.div
         className={`relative z-10 w-full flex flex-col flex-1 min-h-0 pt-6 mobile-content-padding ${
         step === 'master' ? 'px-3 sm:px-4 lg:pl-3 lg:pr-8' : 'px-4 sm:px-6 lg:px-8'
@@ -1215,8 +1258,8 @@ export default function ContentEngine() {
           />
         ) : (
           <PageHeader
-            className={`${chooser ? 'mb-0' : 'mb-4'} shrink-0`}
-            title="Content"
+            className={`${chooser ? 'mb-0' : step === 'master' ? 'mb-3' : 'mb-4'} shrink-0`}
+            title={headerTitle}
             subtitle={subtitle}
             help={<Help />}
             actions={step === 'journey' || step === 'post' ? <NewMenu onMoment={startMoment} onJourney={newJourney} /> : undefined}
@@ -1235,7 +1278,7 @@ export default function ContentEngine() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.38, ease: EASE }}
-              className={step === 'capture' ? 'w-full h-full overflow-hidden' : chooser ? 'w-full h-full overflow-hidden flex items-center justify-center' : `w-full h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] ${step === 'master' || step === 'post' || step === 'journey' ? 'pr-8' : ''}`}
+              className={step === 'capture' || step === 'master' ? 'w-full h-full overflow-hidden' : chooser ? 'w-full h-full overflow-hidden flex items-center justify-center' : `w-full h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] ${step === 'post' || step === 'journey' ? 'pr-8' : ''}`}
             >
           {step === 'home' && (
             <ContentWorkspace
@@ -1303,14 +1346,14 @@ export default function ContentEngine() {
                   icon={Sparkles}
                   accent
                   kicker="Easiest"
-                  title="Nexus makes it"
-                  body="Nexus picks the strongest photo you have logged and writes the post."
+                  title="Nexus writes it"
+                  body="Nexus picks the strongest photo you have logged and writes the post. You can edit every line."
                   onClick={runRecommend}
                 />
                 <ChoiceCard
                   icon={Pencil}
-                  title="I'll make it"
-                  body="Pick or upload photos, then write it yourself. Nexus can draft it if you want a head start."
+                  title="I'll write it"
+                  body="Pick or upload a photo, then write the headline, body, and call to action yourself."
                   onClick={startMomentDiy}
                 />
               </div>
@@ -1336,7 +1379,7 @@ export default function ContentEngine() {
                 icon={Route}
                 title="Journey not found"
                 description="It may have been deleted, or it belongs to another organization."
-                action={<button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={() => navigate(BASE)}>Back to content</button>}
+                action={<button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={() => navigate(BASE)}>Back to studio</button>}
               />
             ) : <SectionLoader />
           )}
@@ -1388,123 +1431,95 @@ export default function ContentEngine() {
           )}
 
           {step === 'master' && master && (
-            <div className="grid grid-cols-1 lg:grid-cols-[24rem_minmax(0,1fr)] xl:grid-cols-[21rem_minmax(0,1fr)] gap-6 lg:gap-10 pb-6 items-start">
-              <aside className="w-full max-w-[24rem] xl:max-w-[21rem]">
-                <div className="relative aspect-square overflow-hidden rounded-xl border border-gray-200/80 bg-gray-900">
-                  <img src={master.source.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                </div>
-                <PhotoStrip photos={photosOf(master)} onChange={setPhotos} onAdd={addMorePhotos} />
-              </aside>
-              <section className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-800 truncate">{draftLabel}</p>
-                  {draftIdea && !editingId && (
-                    <span className="app-chip app-chip-accent text-[11px] inline-flex items-center gap-1 min-w-0 max-w-[16rem]">
-                      <Lightbulb className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">From idea: {draftIdea.card.title}</span>
-                      <button type="button" className="flex-shrink-0 -mr-1 p-0.5 rounded hover:bg-white/10" onClick={() => setDraftIdea(null)} aria-label="Unlink idea">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {hasCopy && (
-                    <button type="button" className="app-btn app-btn-ghost app-btn-sm ml-auto" onClick={draftWithNexus}>
-                      <Sparkles className="w-3.5 h-3.5" /> Redraft with Nexus
-                    </button>
-                  )}
-                </div>
-                {!master.hook.trim() && !master.body.trim() && (
-                  <div className="app-card-muted mt-3 p-4 flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-secondary-900">Write it, or let Nexus draft it</p>
-                      <p className="text-[12px] text-secondary-500 mt-0.5 leading-snug">
-                        {journey
-                          ? 'Nexus reads the photos and the earlier updates, then writes what is new.'
-                          : 'Nexus reads what you logged about these photos and writes a first draft.'}
-                      </p>
-                    </div>
-                    <button type="button" className="app-btn app-btn-primary app-btn-sm" onClick={draftWithNexus}>
-                      <Sparkles className="w-3.5 h-3.5" /> Draft with Nexus
-                    </button>
+            <div className="h-full min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
+              <article className="studio-panel h-full min-h-0 flex flex-col overflow-hidden">
+                <div className="shrink-0 p-3 pb-0 flex gap-3">
+                  <div className="relative h-28 w-44 sm:h-32 sm:w-52 rounded-xl overflow-hidden bg-[#E7F3DF] flex-shrink-0">
+                    <img src={master.source.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   </div>
-                )}
-                <div className="studio-panel mt-3 space-y-3.5 rounded-2xl border p-4">
-                  <label className="block">
-                    <span className="block text-[11px] font-medium text-secondary-500 mb-1">Headline</span>
+                  <div className="min-w-0 flex-1 pt-1">
+                    <PhotoStrip photos={photosOf(master)} onChange={setPhotos} onAdd={addMorePhotos} />
+                    {draftIdea && !editingId && (
+                      <span className="app-chip app-chip-accent text-[11px] inline-flex items-center gap-1 max-w-full mt-2">
+                        <Lightbulb className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{draftIdea.card.title}</span>
+                        <button type="button" className="flex-shrink-0 p-0.5 rounded hover:bg-black/5" onClick={() => setDraftIdea(null)} aria-label="Unlink idea">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-3 flex flex-col gap-3">
+                  <label className="block shrink-0">
+                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Headline</span>
                     <GrowField
                       value={master.hook}
                       onChange={v => setMaster({ ...master, hook: v })}
-                      placeholder={journey ? 'Week 12. They read a whole book.' : 'Headline'}
+                      placeholder="Headline"
+                      maxRows={2}
+                      className="text-[15px] font-semibold"
                     />
                   </label>
-                  <label className="block">
-                    <span className="block text-[11px] font-medium text-secondary-500 mb-1">Body</span>
-                    <div className="app-input min-h-[5.5rem] py-2">
-                      <FitText
-                        value={master.body}
-                        onChange={v => setMaster({ ...master, body: v })}
-                        minRows={3}
-                        className="text-[13px] leading-relaxed text-secondary-800"
-                      />
-                    </div>
+                  <label className="block shrink-0">
+                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Body</span>
+                    <GrowField
+                      value={master.body}
+                      onChange={v => setMaster({ ...master, body: v })}
+                      placeholder="Write the post."
+                      minRows={3}
+                      maxRows={5}
+                      className="text-[14px] leading-relaxed"
+                    />
                   </label>
-                  <label className="block">
-                    <span className="block text-[11px] font-medium text-secondary-500 mb-1">Call To Action</span>
+                  <label className="block shrink-0">
+                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Call to action</span>
                     <GrowField
                       value={master.cta}
                       onChange={v => setMaster({ ...master, cta: v })}
-                      placeholder={journey ? 'Follow the journey.' : 'Learn more about our work.'}
+                      placeholder="Learn more about our work."
+                      maxRows={2}
                     />
                   </label>
                 </div>
-                {hasCopy && (
-                  <div className="app-card-muted mt-6 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-semibold text-secondary-900">Your context</p>
-                        <p className="text-[12px] text-secondary-500 mt-0.5 leading-snug">
-                          This is how you steer the body. Audience, a quote, an event, tone. Nexus rewrites the body only.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="app-btn app-btn-primary app-btn-sm flex-shrink-0"
-                        disabled={!extraContext.trim()}
-                        onClick={applyContext}
-                      >
-                        Add
-                      </button>
-                    </div>
+              </article>
+              <aside className="h-full min-h-0">
+                <div className="studio-panel h-full min-h-0 flex flex-col overflow-hidden p-4">
+                  <p className="text-[15px] font-semibold text-[#1C2B24] shrink-0">Post settings</p>
+                  <button type="button" className="studio-hero-btn studio-hero-btn-mint mt-3 shrink-0" onClick={draftWithNexus}>
+                    <Sparkles className="w-4 h-4" /> {hasCopy ? 'Redraft with Nexus' : 'Draft with Nexus'}
+                  </button>
+                  <p className="mt-2 text-[12px] text-secondary-500 leading-snug shrink-0">
+                    Rewrites the headline, body, and call to action from the photo.
+                  </p>
+                  <label className="block mt-4 flex-1 min-h-0 flex flex-col">
+                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1 shrink-0">Your context</span>
                     <GrowField
-                      className="mt-3"
                       minRows={3}
                       value={extraContext}
                       onChange={setExtraContext}
-                      placeholder="Mention that the class picked the book themselves."
+                      placeholder="Audience, a quote, an event, a tone."
+                      className="flex-1"
                     />
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-2 mt-5">
-                  {editingId ? (
-                    <button type="button" className="app-btn app-btn-primary" disabled={!hasCopy || saving} onClick={() => save()}>
-                      {saving ? <Spinner className="w-3.5 h-3.5" /> : null} Save changes
-                    </button>
-                  ) : (
-                    <button type="button" className="app-btn app-btn-primary" disabled={!hasCopy || saving} onClick={() => save(false)}>
-                      {saving ? <Spinner className="w-3.5 h-3.5" /> : null} Save draft
-                    </button>
-                  )}
-                  <PublishSoon />
-                  <button type="button" className="app-btn app-btn-ghost" onClick={cancelEdit}>
-                    {editingId ? 'Cancel' : 'Back'}
+                  </label>
+                  <button
+                    type="button"
+                    className="app-btn app-btn-secondary app-btn-sm mt-2 shrink-0"
+                    disabled={!extraContext.trim() || !hasCopy}
+                    onClick={applyContext}
+                  >
+                    Apply context
                   </button>
+                  <div className="mt-4 pt-3 border-t border-black/5 flex flex-col gap-2 shrink-0">
+                    <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full" disabled={!hasCopy || saving} onClick={() => save()}>
+                      {saving ? <Spinner className="w-3.5 h-3.5" /> : null} {editingId ? 'Save changes' : 'Save draft'}
+                    </button>
+                    <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={cancelEdit}>
+                      {editingId ? 'Cancel' : 'Back'}
+                    </button>
+                  </div>
                 </div>
-                {!editingId && (
-                  <p className="mt-2 text-[12px] text-secondary-400">
-                    Save this as a draft. Only your team can see it until publishing is on.
-                  </p>
-                )}
-              </section>
+              </aside>
             </div>
           )}
 
@@ -1533,151 +1548,48 @@ export default function ContentEngine() {
                   <button type="button" className="app-btn app-btn-ghost app-btn-sm is-danger" onClick={() => setDeleteId(post.id)}>
                     <Trash2 className="w-3.5 h-3.5" /> Delete
                   </button>
-                  {published ? (
-                    <button
-                      type="button"
-                      className="app-btn app-btn-sm app-btn-secondary"
-                      disabled={publishing}
-                      onClick={togglePublish}
-                    >
-                      {publishing ? <Spinner className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-                      Move to draft
-                    </button>
-                  ) : (
-                    <PublishSoon small />
-                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
-                <section>
-                  <p className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-500">Public post</p>
-                  <PublicPostPreview
-                    master={master}
-                    kicker={journey ? journey.title : undefined}
-                    date={post.published_at || post.created_at}
-                    onCopy={copyText}
-                    onDownload={downloadPhoto}
+              <div className="grid grid-cols-1 lg:grid-cols-[340px_320px] gap-4 items-start max-w-[1080px] pb-8">
+                <div className="space-y-3 min-w-0">
+                  <SocialPostPreview
+                    caption={socialCaption([master.hook, master.body, master.cta])}
+                    media={[master.source, ...(master.extras || [])].filter(item => item.image_url).map(item => ({ url: item.image_url }))}
+                    profileName={activeOrganization?.name || 'Your account'}
+                    profileImage={activeOrganization?.logo_url}
+                    names={{
+                      instagram: socialAccount?.connections?.instagram?.label,
+                      facebook: socialAccount?.connections?.facebook?.label,
+                      linkedin: socialAccount?.connections?.linkedin?.label,
+                    }}
                   />
-                  <p className="mt-2 px-0.5 text-[12px] text-secondary-400">
-                    {published ? 'Published. It will show on your public page.' : 'Draft. Only your team can see it.'}
-                  </p>
-                </section>
-
-                <section className="min-w-0">
-                  <div className="flex flex-wrap items-start gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[15px] font-semibold text-secondary-900">Social posts</p>
-                      <p className="text-[12px] text-secondary-500">Optional. Versions of this post written for each channel.</p>
-                    </div>
-                    {hasVersions && !generating && (
-                      <div className="ml-auto flex flex-wrap items-center gap-1">
-                        <button
-                          type="button"
-                          className={`app-btn app-btn-ghost app-btn-sm ${pickerOpen ? 'bg-white/10' : ''}`}
-                          onClick={() => setPickerOpen(v => !v)}
-                        >
-                          Change channels
-                        </button>
-                        <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={runVersions}>
-                          <RefreshCw className="w-3.5 h-3.5" /> Regenerate
-                        </button>
-                        {versionsDirty && (
-                          <button type="button" className="app-btn app-btn-primary app-btn-sm" disabled={saving} onClick={saveChannelEdits}>
-                            {saving ? <Spinner className="w-3.5 h-3.5" /> : null} Save edits
-                          </button>
-                        )}
-                      </div>
-                    )}
+                  <div className="studio-panel px-3 py-3">
+                    <p className="text-[12px] text-secondary-500 leading-snug">Separate from the social send.</p>
+                    <button
+                      type="button"
+                      disabled={publishing}
+                      onClick={togglePublish}
+                      className={published
+                        ? 'app-btn app-btn-secondary app-btn-sm mt-2 w-full'
+                        : 'studio-hero-btn studio-hero-btn-mint mt-2 w-full justify-center !h-9 px-3 text-[13px]'}
+                    >
+                      {publishing ? <Spinner className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                      {published ? 'Remove from Nexus page' : 'Show on Nexus page'}
+                    </button>
                   </div>
-
-                  {hasVersions && post.channels_stale && !generating && (
-                    <InlineAlert tone="warning" className="mt-3">
-                      You edited the post after these were written. Regenerate so they match.
-                    </InlineAlert>
-                  )}
-
-                  <AnimatePresence mode="wait" initial={false}>
-                  {generating ? (
-                    <motion.div
-                      key="working"
-                      initial={reduceMotion ? false : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2, ease: EASE }}
-                      className="app-card-muted mt-3 h-[24rem] overflow-hidden"
-                    >
-                      <WorkingStage label="Writing your social posts" />
-                    </motion.div>
-                  ) : pickerOpen ? (
-                    <ChannelPicker
-                      key="picker"
-                      selected={channels}
-                      onChange={setChannels}
-                      context={socialContext}
-                      onContext={setSocialContext}
-                      regenerate={hasVersions}
-                      onRun={runVersions}
-                      onCancel={() => setPickerOpen(false)}
-                    />
-                  ) : !hasVersions ? (
-                    <motion.div
-                      key="empty"
-                      initial={reduceMotion ? false : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="app-card-muted mt-3 px-6 py-10 flex flex-col items-center text-center"
-                    >
-                      <span className="app-icon-tile app-icon-tile-accent">
-                        <Share2 className="w-4 h-4" />
-                      </span>
-                      <p className="mt-3 text-[14px] font-semibold text-secondary-900">No social posts yet</p>
-                      <p className="mt-1 text-[12px] text-secondary-500 max-w-sm leading-snug">
-                        Nexus adapts this post for Instagram, Facebook, LinkedIn, email, and SMS. You pick which ones.
-                      </p>
-                      <button type="button" className="app-btn app-btn-primary app-btn-sm mt-4" onClick={() => setPickerOpen(true)}>
-                        Create social posts
-                      </button>
-                    </motion.div>
-                  ) : null}
-                  </AnimatePresence>
-
-                  {hasVersions && !generating && (
-                    <>
-                      <div className="studio-panel mt-3 rounded-2xl border px-3 py-2.5">
-                        <p className="text-[11px] font-semibold text-secondary-700">Graphic overlay</p>
-                        <OverlayBar chrome={chrome} copy={copy} onChrome={setChrome} onCopy={setCopy} />
-                      </div>
-                      <div className="flex flex-wrap gap-5 items-start mt-4">
-                        {versions.map((version, i) => (
-                          <motion.div
-                            key={version.channel}
-                            initial={reduceMotion ? false : { opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: reduceMotion ? 0 : 0.04 + i * 0.04, duration: 0.25, ease: EASE }}
-                          >
-                            <ChannelPreview
-                              version={version}
-                              orgName={copy.orgName || activeOrganization?.name || 'Nexus'}
-                              logoUrl={activeOrganization?.logo_url}
-                              brandColor={activeOrganization?.brand_color}
-                              photoUrl={master.source.image_url}
-                              extras={master.extras || []}
-                              chrome={chrome}
-                              copy={copy}
-                              onChange={patch => patchVersion(version.channel, patch)}
-                              onCopy={copyText}
-                              onDownload={() => downloadGraphic(aspectForDownload(version.channel), version.channel)}
-                              onDownloadExtra={downloadPhoto}
-                              downloading={exportingChannel === version.channel}
-                            />
-                          </motion.div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </section>
+                </div>
+                <SendPanel
+                  packageId={post.id}
+                  publications={post.publications}
+                  connections={socialAccount?.connections}
+                  loaded={socialReady}
+                  onSent={publications => {
+                    setPost(current => current && current.id === post.id ? { ...current, publications } : current)
+                    setPackages(prev => prev.map(pkg => pkg.id === post.id ? { ...pkg, publications } : pkg))
+                    if (activeOrganization?.id) patchStudioPackage(activeOrganization.id, post.id, publications)
+                  }}
+                />
               </div>
             </div>
           )}
@@ -1777,6 +1689,268 @@ export default function ContentEngine() {
   )
 }
 
+const SHARE_CHANNELS: { id: ContentChannel; label: string; icon: typeof Facebook }[] = [
+  { id: 'facebook', label: 'Facebook', icon: Facebook },
+  { id: 'instagram', label: 'Instagram', icon: Instagram },
+  { id: 'linkedin', label: 'LinkedIn', icon: Linkedin },
+]
+
+function accountList(names: string[]) {
+  if (names.length <= 1) return names[0] || ''
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+function scheduleLabel(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return `${day} at ${time}`
+}
+
+function mergePublications(current: ContentPublication[] | undefined, incoming: ContentPublication[]) {
+  const rank = { failed: 0, accepted: 1, scheduled: 2, published: 3 }
+  const byPlatform = new Map<string, ContentPublication>()
+  for (const item of [...(current || []), ...incoming]) {
+    const prev = byPlatform.get(item.platform)
+    if (!prev || rank[item.status] > rank[prev.status] || (item.post_url && !prev.post_url)) byPlatform.set(item.platform, item)
+  }
+  return [...byPlatform.values()]
+}
+
+function sentWhen(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function SendPanel({
+  packageId,
+  publications,
+  connections,
+  loaded,
+  onSent,
+}: {
+  packageId: string
+  publications?: ContentPublication[]
+  connections?: Record<string, { connected: boolean; label: string | null }>
+  loaded: boolean
+  onSent: (publications: ContentPublication[]) => void
+}) {
+  const linked = loaded ? SHARE_CHANNELS.filter(channel => connections?.[channel.id]?.connected) : []
+  const missing = loaded ? SHARE_CHANNELS.filter(channel => !connections?.[channel.id]?.connected) : []
+  const connectedKey = linked.map(channel => channel.id).join(',')
+  const sentKey = (publications || [])
+    .filter(item => item.status !== 'failed')
+    .map(item => item.platform)
+    .sort()
+    .join(',')
+  const [checked, setChecked] = useState<ContentChannel[]>([])
+  const [scheduling, setScheduling] = useState(false)
+  const [when, setWhen] = useState('')
+  const [sending, setSending] = useState(false)
+  const [panelError, setPanelError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!loaded) return
+    const sent = new Set(sentKey ? sentKey.split(',') : [])
+    const next = (connectedKey ? connectedKey.split(',') : []).filter(id => !sent.has(id)) as ContentChannel[]
+    setChecked(next)
+  }, [connectedKey, sentKey, loaded])
+
+  const chosen = SHARE_CHANNELS.filter(channel => checked.includes(channel.id))
+  const names = accountList(chosen.map(channel => channel.label))
+  const sentNames = accountList(
+    SHARE_CHANNELS.filter(channel => sentKey.split(',').includes(channel.id)).map(channel => channel.label)
+  )
+  const whenLabel = scheduleLabel(when)
+  const canSend = loaded && chosen.length > 0 && (!scheduling || !!whenLabel)
+  const button = sending
+    ? `Sending to ${names}`
+    : !loaded
+    ? 'Checking accounts'
+    : chosen.length === 0
+    ? (sentNames ? `Sent to ${sentNames}` : linked.length === 0 ? 'Connect an account' : 'Select an account')
+    : scheduling
+      ? (whenLabel ? `Schedule for ${whenLabel}` : 'Pick a time')
+      : `Post now to ${names}`
+
+  const toggle = (id: ContentChannel) => {
+    setChecked(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+  }
+
+  const send = async () => {
+    if (!canSend || sending) return
+    setSending(true)
+    setPanelError(null)
+    try {
+      const result = await apiService.publishSocial(packageId, {
+        platforms: chosen
+          .map(channel => channel.id)
+          .filter((id): id is 'instagram' | 'facebook' | 'linkedin' => id === 'instagram' || id === 'facebook' || id === 'linkedin'),
+        scheduled_at: scheduling ? when : undefined,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+      const incoming: ContentPublication[] = result.results
+        .filter((item): item is typeof item & { platform: ContentPublication['platform'] } =>
+          item.platform === 'instagram' || item.platform === 'facebook' || item.platform === 'linkedin')
+        .map(item => ({
+          platform: item.platform,
+          status: item.status || (item.ok ? 'accepted' : 'failed'),
+          created_at: item.sentAt || new Date().toISOString(),
+          scheduled_at: scheduling ? when : null,
+          post_url: item.postUrl || null,
+          error: item.error || null,
+        }))
+      onSent(mergePublications(publications, incoming))
+      const failed = result.results.filter(item => !item.ok)
+      const sent = result.results.filter(item => item.ok)
+      if (!sent.length) {
+        const message = failed[0]?.error || 'Could not post'
+        setPanelError(message)
+        notify.error(message)
+        return
+      }
+      const label = accountList(sent.map(item => SHARE_CHANNELS.find(channel => channel.id === item.platform)?.label || item.platform))
+      if (failed.length) {
+        const message = failed[0]?.error || 'One account failed.'
+        setPanelError(message)
+        notify.error(`Sent to ${label}. ${message}`)
+      } else if (sent.some(item => item.status === 'scheduled')) {
+        notify.success(`Scheduled for ${label}`)
+      } else if (sent.some(item => item.postUrl)) {
+        notify.success(`It is on ${label}`)
+      } else {
+        notify.success(`Sent to ${label}`)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not post'
+      setPanelError(message)
+      notify.error(message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const receipts = publications || []
+
+  return (
+    <aside className="studio-panel p-4 lg:sticky lg:top-4">
+      {receipts.length > 0 && (
+        <div className="mb-3 space-y-2">
+          {receipts.map(item => {
+            const label = SHARE_CHANNELS.find(channel => channel.id === item.platform)?.label || item.platform
+            const when = sentWhen(item.status === 'scheduled' ? item.scheduled_at : item.created_at)
+            if (item.status === 'failed') {
+              return (
+                <div key={item.platform} className="rounded-xl bg-red-50 px-3 py-2.5">
+                  <p className="text-[13px] font-semibold text-red-700">{label} did not send</p>
+                  <p className="mt-0.5 text-[12px] text-red-700 leading-snug">{item.error || 'Could not post'}</p>
+                </div>
+              )
+            }
+            const scheduled = item.status === 'scheduled'
+            const live = item.status === 'published'
+            return (
+              <div key={item.platform} className="rounded-xl bg-[#E7F3DF] px-3 py-2.5">
+                <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#14352A]">
+                  <Check className="w-3.5 h-3.5" />
+                  {scheduled ? `Scheduled for ${label}` : live ? `On ${label}` : `Sent to ${label}`}
+                </p>
+                <p className="mt-0.5 text-[12px] text-[#3d4352] leading-snug">
+                  {scheduled
+                    ? (when ? `Goes out ${when}.` : 'Waiting for the scheduled time.')
+                    : live
+                      ? `Posted ${when}.`
+                      : `Posted ${when}. It can take a minute to show up.`}
+                </p>
+                {item.post_url && (
+                  <a href={item.post_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[12px] font-semibold text-[#2A6B4A]">
+                    View on {label}
+                  </a>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <p className="text-[15px] font-semibold text-[#1C2B24]">Send</p>
+      <p className="mt-1 text-[12px] text-secondary-500">Checked accounts get this post. Same words on each.</p>
+      {panelError && <p className="mt-2 text-[12px] font-medium text-red-700">{panelError}</p>}
+      <div className="mt-3 space-y-1">
+        {!loaded && SHARE_CHANNELS.map(channel => (
+          <div key={channel.id} className="h-10 rounded-xl bg-[#E7F3DF] animate-pulse" />
+        ))}
+        {loaded && linked.map(channel => {
+          const on = checked.includes(channel.id)
+          const Icon = channel.icon
+          const who = connections?.[channel.id]?.label
+          return (
+            <label key={channel.id} className="flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-[#F3F6F1] cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[#14352A]"
+                checked={on}
+                onChange={() => toggle(channel.id)}
+              />
+              <Icon className="w-4 h-4 text-[#14352A]" />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-[#1C2B24]">{channel.label}</span>
+                {who && <span className="block text-[12px] text-secondary-500 truncate">{who}</span>}
+              </span>
+              {sentKey.split(',').filter(Boolean).includes(channel.id) && (
+                <span className="ml-auto text-[11px] font-semibold text-[#2A6B4A]">
+                  {(publications || []).some(item => item.platform === channel.id && item.status === 'scheduled') ? 'Scheduled' : 'Sent'}
+                </span>
+              )}
+            </label>
+          )
+        })}
+        {loaded && missing.map(channel => (
+          <div key={channel.id} className="flex items-center justify-between gap-2 px-2 py-2">
+            <span className="text-[13px] text-secondary-400">{channel.label}</span>
+            <Link to="/studio/accounts" className="text-[12px] font-semibold text-[#2A6B4A]">Connect</Link>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        aria-pressed={scheduling}
+        className={scheduling
+          ? 'app-btn mt-3 w-full bg-[#E7F3DF] text-[#14352A] border border-[#14352A]/15'
+          : 'app-btn app-btn-secondary mt-3 w-full'}
+        onClick={() => setScheduling(value => !value)}
+      >
+        <Calendar className="w-4 h-4" />
+        {scheduling ? 'Post now instead' : 'Schedule instead'}
+      </button>
+      {scheduling && (
+        <input
+          type="datetime-local"
+          className="app-input mt-2 min-w-0 max-w-full text-[13px]"
+          value={when}
+          onChange={event => setWhen(event.target.value)}
+        />
+      )}
+      <button
+        type="button"
+        className="studio-hero-btn studio-hero-btn-mint mt-4 w-full justify-center text-center leading-tight !h-auto min-h-11 py-2.5 disabled:opacity-60"
+        disabled={!canSend || sending}
+        onClick={send}
+      >
+        {button}
+      </button>
+      <p className="mt-2 text-[12px] text-secondary-400 leading-snug">
+        {receipts.some(item => item.status !== 'failed')
+          ? 'This stays on the post, in the library, and on the calendar.'
+          : 'One post per checked account. A second click of the same send will not post it twice.'}
+      </p>
+    </aside>
+  )
+}
+
 function PublicPostPreview({
   master,
   kicker,
@@ -1795,7 +1969,7 @@ function PublicPostPreview({
     <article className="app-card studio-panel overflow-hidden">
       <PhotoCarousel extras={master.extras || []} aspect="square" onDownloadExtra={onDownload}>
         <GraphicHover onDownload={() => onDownload(master.source)}>
-          <div className="relative w-full aspect-square overflow-hidden bg-gray-900">
+          <div className="relative w-full aspect-[4/3] overflow-hidden bg-[#E7F3DF]">
             <img src={master.source.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
           </div>
         </GraphicHover>
@@ -1932,13 +2106,17 @@ function GrowField({
   onChange,
   placeholder,
   minRows = 1,
+  maxRows,
   className,
+  plain,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   minRows?: number
+  maxRows?: number
   className?: string
+  plain?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const floor = useRef(0)
@@ -1946,8 +2124,11 @@ function GrowField({
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.max(el.scrollHeight, floor.current, minRows * 24)}px`
-  }, [value, minRows])
+    const next = Math.max(el.scrollHeight, floor.current, minRows * 24)
+    const cap = maxRows ? maxRows * 24 : next
+    el.style.height = `${Math.min(next, cap)}px`
+    el.style.overflowY = next > cap ? 'auto' : 'hidden'
+  }, [value, minRows, maxRows])
   return (
     <textarea
       ref={ref}
@@ -1956,7 +2137,9 @@ function GrowField({
       onChange={e => onChange(e.target.value)}
       onMouseUp={() => { if (ref.current) floor.current = ref.current.offsetHeight }}
       placeholder={placeholder}
-      className={`app-input text-[13px] leading-relaxed resize-y overflow-hidden whitespace-pre-wrap ${className || ''}`}
+      className={plain
+        ? `w-full bg-transparent border-0 p-0 shadow-none resize-none overflow-hidden focus:outline-none focus:ring-0 placeholder:text-secondary-300 ${className || ''}`
+        : `app-input text-[13px] leading-relaxed resize-y overflow-hidden whitespace-pre-wrap ${className || ''}`}
     />
   )
 }
@@ -2423,7 +2606,7 @@ function PhotoStrip({
         )}
       </div>
       {photos.length > 1 && (
-        <p className="mt-1 text-[11px] text-secondary-400">Carousel on Instagram, Facebook, and LinkedIn. Email and SMS use the cover.</p>
+        <p className="mt-1 text-[11px] text-secondary-400">The first photo is the cover.</p>
       )}
     </div>
   )
@@ -2627,19 +2810,19 @@ function MaterialPicker({
         <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={onBack}>
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
-        <div className="inline-flex items-center h-8 p-0.5 rounded-full border border-white/10 bg-white/5">
+        <div className="inline-flex items-center gap-1">
           {(['all', 'unused', 'used'] as const).map(id => (
             <button
               key={id}
               type="button"
               onClick={() => onUsage(id)}
-              className={`h-full px-2.5 rounded-full text-xs font-medium ${usage === id ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white'}`}
+              className={`studio-pill h-8 ${usage === id ? 'studio-pill-on' : ''}`}
             >
               {id === 'all' ? 'All' : id === 'unused' ? 'Unused' : 'Used'}
             </button>
           ))}
         </div>
-        <div className="inline-flex items-center h-8 p-0.5 rounded-full border border-white/10 bg-white/5">
+        <div className="inline-flex items-center gap-1">
           {([
             ['all', 'All'],
             ['evidence', 'Evidence'],
@@ -2649,7 +2832,7 @@ function MaterialPicker({
               key={id}
               type="button"
               onClick={() => onType(id)}
-              className={`h-full px-2.5 rounded-full text-xs font-medium ${typeFilter === id ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white'}`}
+              className={`studio-pill h-8 ${typeFilter === id ? 'studio-pill-on' : ''}`}
             >
               {label}
             </button>
