@@ -258,10 +258,45 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
+// Hero choice for the public page. Missing columns (migration not applied) return the classic default.
+router.get('/:id/hero', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const orgId = req.params.id;
+        const accessible = await TeamService.getUserAccessibleOrganizations(userId);
+        if (!accessible.some(org => org.id === orgId)) {
+            res.status(403).json({ error: 'Permission denied' });
+            return;
+        }
+        const { data, error } = await supabase
+            .from('organizations')
+            .select('public_hero, hero_image_url, hero_video_url')
+            .eq('id', orgId)
+            .maybeSingle();
+        if (error) {
+            if (/public_hero|hero_image_url|hero_video_url/.test(error.message)) {
+                res.json({ public_hero: 'classic', hero_image_url: null, hero_video_url: null, ready: false });
+                return;
+            }
+            throw error;
+        }
+        res.json({
+            public_hero: data?.public_hero || 'classic',
+            hero_image_url: data?.hero_image_url || null,
+            hero_video_url: data?.hero_video_url || null,
+            ready: true,
+        });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Update organization
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const organization = await OrganizationService.update(req.params.id, req.body, req.user!.id);
+        const body = { ...req.body };
+        delete body.hero_image_url;
+        const organization = await OrganizationService.update(req.params.id, body, req.user!.id);
         res.json(organization);
     } catch (error) {
         const status = (error as any).status || 500;
@@ -364,6 +399,73 @@ router.delete('/:id/logo', authenticateUser, async (req: AuthenticatedRequest, r
         });
     } catch (error) {
         console.error('Logo delete error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Hero background image for the public page. Set only from this route.
+router.post('/:id/hero-image', authenticateUser, upload.single('image'), async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!req.file) {
+            res.status(400).json({ error: 'No file uploaded' });
+            return;
+        }
+        if (!req.file.mimetype.startsWith('image/')) {
+            res.status(400).json({ error: 'Upload an image' });
+            return;
+        }
+        const userId = req.user!.id;
+        const orgId = req.params.id;
+        if (!(await TeamService.canEditOrgSettings(userId, orgId))) {
+            res.status(403).json({ error: 'Only the organization owner or admin can update the hero' });
+            return;
+        }
+
+        let finalBuffer = req.file.buffer;
+        let finalMimetype = req.file.mimetype;
+        if (isCompressibleImage(req.file.mimetype)) {
+            const compressionResult = await compressImage(req.file.buffer, req.file.mimetype, req.file.size);
+            finalBuffer = compressionResult.buffer;
+            finalMimetype = compressionResult.mimetype;
+        }
+        const ext = path.extname(req.file.originalname) || '.jpg';
+        const { hero_image_url, organization } = await OrganizationService.replaceHeroImage(
+            orgId, userId, finalBuffer, finalMimetype, ext
+        );
+        res.json({ success: true, hero_image_url, organization });
+    } catch (error) {
+        console.error('Hero image upload error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+router.delete('/:id/hero-image', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const orgId = req.params.id;
+        if (!(await TeamService.canEditOrgSettings(userId, orgId))) {
+            res.status(403).json({ error: 'Only the organization owner or admin can update the hero' });
+            return;
+        }
+        const { data: ownedOrg } = await supabase
+            .from('organizations')
+            .select('hero_image_url')
+            .eq('id', orgId)
+            .maybeSingle();
+        if (ownedOrg?.hero_image_url) {
+            try {
+                const urlParts = ownedOrg.hero_image_url.split('/evidence-files/');
+                if (urlParts.length === 2) {
+                    await supabase.storage.from('evidence-files').remove([urlParts[1]]);
+                }
+            } catch (e) {
+                console.warn('Failed to delete hero image from storage:', e);
+            }
+        }
+        const organization = await OrganizationService.update(orgId, { hero_image_url: null }, userId);
+        res.json({ success: true, organization });
+    } catch (error) {
+        console.error('Hero image delete error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

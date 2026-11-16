@@ -77,14 +77,25 @@ interface ImpactGlobeProps {
   focusLocation?: { lat: number; lng: number } | null;
   /** Camera distance — lower is closer, so the globe fills more of the frame. */
   initialAltitude?: number;
+  /** Share of the frame the globe should fill (0–1). Overrides initialAltitude once the frame is measured. */
+  fill?: number;
 }
 
-const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false, focusLocation, initialAltitude }: ImpactGlobeProps) => {
+const CAMERA_FOV = 50;
+
+const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false, focusLocation, initialAltitude: fixedAltitude, fill }: ImpactGlobeProps) => {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [countries, setCountries] = useState<{ features: any[] }>({ features: [] });
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // Camera altitude at which the sphere spans `fill` of the narrower frame axis.
+  const initialAltitude = useMemo(() => {
+    if (!fill || !dimensions.width || !dimensions.height) return fixedAltitude;
+    const halfView = Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)) * Math.min(1, dimensions.width / dimensions.height);
+    return 1 / Math.sin(Math.atan(fill * halfView)) - 1;
+  }, [fill, fixedAltitude, dimensions.width, dimensions.height]);
 
   // Use custom locations if provided, otherwise use defaults
   const pointsData = useMemo(() => {
@@ -272,7 +283,7 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   const hasSetInitialPov = useRef(false);
 
   useEffect(() => {
-    if (globeRef.current && dimensions.width > 0) {
+    if (isLoaded && globeRef.current && dimensions.width > 0) {
       const controls = globeRef.current.controls();
       controls.autoRotate = true;
       controls.autoRotateSpeed = locations ? 0.3 : 0.5;
@@ -295,7 +306,7 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
       }
 
     }
-  }, [dimensions, initialPov, locations, enableZoom]);
+  }, [isLoaded, dimensions, initialPov, locations, enableZoom]);
 
   // Animate POV when the landing page rotates to a new featured claim.
   useEffect(() => {

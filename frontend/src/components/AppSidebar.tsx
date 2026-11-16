@@ -172,6 +172,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
     isSharedMember,
     isOwner,
     isAdmin,
+    canUseContentStudio,
     loading: teamLoading,
   } = useTeam()
   const { startTutorial } = useTutorial()
@@ -265,6 +266,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             <SoftHome className="w-3.5 h-3.5" />
             Nexus
           </Link>
+          {canUseContentStudio && (
           <Link
             to="/studio"
             role="tab"
@@ -278,6 +280,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             <PenLine className="w-3.5 h-3.5" />
             Studio
           </Link>
+          )}
         </div>
       </div>
 

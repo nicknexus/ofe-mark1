@@ -1156,6 +1156,37 @@ class ApiService {
  })
  }
 
+ async getPublicHero(orgId: string): Promise<{ public_hero: 'classic' | 'image' | 'video'; hero_image_url: string | null; hero_video_url: string | null; ready: boolean }> {
+ return this.request(`/organizations/${orgId}/hero`)
+ }
+
+ async uploadHeroImage(orgId: string, file: File): Promise<{ success: boolean; hero_image_url: string; organization: Organization }> {
+ const { data: { session } } = await supabase.auth.getSession()
+ if (!session) throw new Error('No authenticated session')
+ const formData = new FormData()
+ formData.append('image', file)
+ const response = await fetch(`${API_BASE_URL}/api/organizations/${orgId}/hero-image`, {
+ method: 'POST',
+ headers: { Authorization: `Bearer ${session.access_token}` },
+ body: formData,
+ })
+ if (!response.ok) {
+ const error = await response.json().catch(() => ({ error: 'Upload failed' }))
+ throw new Error(error.error || 'Failed to upload hero image')
+ }
+ this.clearCacheByPattern('/team/organizations')
+ this.clearCacheByPattern(`/organizations/${orgId}`)
+ return response.json()
+ }
+
+ async deleteHeroImage(orgId: string): Promise<{ success: boolean; organization: Organization }> {
+ this.clearCacheByPattern('/team/organizations')
+ this.clearCacheByPattern(`/organizations/${orgId}`)
+ return this.request<{ success: boolean; organization: Organization }>(`/organizations/${orgId}/hero-image`, {
+ method: 'DELETE',
+ })
+ }
+
  // Locations
  async getLocations(initiativeId?: string): Promise<Location[]> {
  const params = initiativeId ? `?initiative_id=${initiativeId}` : ''
@@ -1817,6 +1848,40 @@ class ApiService {
  }> {
  const query = fresh ? `?t=${Date.now()}` : ''
  return this.request(`/content/social/account${query}`)
+ }
+
+ async getSocialInsights(): Promise<{
+ platforms: Array<{
+ platform: 'instagram' | 'facebook' | 'linkedin'
+ label: string
+ error: string | null
+ followers: number | null
+ reach: number | null
+ views: number | null
+ likes: number | null
+ comments: number | null
+ shares: number | null
+ saves: number | null
+ series: Array<{ date: string; reach: number }>
+ }>
+ posts: Array<{
+ platform: 'instagram' | 'facebook' | 'linkedin'
+ packageId: string
+ title: string
+ postUrl: string | null
+ sentAt: string
+ imageUrl: string | null
+ program: string | null
+ reach: number | null
+ views: number | null
+ likes: number | null
+ comments: number | null
+ shares: number | null
+ saves: number | null
+ }>
+ removed: number
+ }> {
+ return this.request('/content/social/insights')
  }
 
  async connectSocial(platform: 'instagram' | 'facebook' | 'linkedin'): Promise<{ url: string }> {

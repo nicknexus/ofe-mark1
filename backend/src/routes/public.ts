@@ -211,6 +211,17 @@ router.get('/organizations/:slug/evidence', async (req, res) => {
     }
 });
 
+router.get('/organizations/:slug/posts', async (req, res) => {
+    try {
+        const posts = await PublicService.getOrganizationPosts(req.params.slug);
+        res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+        res.json(posts);
+    } catch (error) {
+        console.error('Get org posts error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // ============================================
 // INITIATIVES (Advanced View)
 // ============================================

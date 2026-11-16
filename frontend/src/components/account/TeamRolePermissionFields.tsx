@@ -29,6 +29,7 @@ const MATRIX_ROWS: MatrixRow[] = [
 const STRUCTURE_ROWS: PermRow[] = [
  { key: 'editInitiatives', label: 'Edit programs' },
  { key: 'editLocations', label: 'Edit locations' },
+ { key: 'contentStudio', label: 'Content studio', description: 'Create posts, ideas, and graphics' },
 ]
 const REPORT_ROWS: PermRow[] = [
  { key: 'exportReports', label: 'Generate & export reports', description: 'Download PDFs and generate reports' },

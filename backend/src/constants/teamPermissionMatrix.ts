@@ -55,6 +55,7 @@ export const ADMIN_ALLOWED: PermissionGrant[] = [
     { resource: 'org_context', action: 'edit', allowed: true },
     { resource: 'branding', action: 'view', allowed: true },
     { resource: 'branding', action: 'edit', allowed: true },
+    { resource: 'content_studio', action: 'edit', allowed: true },
 ];
 
 const adminKey = (resource: PermissionResource, action: PermissionAction) =>

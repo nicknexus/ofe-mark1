@@ -39,6 +39,7 @@ export interface MemberCapabilities {
     canEditTags: boolean;
     canExportReports: boolean;
     canEditOrgContext: boolean;
+    canUseContentStudio: boolean;
     canDelete: boolean;
 }
 
@@ -62,6 +63,7 @@ export function fullCapabilities(): MemberCapabilities {
         canEditTags: true,
         canExportReports: true,
         canEditOrgContext: true,
+        canUseContentStudio: true,
         canDelete: true,
     };
 }
@@ -85,6 +87,7 @@ export function noCapabilities(): MemberCapabilities {
         canEditTags: false,
         canExportReports: false,
         canEditOrgContext: false,
+        canUseContentStudio: false,
         canDelete: false,
     };
 }
@@ -288,6 +291,7 @@ export class TeamMemberPermissionsService {
             canEditTags: grantsAllow(grants, 'tags', 'edit'),
             canExportReports: grantsAllow(grants, 'reports', 'export'),
             canEditOrgContext: false, // owner/admin only
+            canUseContentStudio: grantsAllow(grants, 'content_studio', 'edit'),
             canDelete:
                 grantsAllow(grants, 'evidence', 'delete') ||
                 grantsAllow(grants, 'initiatives', 'delete') ||

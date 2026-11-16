@@ -8,6 +8,9 @@ export interface Organization {
     donation_url?: string; // URL where people can donate
     logo_url?: string; // URL to organization logo image
     brand_color?: string; // Hex color for public page branding
+    public_hero?: 'classic' | 'image' | 'video';
+    hero_image_url?: string | null;
+    hero_video_url?: string | null;
     is_public?: boolean;
     is_demo?: boolean; // Sandbox / mock-charity org (admin-only). Hidden from /explore + public search.
     demo_public_share?: boolean; // When true + is_demo true, public /org/:slug page is reachable via direct link.

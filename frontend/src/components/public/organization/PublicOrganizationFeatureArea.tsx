@@ -1,11 +1,10 @@
-import React, { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
     BookOpen,
     ChevronLeft,
     ChevronRight,
     Compass,
-    FileText,
     Globe,
     LineChart,
     Map as MapIcon,
@@ -21,14 +20,18 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import type {
-    PublicInitiative,
-    PublicKPI,
-    PublicOrganization,
-    PublicStatCard,
-    PublicStory,
-    PublicLocation,
+import {
+    publicApi,
+    type PublicInitiative,
+    type PublicKPI,
+    type PublicOrganization,
+    type PublicOrgPost,
+    type PublicStatCard,
+    type PublicStory,
+    type PublicLocation,
 } from '../../../services/publicApi'
+import { shade } from './orgShowcase'
+import { FieldFeatureCard, type FeedItem } from './OrgPostTimeline'
 import { OrganizationGlobeErrorBoundary } from './OrganizationGlobeErrorBoundary'
 import { CHART_COLORS } from './organizationChartColors'
 import type { OrganizationFeatureView } from './organizationTypes'
@@ -54,9 +57,7 @@ type Props = {
     globeLocations: { lat: number; lng: number; name: string }[]
     activePopups: OrgLocationPopup[]
     filteredStories: PublicStory[]
-    storyIndex: number
-    setStoryIndex: React.Dispatch<React.SetStateAction<number>>
-    currentStory: PublicStory | undefined
+    focusStoryId?: string | null
     highlightCards: PublicStatCard[]
     filteredInitiatives: PublicInitiative[]
     organization: PublicOrganization
@@ -83,9 +84,7 @@ export function PublicOrganizationFeatureArea(props: Props) {
         globeLocations,
         activePopups,
         filteredStories,
-        storyIndex,
-        setStoryIndex,
-        currentStory,
+        focusStoryId,
         highlightCards,
         filteredInitiatives,
         organization,
@@ -95,6 +94,62 @@ export function PublicOrganizationFeatureArea(props: Props) {
         globeMode,
         onGlobeModeChange,
     } = props
+
+    const [posts, setPosts] = useState<PublicOrgPost[] | null>(null)
+    const [fieldIndex, setFieldIndex] = useState(0)
+    const focusedStory = useRef(false)
+    const accent = shade(brandColor, 0.45)
+
+    useEffect(() => {
+        let cancelled = false
+        publicApi.getOrganizationPosts(slug)
+            .then(rows => { if (!cancelled) setPosts(rows) })
+            .catch(() => { if (!cancelled) setPosts([]) })
+        return () => { cancelled = true }
+    }, [slug])
+
+    const fieldFeed = useMemo(() => {
+        const items: FeedItem[] = []
+        for (const post of posts || []) {
+            items.push({
+                key: `post-${post.id}`,
+                at: new Date(post.published_at).getTime() || 0,
+                title: post.hook,
+                body: post.body,
+                image: post.image_url,
+                kind: 'Post',
+            })
+        }
+        for (const story of filteredStories) {
+            const url = story.media_url
+            const youtubeId = url?.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]
+            items.push({
+                key: `story-${story.id}`,
+                at: new Date(story.date_represented).getTime() || 0,
+                title: story.title,
+                body: story.description,
+                image: story.media_type === 'photo' && url ? url : youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : null,
+                href: story.initiative_slug ? `${orgLinkBase}/${slug}/${story.initiative_slug}/story/${story.id}` : undefined,
+                kind: 'Story',
+            })
+        }
+        return items.sort((a, b) => b.at - a.at)
+    }, [posts, filteredStories, orgLinkBase, slug])
+
+    useEffect(() => { setFieldIndex(0) }, [filteredStories])
+
+    useEffect(() => {
+        if (focusedStory.current || !focusStoryId) return
+        const index = fieldFeed.findIndex(item => item.key === `story-${focusStoryId}`)
+        if (index >= 0) {
+            setFieldIndex(index)
+            focusedStory.current = true
+        }
+    }, [focusStoryId, fieldFeed])
+
+    const fieldCount = fieldFeed.length
+    const safeFieldIndex = Math.min(fieldIndex, Math.max(fieldCount - 1, 0))
+    const currentField = fieldFeed[safeFieldIndex]
 
     return (
         <div className={`w-full md:w-[45%] flex-shrink-0 pt-0 pb-2 md:pb-4 px-2 md:px-0 md:pr-2 ${activeView === 'graph' ? 'h-[72vh]' : 'h-[50vh]'} md:h-auto`}>
@@ -273,23 +328,25 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                 style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
                                             />
                                         </div>
-                                        <h2 className="font-semibold text-foreground">Stories</h2>
+                                        <h2 className="font-semibold text-foreground">Posts & Stories</h2>
                                         <span
                                             className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                             style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
-                                        >{filteredStories.length}</span>
+                                        >{fieldCount}</span>
                                     </div>
-                                    {filteredStories.length > 1 && (
+                                    {fieldCount > 1 && (
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => setStoryIndex(p => p === 0 ? filteredStories.length - 1 : p - 1)}
+                                                type="button"
+                                                onClick={() => setFieldIndex(safeFieldIndex === 0 ? fieldCount - 1 : safeFieldIndex - 1)}
                                                 className="w-8 h-8 md:w-6 md:h-6 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                                             >
                                                 <ChevronLeft className="w-4 h-4 md:w-3.5 md:h-3.5 text-gray-600" />
                                             </button>
-                                            <span className="text-xs text-muted-foreground w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
+                                            <span className="text-xs text-muted-foreground w-12 text-center">{safeFieldIndex + 1}/{fieldCount}</span>
                                             <button
-                                                onClick={() => setStoryIndex(p => (p + 1) % filteredStories.length)}
+                                                type="button"
+                                                onClick={() => setFieldIndex((safeFieldIndex + 1) % fieldCount)}
                                                 className="w-8 h-8 md:w-6 md:h-6 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                                             >
                                                 <ChevronRight className="w-4 h-4 md:w-3.5 md:h-3.5 text-gray-600" />
@@ -297,97 +354,16 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex-1 p-4 pt-0 overflow-hidden flex flex-col">
-                                    {!currentStory ? (
+                                <div className="flex-1 p-4 pt-0 overflow-hidden">
+                                    {!currentField ? (
                                         <div className="h-full flex items-center justify-center text-muted-foreground">
                                             <div className="text-center">
                                                 <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                                <p>No stories yet</p>
+                                                <p>No posts or stories yet</p>
                                             </div>
                                         </div>
                                     ) : (
-                                        <Link
-                                            to={`${orgLinkBase}/${slug}/${currentStory.initiative_slug}?tab=stories`}
-                                            className="flex-1 rounded-2xl overflow-hidden hover:shadow-lg transition-all group relative"
-                                        >
-                                            {(() => {
-                                                const url = currentStory.media_url
-                                                if (url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)) {
-                                                    const ytId = (url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]
-                                                    return (
-                                                        <div className="relative w-full h-full">
-                                                            <img
-                                                                src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
-                                                                alt={currentStory.title}
-                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                            />
-                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                                                    <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                }
-                                                if (url && currentStory.media_type === 'photo') {
-                                                    return (
-                                                        <img
-                                                            src={url}
-                                                            alt={currentStory.title}
-                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                        />
-                                                    )
-                                                }
-                                                if (url && currentStory.media_type === 'video') {
-                                                    // Self-uploaded video: render a muted <video> with preload=metadata
-                                                    // so the browser paints the first frame as a thumbnail. Click is
-                                                    // captured by the parent <Link>; overlay stays pointer-events:none.
-                                                    return (
-                                                        <div className="relative w-full h-full bg-black">
-                                                            <video
-                                                                src={`${url}#t=0.5`}
-                                                                muted
-                                                                playsInline
-                                                                preload="metadata"
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                                <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                                                                    <svg className="w-5 h-5 text-gray-900 ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                }
-                                                return (
-                                                    <div className="w-full h-full flex items-center justify-center bg-white/40">
-                                                        <FileText className="w-16 h-16 text-gray-300" />
-                                                    </div>
-                                                )
-                                            })()}
-                                            {/* Overlay with title */}
-                                            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
-                                                <span className="text-xs font-medium text-white/80 mb-1 block">{currentStory.initiative_title}</span>
-                                                <h3 className="text-lg font-bold text-white">{currentStory.title}</h3>
-                                            </div>
-                                        </Link>
-                                    )}
-
-                                    {/* Story Progress Dots */}
-                                    {filteredStories.length > 1 && (
-                                        <div className="flex justify-center gap-2 mt-3 flex-shrink-0">
-                                            {filteredStories.slice(0, 10).map((_, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => setStoryIndex(idx)}
-                                                    className={`h-2 rounded-full transition-all ${idx === storyIndex ? 'w-6 bg-gray-800' : 'w-2 bg-gray-300 hover:bg-gray-400'
-                                                        }`}
-                                                />
-                                            ))}
-                                            {filteredStories.length > 10 && (
-                                                <span className="text-xs text-muted-foreground ml-1">+{filteredStories.length - 10}</span>
-                                            )}
-                                        </div>
+                                        <FieldFeatureCard item={currentField} brandColor={brandColor} accent={accent} />
                                     )}
                                 </div>
                             </div>

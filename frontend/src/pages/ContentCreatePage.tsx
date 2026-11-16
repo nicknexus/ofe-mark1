@@ -9,13 +9,14 @@ import ContentEngine, { StudioBoot } from '../components/content/ContentEngine'
 import { isStudioComposer } from './studio/studioPaths'
 import StudioHome from './studio/StudioHome'
 import StudioLibrary from './studio/StudioLibrary'
-import { StudioAccounts, StudioCalendar, StudioInsights } from './studio/StudioSoon'
+import { StudioAccounts, StudioCalendar } from './studio/StudioSoon'
+import StudioInsights from './studio/StudioInsights'
 
 const featureCache = new Map<string, { free: boolean; gated: boolean }>()
 
 export default function ContentCreatePage() {
   const { pathname } = useLocation()
-  const { isOwner, activeOrganization } = useTeam()
+  const { isOwner, canUseContentStudio, loading: teamLoading, activeOrganization } = useTeam()
   const orgKey = `${activeOrganization?.id || ''}:${activeOrganization?.is_demo ? 1 : 0}`
   const cachedFeatures = featureCache.get(orgKey)
   const [isFree, setIsFree] = useState(cachedFeatures?.free ?? false)
@@ -40,7 +41,7 @@ export default function ContentCreatePage() {
     return () => { cancelled = true }
   }, [orgKey, activeOrganization?.is_demo])
 
-  if (!featuresLoaded) {
+  if (!featuresLoaded || teamLoading) {
     return isStudioComposer(pathname) ? <StudioBoot /> : (
       <div className="min-h-screen flex items-center justify-center">
         <PageLoader />
@@ -62,7 +63,40 @@ export default function ContentCreatePage() {
     )
   }
 
+  if (!canUseContentStudio) return <StudioLocked />
+
   return <StudioRoutes />
+}
+
+function StudioLocked() {
+  return (
+    <div className="min-h-screen pt-8 pb-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="app-card overflow-hidden">
+          <div className="px-8 pt-10 pb-8">
+            <div className="flex items-start gap-3">
+              <div className="app-icon-tile app-icon-tile-accent mt-0.5">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-[28px] font-semibold tracking-tight text-secondary-900 leading-tight">
+                  Content studio
+                </h1>
+                <p className="text-sm text-secondary-500 mt-2 leading-relaxed max-w-xl">
+                  An admin has to turn on Content studio for you.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="px-8 py-5 border-t border-gray-100 bg-gray-50/60">
+            <Link to="/home" className="app-btn app-btn-secondary app-btn-sm">
+              Back to Nexus
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function StudioRoutes() {

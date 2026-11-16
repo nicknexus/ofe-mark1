@@ -1,19 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft,
     Building2,
-    Check,
-    ChevronDown,
     ChevronRight,
-    MapPin,
-    Target,
-    X,
 } from 'lucide-react'
 import PublicHeaderActions from '../components/public/PublicHeaderActions'
-import FilterPill from '../components/shared/FilterPill'
 import {
     publicApi,
     PublicOrganization,
@@ -27,7 +20,6 @@ import {
     OrganizationStats,
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
-import PublicTagFilter from '../components/public/PublicTagFilter'
 import DateRangePicker from '../components/DateRangePicker'
 import {
     PublicMobileFilterButton,
@@ -38,7 +30,7 @@ import {
     mobileDateSummary,
     mobileMultiSummary,
 } from '../components/public/PublicMobileFilters'
-import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS, publicFilterPillClass } from '../components/public/publicStyles'
+import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS } from '../components/public/publicStyles'
 import { compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { groupMetricsByDefinition } from '../utils/groupMetricsByDefinition'
@@ -47,6 +39,8 @@ import { PublicOrganizationHero } from '../components/public/organization/Public
 import { PublicOrganizationViewToggles } from '../components/public/organization/PublicOrganizationViewToggles'
 import { PublicOrganizationFeatureArea } from '../components/public/organization/PublicOrganizationFeatureArea'
 import { PublicOrganizationRightPanel } from '../components/public/organization/PublicOrganizationRightPanel'
+import { PublicOrganizationScroll } from '../components/public/organization/PublicOrganizationScroll'
+import { parseVideoUrl } from '../utils/videoEmbed'
 
 
 export default function PublicOrganizationPage() {
@@ -67,6 +61,7 @@ export default function PublicOrganizationPage() {
         return map
     }, [tags])
     const [highlightCards, setHighlightCards] = useState<PublicStatCard[]>([])
+    const [problemStatement, setProblemStatement] = useState('')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +72,7 @@ export default function PublicOrganizationPage() {
     const [globeMode, setGlobeMode] = useState<'globe' | 'map'>('globe')
 
     // Story carousel state
-    const [storyIndex, setStoryIndex] = useState(0)
+    const focusStoryId = searchParams.get('story')
     const [evidencePage, setEvidencePage] = useState(0)
     const [heroInitiativePage, setHeroInitiativePage] = useState(0)
 
@@ -85,10 +80,8 @@ export default function PublicOrganizationPage() {
     const [selectedInitiative, setSelectedInitiative] = useState<string>('all')
     const [startDate, setStartDate] = useState<string>('')
     const [endDate, setEndDate] = useState<string>('')
-    const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-    const initiativeBtnRef = useRef<HTMLButtonElement>(null)
     const keyMetricsScrollRef = useRef<HTMLDivElement>(null)
 
     // Mobile filter sheet drafts
@@ -148,31 +141,11 @@ export default function PublicOrganizationPage() {
                     : !!((c?.title || '').trim() || (c?.description || '').trim())
             ).slice(0, 4)
             setHighlightCards(valid)
+            setProblemStatement((ctx?.problem_statement || '').trim())
         } catch (err) {
             setError('Failed to load organization')
         } finally {
             setLoading(false)
-        }
-    }
-
-    // DateRangePicker value adapter
-    const datePickerValue = useMemo(() => {
-        if (startDate && endDate && startDate === endDate) return { singleDate: startDate }
-        if (startDate && endDate) return { startDate, endDate }
-        if (startDate) return { singleDate: startDate }
-        return {}
-    }, [startDate, endDate])
-
-    const handleDateChange = (value: { singleDate?: string; startDate?: string; endDate?: string }) => {
-        if (value.singleDate) {
-            setStartDate(value.singleDate)
-            setEndDate(value.singleDate)
-        } else if (value.startDate && value.endDate) {
-            setStartDate(value.startDate)
-            setEndDate(value.endDate)
-        } else {
-            setStartDate('')
-            setEndDate('')
         }
     }
 
@@ -432,11 +405,8 @@ export default function PublicOrganizationPage() {
 
     // Stories carousel no longer auto-rotates — first story stays pinned
     // until the visitor uses the prev/next chevrons or progress dots.
-    const hasStoryDeepLink = !!searchParams.get('story')
-
     // Reset indices when filters change
     useEffect(() => {
-        setStoryIndex(0)
         setEvidencePage(0)
         setHeroInitiativePage(0)
     }, [selectedInitiative, startDate, endDate, selectedLocationIds, selectedTagIds])
@@ -454,13 +424,7 @@ export default function PublicOrganizationPage() {
         if (view && ['globe', 'stories', 'highlights', 'initiatives', 'graph'].includes(view)) {
             setActiveView(view)
         }
-        if (storyParam) {
-            const idx = stories.findIndex(s => s.id === storyParam)
-            if (idx >= 0) {
-                setStoryIndex(idx)
-                if (!view) setActiveView('stories')
-            }
-        }
+        if (storyParam && !view) setActiveView('stories')
         deepLinkApplied.current = true
     }, [loading, stories, searchParams])
 
@@ -514,19 +478,11 @@ export default function PublicOrganizationPage() {
         setGlobeMode(m)
     }
 
-    const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
     const activeFilterCount =
         (selectedInitiative !== 'all' ? 1 : 0) +
         (startDate || endDate ? 1 : 0) +
         (selectedLocationIds.length > 0 ? 1 : 0) +
         (selectedTagIds.length > 0 ? 1 : 0)
-    const clearFilters = () => {
-        setSelectedInitiative('all')
-        setStartDate('')
-        setEndDate('')
-        setSelectedLocationIds([])
-        setSelectedTagIds([])
-    }
 
     const openMobileFilters = () => {
         setDraftInitiative(selectedInitiative)
@@ -554,8 +510,6 @@ export default function PublicOrganizationPage() {
     }, [draftStartDate, draftEndDate])
 
     // Current story for carousel
-    const currentStory = filteredStories[storyIndex]
-
     // Brand color with fallback
     const brandColor = organization?.brand_color || '#c0dfa1'
 
@@ -888,8 +842,18 @@ export default function PublicOrganizationPage() {
         )
     }
 
+    const featureVideo = parseVideoUrl(organization.hero_video_url)
+    const featureMode: 'image' | 'video' | null = organization.public_hero === 'image' && organization.hero_image_url
+        ? 'image'
+        : organization.public_hero === 'video' && featureVideo
+            ? 'video'
+            : null
+
     return (
-        <div className="min-h-screen md:h-screen flex flex-col font-figtree overflow-auto md:overflow-hidden relative animate-fadeIn">
+        <div className={featureMode
+            ? 'min-h-screen flex flex-col font-figtree overflow-x-clip relative animate-fadeIn'
+            : 'min-h-screen md:h-screen flex flex-col font-figtree overflow-auto md:overflow-hidden relative animate-fadeIn'
+        }>
             <PublicPageBackground brandColor={brandColor} />
 
             {/* Header with Filters */}
@@ -916,84 +880,15 @@ export default function PublicOrganizationPage() {
                             />
                         </div>
 
-                        {/* Center: Filters — desktop only (hidden on phone / PWA) */}
-                        <div className="hidden md:flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
-                            <button
-                                ref={initiativeBtnRef}
-                                type="button"
-                                onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
-                                className={publicFilterPillClass(selectedInitiative !== 'all')}
-                            >
-                                <Target className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 ${selectedInitiative !== 'all' ? 'text-primary-600' : 'text-gray-400'}`} />
-                                <span className="truncate max-w-[100px] md:max-w-[140px]">
-                                    {selectedInitiative === 'all'
-                                        ? 'Program'
-                                        : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
-                                </span>
-                                {selectedInitiative !== 'all' ? (
-                                    <X
-                                        className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400 hover:text-gray-600"
-                                        onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }}
-                                    />
-                                ) : (
-                                    <ChevronDown className={`w-3 h-3 md:w-3.5 md:h-3.5 -mr-0.5 text-gray-400 transition-transform ${showInitiativeDropdown ? 'rotate-180' : ''}`} />
-                                )}
-                            </button>
+                        <div className="flex-1" />
 
-                            <div className="flex-shrink-0">
-                                <DateRangePicker
-                                    value={datePickerValue.singleDate || datePickerValue.startDate ? datePickerValue : undefined}
-                                    onChange={handleDateChange}
-                                    placeholder="Date"
-                                    variant="pill"
-                                />
-                            </div>
-
-                            {dropdownLocations.length > 0 && (
-                                <div className="flex-shrink-0">
-                                    <FilterPill
-                                        icon={MapPin}
-                                        label="Location"
-                                        pluralLabel="locations"
-                                        options={dropdownLocations
-                                            .filter((loc): loc is typeof loc & { id: string } => !!loc.id)
-                                            .map(loc => ({
-                                                id: loc.id,
-                                                name: loc.country ? `${loc.name} · ${loc.country}` : loc.name,
-                                            }))}
-                                        selected={selectedLocationIds}
-                                        onChange={setSelectedLocationIds}
-                                        emptyText="No locations available"
-                                        onOpenChange={(open) => { if (open) setShowInitiativeDropdown(false) }}
-                                    />
-                                </div>
-                            )}
-
-                            <PublicTagFilter
-                                tags={tags}
-                                selectedTagIds={selectedTagIds}
-                                onChange={setSelectedTagIds}
-                                onOpenChange={(open) => { if (open) setShowInitiativeDropdown(false) }}
-                            />
-
-                            {hasActiveFilters && (
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                                >
-                                    <X className="w-3 h-3" /> Clear
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex-1 md:hidden" />
-
-                        {/* Right: mobile filter + desktop Nexus mark */}
+                        {/* Right: filter + Nexus mark */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <PublicMobileFilterButton
                                 activeCount={activeFilterCount}
                                 onClick={openMobileFilters}
+                                label="Filter"
+                                className="md:!flex"
                             />
                             <Link to="/" className="hidden md:flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-lg overflow-hidden">
@@ -1095,135 +990,79 @@ export default function PublicOrganizationPage() {
                 )}
             </PublicMobileFilterSheet>
 
-            {/* Initiative Dropdown Portal */}
-            {showInitiativeDropdown && createPortal(
-                <>
-                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowInitiativeDropdown(false)} />
-                    <div
-                        className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] p-2 min-w-[220px] max-h-72 overflow-y-auto"
-                        style={(() => {
-                            const rect = initiativeBtnRef.current?.getBoundingClientRect()
-                            if (!rect) return {}
-                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 240)) }
-                        })()}
-                    >
-                        <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-gray-100">
-                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Programs</span>
-                            {selectedInitiative !== 'all' && (
-                                <button
-                                    type="button"
-                                    onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
-                                    className="text-xs font-medium text-primary-700 hover:text-primary-800"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
-                            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                                selectedInitiative === 'all' ? 'bg-primary-50' : 'hover:bg-gray-50'
-                            }`}
-                        >
-                            <span className={`w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 ${
-                                selectedInitiative === 'all' ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-300'
-                            }`}>
-                                {selectedInitiative === 'all' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                            </span>
-                            <span className={`text-sm truncate ${selectedInitiative === 'all' ? 'text-primary-800 font-medium' : 'text-gray-700'}`}>
-                                All Programs
-                            </span>
-                        </button>
-                        {initiatives.map(init => {
-                            const checked = selectedInitiative === init.id
-                            return (
-                                <button
-                                    key={init.id}
-                                    type="button"
-                                    onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
-                                    className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                                        checked ? 'bg-primary-50' : 'hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <span className={`w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 ${
-                                        checked ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-300'
-                                    }`}>
-                                        {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                                    </span>
-                                    <span className={`text-sm truncate ${checked ? 'text-primary-800 font-medium' : 'text-gray-700'}`}>
-                                        {init.title}
-                                    </span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </>,
-                document.body
-            )}
-
-
-            <PublicOrganizationHero
-                organization={organization}
-                slug={slug!}
-                orgLinkBase={orgLinkBase}
-                brandColor={brandColor}
-                filteredInitiatives={filteredInitiatives}
-                heroInitiativePage={heroInitiativePage}
-                setHeroInitiativePage={setHeroInitiativePage}
-            />
-
-
-
-            <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                <PublicOrganizationViewToggles
-                    activeView={activeView}
-                    chooseView={chooseView}
-                    highlightCards={highlightCards}
-                />
-                <PublicOrganizationFeatureArea
-                    activeView={activeView}
-                    brandColor={brandColor}
+            {featureMode ? (
+                <PublicOrganizationScroll
+                    organization={organization}
                     slug={slug!}
                     orgLinkBase={orgLinkBase}
-                    filteredLocations={filteredLocations}
+                    brandColor={brandColor}
+                    initiatives={filteredInitiatives}
+                    metrics={filteredMetrics}
                     globeLocations={globeLocations}
-                    activePopups={activePopups}
-                    filteredStories={filteredStories}
-                    storyIndex={storyIndex}
-                    setStoryIndex={setStoryIndex}
-                    currentStory={currentStory}
-                    highlightCards={highlightCards}
-                    filteredInitiatives={filteredInitiatives}
-                    organization={organization}
-                    initiativeChartData={initiativeChartData}
-                    chartInitiatives={chartInitiatives}
-                    isPercentageChart={isPercentageChart}
-                    globeMode={globeMode}
-                    onGlobeModeChange={chooseGlobeMode}
+                    evidence={filteredEvidence}
+                    locations={filteredLocations}
+                    stories={filteredStories}
                 />
-                <PublicOrganizationRightPanel
-                    slug={slug!}
-                    orgLinkBase={orgLinkBase}
-                    brandColor={brandColor}
-                    organization={organization}
-                    filteredInitiatives={filteredInitiatives}
-                    heroInitiativePage={heroInitiativePage}
-                    setHeroInitiativePage={setHeroInitiativePage}
-                    filteredMetrics={filteredMetrics}
-                    keyMetricsScrollRef={keyMetricsScrollRef}
-                    keyMetricsRowPx={keyMetricsRowPx}
-                    allImpactClaims={allImpactClaims}
-                    tagsById={tagsById}
-                    selectedTagIds={selectedTagIds}
-                    setSelectedTagIds={setSelectedTagIds}
-                    filteredEvidence={filteredEvidence}
-                    evidencePage={evidencePage}
-                    setEvidencePage={setEvidencePage}
-                    totalEvidencePages={totalEvidencePages}
-                    displayedEvidence={displayedEvidence}
-                />
-            </main>
+            ) : (
+                <>
+                    <PublicOrganizationHero
+                        organization={organization}
+                        slug={slug!}
+                        orgLinkBase={orgLinkBase}
+                        brandColor={brandColor}
+                        filteredInitiatives={filteredInitiatives}
+                        heroInitiativePage={heroInitiativePage}
+                        setHeroInitiativePage={setHeroInitiativePage}
+                    />
+                    <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+                        <PublicOrganizationViewToggles
+                            activeView={activeView}
+                            chooseView={chooseView}
+                            highlightCards={highlightCards}
+                        />
+                        <PublicOrganizationFeatureArea
+                            activeView={activeView}
+                            brandColor={brandColor}
+                            slug={slug!}
+                            orgLinkBase={orgLinkBase}
+                            filteredLocations={filteredLocations}
+                            globeLocations={globeLocations}
+                            activePopups={activePopups}
+                            filteredStories={filteredStories}
+                            focusStoryId={focusStoryId}
+                            highlightCards={highlightCards}
+                            filteredInitiatives={filteredInitiatives}
+                            organization={organization}
+                            initiativeChartData={initiativeChartData}
+                            chartInitiatives={chartInitiatives}
+                            isPercentageChart={isPercentageChart}
+                            globeMode={globeMode}
+                            onGlobeModeChange={chooseGlobeMode}
+                        />
+                        <PublicOrganizationRightPanel
+                            slug={slug!}
+                            orgLinkBase={orgLinkBase}
+                            brandColor={brandColor}
+                            organization={organization}
+                            filteredInitiatives={filteredInitiatives}
+                            heroInitiativePage={heroInitiativePage}
+                            setHeroInitiativePage={setHeroInitiativePage}
+                            filteredMetrics={filteredMetrics}
+                            keyMetricsScrollRef={keyMetricsScrollRef}
+                            keyMetricsRowPx={keyMetricsRowPx}
+                            allImpactClaims={allImpactClaims}
+                            tagsById={tagsById}
+                            selectedTagIds={selectedTagIds}
+                            setSelectedTagIds={setSelectedTagIds}
+                            filteredEvidence={filteredEvidence}
+                            evidencePage={evidencePage}
+                            setEvidencePage={setEvidencePage}
+                            totalEvidencePages={totalEvidencePages}
+                            displayedEvidence={displayedEvidence}
+                        />
+                    </main>
+                </>
+            )}
 
         </div>
     )

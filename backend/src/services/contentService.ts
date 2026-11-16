@@ -4,6 +4,7 @@ import { openai, isOpenAIConfigured } from '../utils/openai'
 import { composeBrandedPng, parseGraphicAspect, parseGraphicLayout, type GraphicChrome, type GraphicCopy } from '../utils/contentCompose'
 import { masterWriterPrompt, refineMasterPrompt, versionsWriterPrompt } from '../prompts/nexusCopyFramework'
 import { OrgAccessService } from './orgAccessService'
+import { TeamService } from './teamService'
 import { SubscriptionService } from './subscriptionService'
 import {
     ContentChannel,
@@ -366,6 +367,18 @@ function daysAgo(iso?: string | null): number {
     return Math.max(0, (Date.now() - then) / 86400000)
 }
 
+function factScore(source: ContentSource): number {
+    const title = (source.title || '').trim()
+    const description = (source.description || '').trim()
+    const text = `${title} ${description}`
+    let score = 0
+    if (description.length >= 40) score += 36
+    else if (description.length >= 20) score += 18
+    else if (title.length >= 12) score += 10
+    if (/\d/.test(text)) score += 8
+    return score
+}
+
 function uniqueMetrics(kpis: Array<any | null>): any[] {
     const seen = new Set<string>()
     const out: any[] = []
@@ -398,6 +411,9 @@ export class ContentService {
         const features = await SubscriptionService.getFeatureAccess(userId, requestedOrgId)
         if (!features.contentStudio && !org.is_demo) {
             throw httpError(403, 'Impact content is available on Growth and Pro.', 'FEATURE_GATED')
+        }
+        if (!(await TeamService.canUseContentStudio(userId, ctx.organizationId))) {
+            throw httpError(403, 'An admin has to turn on Content studio for you.', 'FORBIDDEN')
         }
 
         return { organizationId: ctx.organizationId, org }
@@ -450,7 +466,7 @@ export class ContentService {
                     supabase
                         .from('evidence')
                         .select(`
-                            id, title, date_represented, initiative_id, file_url, file_type,
+                            id, title, description, date_represented, initiative_id, file_url, file_type,
                             approval_status,
                             evidence_files(file_url, file_type, display_order)
                         `)
@@ -465,7 +481,7 @@ export class ContentService {
                 ? applyDates(
                     supabase
                         .from('stories')
-                        .select('id, title, date_represented, initiative_id, media_url, media_type')
+                        .select('id, title, description, date_represented, initiative_id, media_url, media_type')
                         .eq('media_type', 'photo')
                         .in('initiative_id', initiativeIds)
                         .not('media_url', 'is', null)
@@ -490,6 +506,7 @@ export class ContentService {
                 source_type: 'evidence',
                 source_id: row.id,
                 title: row.title,
+                description: row.description || undefined,
                 date_represented: row.date_represented,
                 image_url,
                 thumb_url: publicThumbUrl(image_url),
@@ -504,6 +521,7 @@ export class ContentService {
                 source_type: 'story',
                 source_id: row.id,
                 title: row.title,
+                description: row.description || undefined,
                 date_represented: row.date_represented,
                 image_url: row.media_url,
                 thumb_url: publicThumbUrl(row.media_url),
@@ -1060,25 +1078,38 @@ email_body: donor-email depth, line breaks, no emojis.`,
             throw httpError(404, 'No photos to share yet. Log visual evidence or a photo story first.', 'NO_SOURCES')
         }
 
-        const evidenceIds = all.filter(s => s.source_type === 'evidence').map(s => s.source_id)
-        const [claimRows, recentTypes] = await Promise.all([
+        const fresh = all.filter(source => !source.used)
+        if (fresh.length === 0) {
+            throw httpError(404, 'Every photo already has a draft. Log a new photo, or open an existing draft.', 'NO_FRESH_SOURCES')
+        }
+
+        const evidenceIds = fresh.filter(s => s.source_type === 'evidence').map(s => s.source_id)
+        const [claimRows, programLift] = await Promise.all([
             evidenceIds.length
                 ? supabase.from('evidence_kpi_updates').select('evidence_id').in('evidence_id', evidenceIds)
                 : Promise.resolve({ data: [] as Array<{ evidence_id: string }>, error: null }),
-            this.loadRecentStoryTypes(organizationId),
+            this.programReachLift(organizationId),
         ])
 
         const withClaims = new Set((claimRows.data || []).map(r => r.evidence_id))
 
-        const scored = all.map(source => {
-            let score = source.used ? 8 : 42
-            score += Math.max(0, 30 - daysAgo(source.date_represented))
-            if (recentTypes.includes('moment') && source.used) score -= 12
-            return { source, story_type: 'moment' as const, score }
+        const scored = fresh.map(source => {
+            let score = 20
+            score += factScore(source)
+            score += Math.max(0, 18 - Math.floor(daysAgo(source.date_represented) / 2))
+            const lift = programLift.byProgram.get(source.initiative_title)
+            if (lift === 'hot') score += programLift.samples >= 5 ? 18 : 6
+            if (lift === 'quiet' && programLift.samples >= 5) score -= 6
+            return { source, score, hot: lift === 'hot' }
         }).sort((a, b) => b.score - a.score)
 
         const pick = scored[0]
-        const why = this.recommendWhy(pick.source, 'moment', withClaims.has(pick.source.source_id), !pick.source.used)
+        const why = this.recommendWhy(
+            pick.source,
+            withClaims.has(pick.source.source_id),
+            factScore(pick.source) > 0,
+            pick.hot,
+        )
         return this.generateMaster(
             userId,
             pick.source.source_type,
@@ -1122,8 +1153,8 @@ email_body: donor-email depth, line breaks, no emojis.`,
         const completion = await openai!.chat.completions.create({
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
-            temperature: 0.7,
-            max_tokens: 450,
+            temperature: 0.4,
+            max_tokens: 900,
             messages: [
                 {
                     role: 'system',
@@ -1371,6 +1402,57 @@ email_body: donor-email depth, line breaks, no emojis.`,
         return mapped
     }
 
+    /** Photo, headline, and program for posts that have been sent. */
+    static async socialInsightContext(organizationId: string, packageIds: string[]): Promise<Map<string, { hook: string | null; imageUrl: string | null; program: string | null }>> {
+        const out = new Map<string, { hook: string | null; imageUrl: string | null; program: string | null }>()
+        if (!packageIds.length) return out
+        const { data, error } = await supabase
+            .from('content_packages')
+            .select('id, hook, media, visual_source_type, visual_source_id')
+            .eq('organization_id', organizationId)
+            .in('id', packageIds)
+        if (error || !data) return out
+        const evidenceIds: string[] = []
+        const storyIds: string[] = []
+        const sourceByPackage = new Map<string, { type: string; id: string }>()
+        for (const row of data as any[]) {
+            const media = Array.isArray(row.media) ? row.media[0] : null
+            const type = row.visual_source_type || media?.source_type
+            const sourceId = row.visual_source_id || media?.source_id
+            const imageUrl = typeof media?.image_url === 'string' ? media.image_url : null
+            out.set(row.id, { hook: row.hook || null, imageUrl, program: null })
+            if ((type === 'evidence' || type === 'story') && typeof sourceId === 'string') {
+                sourceByPackage.set(row.id, { type, id: sourceId })
+                if (type === 'evidence') evidenceIds.push(sourceId)
+                else storyIds.push(sourceId)
+            }
+        }
+        const [evidenceRes, storyRes] = await Promise.all([
+            evidenceIds.length
+                ? supabase.from('evidence').select('id, initiative_id').in('id', evidenceIds)
+                : Promise.resolve({ data: [] as any[] }),
+            storyIds.length
+                ? supabase.from('stories').select('id, initiative_id').in('id', storyIds)
+                : Promise.resolve({ data: [] as any[] }),
+        ])
+        const initiativeBySource = new Map<string, string>()
+        for (const row of [...(evidenceRes.data || []), ...(storyRes.data || [])] as any[]) {
+            if (row.initiative_id) initiativeBySource.set(row.id, row.initiative_id)
+        }
+        const initiativeIds = [...new Set(initiativeBySource.values())]
+        const titles = new Map<string, string>()
+        if (initiativeIds.length) {
+            const { data: programs } = await supabase.from('initiatives').select('id, title').in('id', initiativeIds)
+            for (const row of (programs || []) as any[]) if (row.title) titles.set(row.id, row.title)
+        }
+        for (const [packageId, source] of sourceByPackage) {
+            const current = out.get(packageId)
+            const initiativeId = initiativeBySource.get(source.id)
+            if (current && initiativeId) current.program = titles.get(initiativeId) || null
+        }
+        return out
+    }
+
     /**
      * Stores one Upload Post send on content_posts via overlay.upload_post.
      * Channel regeneration must not delete these rows.
@@ -1401,6 +1483,8 @@ email_body: donor-email depth, line breaks, no emojis.`,
             error: input.error || null,
             requestId: input.requestId || null,
             jobId: input.jobId || null,
+            platformPostId: null,
+            title: 'Post',
             sentAt: input.sentAt,
             scheduledAt: input.scheduledAt || null,
         }
@@ -2051,30 +2135,48 @@ email_body: donor-email depth, line breaks, no emojis.`,
         return keys
     }
 
-    private static async loadRecentStoryTypes(organizationId: string): Promise<ContentStoryType[]> {
-        const { data, error } = await supabase
-            .from('content_packages')
-            .select('story_type, created_at')
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(8)
-        if (error || !data) return []
-        return data.map(row => row.story_type).filter(Boolean) as ContentStoryType[]
+    private static async programReachLift(organizationId: string): Promise<{ byProgram: Map<string, 'hot' | 'quiet'>; samples: number }> {
+        const empty = { byProgram: new Map<string, 'hot' | 'quiet'>(), samples: 0 }
+        try {
+            const { posts } = await UploadPostService.publishedPostMetrics(organizationId)
+            if (!posts.length) return empty
+            const context = await this.socialInsightContext(organizationId, posts.map(post => post.packageId))
+            const grouped = new Map<string, number[]>()
+            for (const post of posts) {
+                const program = context.get(post.packageId)?.program
+                if (!program || post.reach == null) continue
+                const list = grouped.get(program) || []
+                list.push(post.reach)
+                grouped.set(program, list)
+            }
+            const all = [...grouped.values()].flat()
+            if (grouped.size < 2 || !all.length) return { byProgram: empty.byProgram, samples: all.length }
+            const avg = all.reduce((sum, value) => sum + value, 0) / all.length
+            const byProgram = new Map<string, 'hot' | 'quiet'>()
+            for (const [name, values] of grouped) {
+                const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+                if (mean > avg) byProgram.set(name, 'hot')
+                else if (mean < avg) byProgram.set(name, 'quiet')
+            }
+            return { byProgram, samples: all.length }
+        } catch {
+            return empty
+        }
     }
 
     private static recommendWhy(
         source: ContentSource,
-        storyType: ContentStoryType,
         hasClaim: boolean,
-        unused: boolean
+        described: boolean,
+        programHot: boolean
     ): string {
-        const bits: string[] = []
-        if (unused) bits.push('it has not been used in a post yet')
+        const bits: string[] = ['it has not been used in a post yet']
+        if (described) bits.push('its title and description have the facts')
         if (daysAgo(source.date_represented) <= 21) bits.push('it is recent')
         if (hasClaim) bits.push('it has a connected result')
-        if (storyType === 'journey') bits.push('it can show people over time')
-        if (storyType === 'glance') bits.push('it can lead with a number')
-        if (bits.length === 0) bits.push(`it is a strong ${storyType} from ${source.initiative_title}`)
+        if (programHot && source.initiative_title && source.initiative_title !== 'Program') {
+            bits.push(`${source.initiative_title} posts are reaching more people`)
+        }
         return `Recommended because ${bits.join(', ')}.`
     }
 

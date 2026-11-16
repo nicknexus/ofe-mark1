@@ -42,6 +42,65 @@ function accountConnected(value: unknown): { connected: boolean; label: string |
 const BASE = 'https://api.upload-post.com'
 let accountCache: { at: number; value: UploadPostAccount } | null = null
 let uploadCache: { at: number; username: string; rows: UploadReceipt[] } | null = null
+let analyticsCache: { key: string; at: number; value: SocialPlatformStats[] } | null = null
+let postMetricsCache: { username: string; at: number; value: { posts: SocialPostMetrics[]; removed: number } } | null = null
+
+export interface SocialPlatformStats {
+    platform: 'instagram' | 'facebook' | 'linkedin'
+    error: string | null
+    followers: number | null
+    reach: number | null
+    views: number | null
+    likes: number | null
+    comments: number | null
+    shares: number | null
+    saves: number | null
+    series: { date: string; reach: number }[]
+}
+
+function metric(row: any, key: string): number | null {
+    const value = row?.[key]
+    return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function readPlatformStats(platform: SocialPlatformStats['platform'], row: any): SocialPlatformStats {
+    if (!row || typeof row !== 'object' || typeof row.message === 'string' || typeof row.error === 'string') {
+        return {
+            platform,
+            error: (typeof row?.message === 'string' && row.message) || (typeof row?.error === 'string' && row.error) || 'No numbers for this account yet.',
+            followers: null,
+            reach: null,
+            views: null,
+            likes: null,
+            comments: null,
+            shares: null,
+            saves: null,
+            series: [],
+        }
+    }
+    return {
+        platform,
+        error: null,
+        followers: metric(row, 'followers'),
+        reach: metric(row, 'reach'),
+        views: metric(row, 'views') ?? metric(row, 'impressions'),
+        likes: metric(row, 'likes'),
+        comments: metric(row, 'comments'),
+        shares: metric(row, 'shares'),
+        saves: metric(row, 'saves'),
+        series: readReachSeries(row),
+    }
+}
+
+function readReachSeries(row: any): { date: string; reach: number }[] {
+    const list = Array.isArray(row?.reach_timeseries) ? row.reach_timeseries : []
+    return list
+        .map((point: any) => ({
+            date: typeof point?.date === 'string' ? point.date.slice(0, 10) : '',
+            reach: typeof point?.value === 'number' && Number.isFinite(point.value) ? point.value : 0,
+        }))
+        .filter((point: { date: string }) => /^\d{4}-\d{2}-\d{2}$/.test(point.date))
+}
 
 const EXTERNAL_ID = /^pkg_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(instagram|facebook|linkedin)_(.+)$/i
 
@@ -54,8 +113,30 @@ export interface UploadReceipt {
     error: string | null
     requestId: string | null
     jobId: string | null
+    platformPostId: string | null
+    title: string
     sentAt: string
     scheduledAt: string | null
+}
+
+export interface SocialPostMetrics {
+    platform: 'instagram' | 'facebook' | 'linkedin'
+    packageId: string
+    title: string
+    postUrl: string | null
+    sentAt: string
+    reach: number | null
+    views: number | null
+    likes: number | null
+    comments: number | null
+    shares: number | null
+    saves: number | null
+}
+
+function postTitle(value: unknown): string {
+    if (typeof value !== 'string') return 'Post'
+    const line = value.replace(/\r/g, '').split('\n').find(part => part.trim())
+    return (line || 'Post').trim().slice(0, 120)
 }
 
 function parseUploads(body: any): UploadReceipt[] {
@@ -83,6 +164,8 @@ function parseUploads(body: any): UploadReceipt[] {
             error: typeof row?.error_message === 'string' ? row.error_message : null,
             requestId: typeof row?.request_id === 'string' ? row.request_id : null,
             jobId: typeof row?.job_id === 'string' ? row.job_id : null,
+            platformPostId: row?.platform_post_id != null && String(row.platform_post_id) ? String(row.platform_post_id) : null,
+            title: postTitle(row?.post_title),
             sentAt: typeof row?.upload_timestamp === 'string' ? row.upload_timestamp : new Date().toISOString(),
             scheduledAt,
         })
@@ -214,6 +297,78 @@ export class UploadPostService {
 
     static clearUploadCache(): void {
         uploadCache = null
+        postMetricsCache = null
+    }
+
+    /** Account totals for the connected networks. Cached for five minutes. */
+    static async profileAnalytics(organizationId: string, platforms: Array<typeof CONNECT_PLATFORMS[number]>): Promise<SocialPlatformStats[]> {
+        const username = this.profileUsername(organizationId)
+        const key = `${username}:${platforms.join(',')}`
+        if (analyticsCache && analyticsCache.key === key && Date.now() - analyticsCache.at < 5 * 60_000) {
+            return analyticsCache.value
+        }
+        if (!platforms.length) return []
+        const body = await this.request(`/api/analytics/${encodeURIComponent(username)}?platforms=${platforms.join(',')}`)
+        const stats = platforms.map(platform => readPlatformStats(platform, body?.[platform]))
+        analyticsCache = { key, at: Date.now(), value: stats }
+        return stats
+    }
+
+    /**
+     * Live metrics for posts that are still on the network.
+     * A deleted post comes back as an error and is counted, not shown.
+     */
+    static async publishedPostMetrics(organizationId: string): Promise<{ posts: SocialPostMetrics[]; removed: number }> {
+        const username = this.profileUsername(organizationId)
+        if (postMetricsCache && postMetricsCache.username === username && Date.now() - postMetricsCache.at < 5 * 60_000) {
+            return postMetricsCache.value
+        }
+        const uploads = await this.uploadsForProfile(username)
+        const published = uploads.filter(row => row.status === 'published' && row.platformPostId)
+        const posts: SocialPostMetrics[] = []
+        let removed = 0
+        for (const row of published.slice(0, 8)) {
+            const metrics = await this.livePostMetrics(username, row.platform, row.platformPostId as string)
+            if (!metrics) {
+                removed += 1
+                continue
+            }
+            posts.push({
+                platform: row.platform,
+                packageId: row.packageId,
+                title: row.title,
+                postUrl: row.postUrl,
+                sentAt: row.sentAt,
+                ...metrics,
+            })
+        }
+        const value = { posts, removed }
+        postMetricsCache = { username, at: Date.now(), value }
+        return value
+    }
+
+    private static async livePostMetrics(
+        username: string,
+        platform: SocialPostMetrics['platform'],
+        platformPostId: string,
+    ): Promise<Pick<SocialPostMetrics, 'reach' | 'views' | 'likes' | 'comments' | 'shares' | 'saves'> | null> {
+        const params = new URLSearchParams({
+            platform_post_id: platformPostId,
+            platform,
+            user: username,
+        })
+        const body = await this.request(`/api/uploadposts/post-analytics?${params.toString()}`)
+        const row = body?.platforms?.[platform]
+        if (!row || row.post_metrics_error || !row.post_metrics) return null
+        const numbers = row.post_metrics
+        return {
+            reach: metric(numbers, 'reach'),
+            views: metric(numbers, 'views') ?? metric(numbers, 'impressions'),
+            likes: metric(numbers, 'likes'),
+            comments: metric(numbers, 'comments'),
+            shares: metric(numbers, 'shares'),
+            saves: metric(numbers, 'saves'),
+        }
     }
 
     static async disconnect(organizationId: string, platform: typeof CONNECT_PLATFORMS[number]): Promise<{ removedProfile: boolean }> {

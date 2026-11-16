@@ -26,7 +26,7 @@ interface UpsertInput {
 const YT_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
 const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
 
-function sanitizeFeaturedVideoUrl(raw: unknown): string {
+export function sanitizeFeaturedVideoUrl(raw: unknown): string {
     if (typeof raw !== 'string') return '';
     const trimmed = raw.trim();
     if (!trimmed) return '';

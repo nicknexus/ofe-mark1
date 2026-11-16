@@ -37,7 +37,7 @@ export function PublicOrganizationViewToggles({ activeView, chooseView, highligh
                         }`}
                 >
                     <BookOpen className="w-3.5 h-3.5" />
-                    <span>Stories</span>
+                    <span>Posts & Stories</span>
                 </button>
                 {highlightCards.length > 0 && (
                     <button
@@ -99,7 +99,7 @@ export function PublicOrganizationViewToggles({ activeView, chooseView, highligh
                         <BookOpen className="w-5 h-5" />
                     </button>
                     <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100]">
-                        Stories
+                        Posts & Stories
                     </div>
                 </div>
                 {highlightCards.length > 0 && (

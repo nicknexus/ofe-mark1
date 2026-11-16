@@ -27,6 +27,13 @@ export interface PublicOrganization {
     slug: string;
     description?: string;
     logo_url?: string;
+    statement?: string;
+    brand_color?: string;
+    donation_url?: string;
+    website_url?: string;
+    public_hero?: 'classic' | 'image' | 'video';
+    hero_image_url?: string | null;
+    hero_video_url?: string | null;
     created_at?: string;
     is_demo?: boolean; // Frontend uses this to render a DEMO banner on shared demo pages
 }
@@ -370,8 +377,20 @@ export class PublicService {
             kpiCount = kCount || 0;
         }
 
+        const hero = await (supabase as any)
+            .from('organizations')
+            .select('public_hero, hero_image_url, hero_video_url')
+            .eq('id', org.id)
+            .maybeSingle();
+        const heroRow = hero.error ? null : hero.data;
+
         return {
-            organization: org,
+            organization: {
+                ...org,
+                public_hero: heroRow?.public_hero || 'classic',
+                hero_image_url: heroRow?.hero_image_url || null,
+                hero_video_url: heroRow?.hero_video_url || null,
+            },
             stats: {
                 initiatives: initiativeIds.length,
                 locations: locationCount,
@@ -719,6 +738,41 @@ export class PublicService {
                 .map((c: any) => ({ ...c, tag_id: tagByClaim[c.id] || null })),
             tag_ids: tagsByEv[e.id] || [],
         }));
+    }
+
+    /** Published Content Studio posts. A private org or a missing table returns nothing. */
+    static async getOrganizationPosts(orgSlug: string): Promise<Array<{
+        id: string
+        hook: string
+        body: string
+        cta: string | null
+        image_url: string | null
+        published_at: string
+    }>> {
+        const found = await this.getOrganizationBySlug(orgSlug);
+        if (!found) return [];
+        const { data, error } = await supabase
+            .from('content_packages')
+            .select('id, hook, body, cta, media, published_at')
+            .eq('organization_id', found.organization.id)
+            .not('published_at', 'is', null)
+            .order('published_at', { ascending: false })
+            .limit(60);
+        if (error) {
+            if (error.code === '42P01' || /does not exist|schema cache/i.test(error.message)) return [];
+            throw new Error(`Failed to fetch posts: ${error.message}`);
+        }
+        return (data || []).map((row: any) => {
+            const media = Array.isArray(row.media) ? row.media[0] : null;
+            return {
+                id: row.id,
+                hook: row.hook || 'Update',
+                body: row.body || '',
+                cta: row.cta || null,
+                image_url: typeof media?.image_url === 'string' ? media.image_url : null,
+                published_at: row.published_at,
+            };
+        });
     }
 
     // ============================================

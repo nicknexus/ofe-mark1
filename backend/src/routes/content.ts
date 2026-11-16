@@ -562,6 +562,35 @@ router.get('/social/account', authenticateUser, async (req: AuthenticatedRequest
     }
 })
 
+router.get('/social/insights', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, req.headers['x-organization-id'] as string | undefined)
+        const connections = await UploadPostService.connections(organizationId).catch(() => ({} as Record<string, { connected: boolean; label: string | null }>))
+        const platforms = (['instagram', 'facebook', 'linkedin'] as const).filter(platform => connections[platform]?.connected)
+        const stats = await UploadPostService.profileAnalytics(organizationId, platforms)
+        const { posts, removed } = await UploadPostService.publishedPostMetrics(organizationId)
+        const context = await ContentService.socialInsightContext(organizationId, posts.map(post => post.packageId))
+        res.json({
+            platforms: stats.map(row => ({
+                ...row,
+                label: row.platform.charAt(0).toUpperCase() + row.platform.slice(1),
+            })),
+            posts: posts.map(post => {
+                const extra = context.get(post.packageId)
+                return {
+                    ...post,
+                    title: extra?.hook || post.title,
+                    imageUrl: extra?.imageUrl || null,
+                    program: extra?.program || null,
+                }
+            }),
+            removed,
+        })
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
 router.post('/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined

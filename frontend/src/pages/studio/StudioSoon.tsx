@@ -10,8 +10,6 @@ import { SocialMarks, StudioFrame, StudioPanel, STUDIO_PLATFORMS, socialSendLabe
 import { useStudioLibrary } from './useStudioLibrary'
 import { useSocialAccount } from './useSocialAccount'
 
-const METRICS = ['Reach', 'Engagements', 'Shares', 'Top platform']
-
 type TimelineFilter = 'all' | 'draft' | 'public'
 
 function dayKey(value: string) {
@@ -171,34 +169,6 @@ function ScheduledList({ packages }: { packages: { id: string; hook?: string | n
         </div>
       )}
     </StudioPanel>
-  )
-}
-
-export function StudioInsights() {
-  const { account, ready } = useSocialAccount()
-  return (
-    <StudioFrame
-      title="Insights"
-      subtitle="Reach, likes, and comments from the accounts you connect."
-    >
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {METRICS.map(label => (
-          <StudioPanel key={label} className="px-4 py-4">
-            <p className="text-[13px] text-secondary-500">{label}</p>
-            <p className="mt-2 font-fraunces text-[32px] leading-none text-[#1C2B24]">–</p>
-            <p className="mt-2 text-[12px] text-secondary-400">After you connect</p>
-          </StudioPanel>
-        ))}
-      </div>
-      <StudioPanel className="mt-4 px-5 py-8">
-        <p className="text-[15px] font-semibold text-[#1C2B24]">Content performance</p>
-        <p className="mt-1 text-sm text-secondary-500 max-w-lg leading-relaxed">
-          {ready && account?.configured
-            ? `Plan ${account.plan || 'free'}: ${account.usage.limit ?? 10} uploads a month. Per-post numbers wait until a post has actually published.`
-            : 'Account totals show up here first. Per-post numbers wait until a post has published and we have its request id.'}
-        </p>
-      </StudioPanel>
-    </StudioFrame>
   )
 }
 

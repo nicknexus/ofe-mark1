@@ -17,6 +17,9 @@ export interface PublicOrganization {
  statement?: string
  logo_url?: string
  brand_color?: string
+ public_hero?: 'classic' | 'image' | 'video'
+ hero_image_url?: string | null
+ hero_video_url?: string | null
  donation_url?: string
  website_url?: string
  created_at?: string
@@ -118,6 +121,15 @@ export interface PublicStory {
  beneficiary_groups?: PublicBeneficiaryGroup[]
  created_at?: string
  tag_ids?: string[]
+}
+
+export interface PublicOrgPost {
+ id: string
+ hook: string
+ body: string
+ cta: string | null
+ image_url: string | null
+ published_at: string
 }
 
 export interface PublicEvidenceFile {
@@ -473,6 +485,10 @@ class PublicApiService {
  async getOrganizationEvidence(orgSlug: string, limit?: number): Promise<PublicEvidence[]> {
  const params = limit ? `?limit=${limit}` : ''
  return this.request<PublicEvidence[]>(`/organizations/${orgSlug}/evidence${params}`)
+ }
+
+ async getOrganizationPosts(orgSlug: string): Promise<PublicOrgPost[]> {
+ return this.request<PublicOrgPost[]>(`/organizations/${orgSlug}/posts`)
  }
 
  async getOrganizationContext(orgSlug: string): Promise<PublicOrganizationContext | null> {

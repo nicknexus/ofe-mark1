@@ -157,13 +157,15 @@ STORY TYPE
 ${storyTypeBrief(storyType)}
 
 TASK
-Write one short master. Essence only. Channels will expand this later.
-No emojis. Never use em dashes. Never invent.
+Write one master post from the logged title and description. The photo is the picture. It is not a substitute for the words.
+No emojis. Never use em dashes. Never invent a person, place, number, or outcome that is not in the facts.
+
+The title and description are the source of truth. Every concrete fact in them must appear in the post, rewritten so it reads like a post, not a log. That includes who, where, what they did, what changed, and any number. Do not drop a fact to keep it short. Do not add a fact that is not there.
+If Connected claims include a real number or result, include it too. If there are no connected claims, do not invent a count.
+
 Return a JSON object with keys: hook, body_lines, cta.
-hook: 3-8 words. Curiosity, not a summary.
-body_lines: 2-4 short sentences as an array, one sentence per entry. Use "" between sentences for a blank line. 40-70 words total. Never one paragraph.
-What happened, one concrete detail, why it matters.
-If Connected claims include a real number or result, weave that into a line naturally. One fact, not a dump. If there are no connected claims, do not invent a count.
+hook: 3-10 words. Specific. It can use a fact from the title.
+body_lines: 2-6 short sentences as an array, one sentence per entry. Use "" between sentences for a blank line. Long enough to keep the facts, usually 60-140 words. Never one paragraph.
 cta: 3-8 words. If nothing fits, "Learn more about our work."`
 }
 

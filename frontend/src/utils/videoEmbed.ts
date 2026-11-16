@@ -75,6 +75,54 @@ export function parseVideoUrl(raw: string | null | undefined): ParsedVideo | nul
  return null
 }
 
+/** Looping, chromeless embed for a hero background. Sound stays off until the visitor hits play. */
+export function backgroundEmbedUrl(video: ParsedVideo, sound = false): string {
+    if (video.provider === 'youtube') {
+        const params = new URLSearchParams({
+            autoplay: '1',
+            mute: sound ? '0' : '1',
+            controls: '0',
+            loop: '1',
+            playlist: video.id,
+            modestbranding: '1',
+            rel: '0',
+            playsinline: '1',
+            disablekb: '1',
+            fs: '0',
+            iv_load_policy: '3',
+            enablejsapi: '1',
+        })
+        if (typeof window !== 'undefined') params.set('origin', window.location.origin)
+        return `https://www.youtube-nocookie.com/embed/${video.id}?${params}`
+    }
+    const params = new URLSearchParams({
+        autoplay: '1',
+        muted: sound ? '0' : '1',
+        loop: '1',
+        autopause: '0',
+        controls: '0',
+        background: sound ? '0' : '1',
+    })
+    const join = video.embedUrl.includes('?') ? '&' : '?'
+    return `${video.embedUrl}${join}${params}`
+}
+
+/** Embed that starts when the visitor hits play. */
+export function playerEmbedUrl(video: ParsedVideo): string {
+    if (video.provider === 'youtube') {
+        const params = new URLSearchParams({
+            autoplay: '1',
+            rel: '0',
+            modestbranding: '1',
+            playsinline: '1',
+        })
+        return `https://www.youtube-nocookie.com/embed/${video.id}?${params}`
+    }
+    const params = new URLSearchParams({ autoplay: '1' })
+    const join = video.embedUrl.includes('?') ? '&' : '?'
+    return `${video.embedUrl}${join}${params}`
+}
+
 export function isValidVideoUrl(raw: string | null | undefined): boolean {
  return parseVideoUrl(raw) !== null
 }

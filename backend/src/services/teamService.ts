@@ -317,6 +317,17 @@ export class TeamService {
         return await PlatformAdminService.canAccessOrg(userId, organizationId);
     }
 
+    /** Content studio. Owners, admins, and platform admins always. Team members only with the grant. */
+    static async canUseContentStudio(userId: string, organizationId: string): Promise<boolean> {
+        if (await this.isUserOwnerOfOrganization(userId, organizationId)) return true;
+        const membership = await this.getUserTeamMembership(userId, organizationId);
+        if (membership && resolveMemberType(membership.member_type) === 'admin') return true;
+        if (await PlatformAdminService.canAccessOrg(userId, organizationId)) return true;
+        if (!membership) return false;
+        const blob = normalizePermissionsBlob((membership as any).permissions);
+        return grantsAllow(blob.grants, 'content_studio', 'edit');
+    }
+
     /**
      * Return all organizations owned by a user (including demo / sandbox orgs).
      * Platform admins can own many demos alongside their real org.
@@ -333,6 +344,9 @@ export class TeamService {
         statement?: string;
         website_url?: string;
         donation_url?: string;
+        public_hero?: 'classic' | 'image' | 'video';
+        hero_image_url?: string | null;
+        hero_video_url?: string | null;
     }>> {
         const { data, error } = await supabase
             .from('organizations')
@@ -406,6 +420,9 @@ export class TeamService {
         statement?: string;
         website_url?: string;
         donation_url?: string;
+        public_hero?: 'classic' | 'image' | 'video';
+        hero_image_url?: string | null;
+        hero_video_url?: string | null;
     }>> {
         const orgs: Array<{
             id: string;
@@ -422,6 +439,9 @@ export class TeamService {
             statement?: string;
             website_url?: string;
             donation_url?: string;
+            public_hero?: 'classic' | 'image' | 'video';
+            hero_image_url?: string | null;
+            hero_video_url?: string | null;
         }> = [];
 
         // Get ALL owned organizations (admins can own a real org + many demos)
@@ -441,7 +461,10 @@ export class TeamService {
                 demo_public_share: ownedOrg.demo_public_share,
                 statement: ownedOrg.statement,
                 website_url: ownedOrg.website_url,
-                donation_url: ownedOrg.donation_url
+                donation_url: ownedOrg.donation_url,
+                public_hero: ownedOrg.public_hero,
+                hero_image_url: ownedOrg.hero_image_url,
+                hero_video_url: ownedOrg.hero_video_url,
             });
         }
 
@@ -474,7 +497,10 @@ export class TeamService {
                         demo_public_share: org.demo_public_share,
                         statement: org.statement,
                         website_url: org.website_url,
-                        donation_url: org.donation_url
+                        donation_url: org.donation_url,
+                        public_hero: org.public_hero,
+                        hero_image_url: org.hero_image_url,
+                        hero_video_url: org.hero_video_url,
                     });
                 }
             }
@@ -539,6 +565,9 @@ export class TeamService {
         statement?: string;
         website_url?: string;
         donation_url?: string;
+        public_hero?: 'classic' | 'image' | 'video';
+        hero_image_url?: string | null;
+        hero_video_url?: string | null;
     } | null> {
         const { data, error } = await supabase
             .from('organizations')

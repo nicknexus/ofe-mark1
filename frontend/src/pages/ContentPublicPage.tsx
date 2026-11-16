@@ -8,6 +8,7 @@ import { notify } from '../lib/notify'
 import { apiService } from '../services/api'
 import { OrganizationContext } from '../types'
 import { easeOut, fadeUp, staggerContainer } from '../components/timeline/motion'
+import { PublicHeroSettings } from '../components/share/PublicHeroSettings'
 
 const DEFAULT_BRAND = '#c0dfa1'
 
@@ -227,6 +228,13 @@ export default function ContentPublicPage() {
             </ul>
           </motion.div>
         </motion.div>
+
+        <PublicHeroSettings
+          org={org}
+          canEdit={canEditShare}
+          storyVideo={orgContext?.featured_video_url}
+          onSaved={refreshPermissions}
+        />
       </div>
     </motion.div>
   )

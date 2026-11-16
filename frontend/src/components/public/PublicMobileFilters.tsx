@@ -30,10 +30,12 @@ export function mobileMultiSummary(count: number, unit = 'selected'): string | u
 export function PublicMobileFilterButton({
   activeCount,
   onClick,
+  label,
   className = '',
 }: {
   activeCount: number
   onClick: () => void
+  label?: string
   className?: string
 }) {
   return (
@@ -42,11 +44,12 @@ export function PublicMobileFilterButton({
       onClick={onClick}
       whileTap={tapScale}
       aria-label={activeCount > 0 ? `Filters, ${activeCount} active` : 'Filters'}
-      className={`relative md:hidden flex-shrink-0 w-9 h-9 rounded-xl border border-gray-200 bg-white text-gray-600 active:bg-gray-50 flex items-center justify-center ${className}`}
+      className={`relative md:hidden flex-shrink-0 ${label ? 'h-9 px-3 gap-1.5 w-auto' : 'w-9 h-9'} rounded-xl border border-gray-200 bg-white text-gray-700 active:bg-gray-50 inline-flex items-center justify-center ${className}`}
     >
       <SlidersHorizontal className="w-4 h-4" />
+      {label && <span className="text-[13px] font-semibold">{label}</span>}
       {activeCount > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-600 text-white text-[10px] font-semibold flex items-center justify-center">
+        <span className={`${label ? 'ml-0.5 min-w-[18px] h-[18px] px-1' : 'absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1'} rounded-full bg-primary-600 text-white text-[10px] font-semibold inline-flex items-center justify-center`}>
           {activeCount}
         </span>
       )}
@@ -73,14 +76,14 @@ export function PublicMobileFilterSheet({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] md:hidden">
+        <div className="fixed inset-0 z-[200]">
           <motion.div
             className="absolute inset-0 bg-black/40"
             onClick={onClose}
             {...sheetBackdrop}
           />
           <motion.div
-            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-app-modal border-t border-gray-100 max-h-[85dvh] flex flex-col safe-area-pb"
+            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-app-modal border-t border-gray-100 max-h-[85dvh] flex flex-col safe-area-pb md:bottom-auto md:top-16 md:right-4 md:left-auto md:w-[400px] md:rounded-3xl md:border"
             {...sheetPanel}
           >
             <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-gray-200 flex-shrink-0" />

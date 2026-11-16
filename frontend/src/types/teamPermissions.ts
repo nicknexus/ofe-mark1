@@ -12,6 +12,7 @@ export type PermissionResource =
  | 'tags'
  | 'reports'
  | 'analytics'
+ | 'content_studio'
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'upload' | 'export'
 
@@ -65,6 +66,7 @@ export interface TeamMemberPermissionToggles {
  editTags: boolean
  editInitiatives: boolean
  editLocations: boolean
+ contentStudio: boolean
  deleteContent: boolean
  exportReports: boolean
 }
@@ -85,6 +87,7 @@ export const defaultTeamMemberToggles: TeamMemberPermissionToggles = {
  editTags: false,
  editInitiatives: false,
  editLocations: false,
+ contentStudio: false,
  deleteContent: false,
  exportReports: false,
 }
@@ -133,6 +136,9 @@ export function togglesToGrants(toggles: TeamMemberPermissionToggles): Permissio
  if (toggles.editLocations) {
  grants.push({ resource: 'locations', action: 'edit', allowed: true })
  }
+ if (toggles.contentStudio) {
+ grants.push({ resource: 'content_studio', action: 'edit', allowed: true })
+ }
 
  if (toggles.deleteContent) {
  grants.push({ resource: 'evidence', action: 'delete', allowed: true })
@@ -178,6 +184,7 @@ export function grantsToToggles(grants: PermissionGrant[]): TeamMemberPermission
  editTags: has('tags', 'edit'),
  editInitiatives: has('initiatives', 'edit'),
  editLocations: has('locations', 'edit'),
+ contentStudio: has('content_studio', 'edit'),
  deleteContent:
  has('evidence', 'delete') ||
  has('initiatives', 'delete') ||

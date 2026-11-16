@@ -1451,6 +1451,9 @@ export default function ContentEngine() {
                   </div>
                 </div>
                 <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-3 flex flex-col gap-3">
+                  {master.why && (
+                    <p className="text-[12px] leading-snug text-[#2A6B4A]">{master.why}</p>
+                  )}
                   <label className="block shrink-0">
                     <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Headline</span>
                     <GrowField

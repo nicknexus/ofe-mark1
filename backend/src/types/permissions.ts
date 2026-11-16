@@ -14,6 +14,7 @@ export type PermissionResource =
     | 'org_settings'
     | 'org_context'
     | 'branding'
+    | 'content_studio'
     | 'billing'
     | 'subscription'
     | 'ownership'

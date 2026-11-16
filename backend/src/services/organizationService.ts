@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { SubscriptionService } from './subscriptionService';
 import { Organization } from '../types';
+import { sanitizeFeaturedVideoUrl } from './organizationContextService';
 
 export class OrganizationService {
     // Generate slug from organization name
@@ -180,6 +181,20 @@ export class OrganizationService {
         }
 
         // Generate slug if name is being updated, with collision detection
+        if ('public_hero' in updates && updates.public_hero !== 'classic' && updates.public_hero !== 'image' && updates.public_hero !== 'video') {
+            delete updates.public_hero;
+        }
+        if ('hero_video_url' in updates) {
+            const raw = updates.hero_video_url;
+            const clean = sanitizeFeaturedVideoUrl(raw);
+            if (typeof raw === 'string' && raw.trim() && !clean) {
+                const err = new Error('Use a YouTube or Vimeo link.');
+                (err as any).status = 400;
+                throw err;
+            }
+            updates.hero_video_url = clean || null;
+        }
+
         if (updates.name) {
             let baseSlug = this.generateSlug(updates.name);
             let slug = baseSlug;
@@ -258,6 +273,43 @@ export class OrganizationService {
 
         const organization = await this.update(orgId, { logo_url: urlData.publicUrl }, userId);
         return { logo_url: urlData.publicUrl, organization };
+    }
+
+    static async replaceHeroImage(
+        orgId: string,
+        userId: string,
+        buffer: Buffer,
+        mimetype: string,
+        ext: string
+    ): Promise<{ hero_image_url: string; organization: Organization }> {
+        const { data: currentOrg } = await supabase
+            .from('organizations')
+            .select('hero_image_url')
+            .eq('id', orgId)
+            .maybeSingle();
+
+        const filePath = `heroes/${orgId}/${Date.now()}-${Math.round(Math.random() * 1E9)}-hero${ext}`;
+        const { error: uploadError } = await supabase.storage
+            .from('evidence-files')
+            .upload(filePath, buffer, { contentType: mimetype, upsert: false });
+        if (uploadError) throw new Error('Failed to upload hero image');
+
+        const { data: urlData } = supabase.storage.from('evidence-files').getPublicUrl(filePath);
+        if (!urlData?.publicUrl) throw new Error('Failed to generate hero image URL');
+
+        if (currentOrg?.hero_image_url) {
+            try {
+                const oldUrlParts = currentOrg.hero_image_url.split('/evidence-files/');
+                if (oldUrlParts.length === 2) {
+                    await supabase.storage.from('evidence-files').remove([oldUrlParts[1]]);
+                }
+            } catch (e) {
+                console.warn('[Hero] Failed to delete old hero image:', e);
+            }
+        }
+
+        const organization = await this.update(orgId, { hero_image_url: urlData.publicUrl } as Partial<Organization>, userId);
+        return { hero_image_url: urlData.publicUrl, organization };
     }
 
     // Search public organizations (excludes demo / sandbox orgs).

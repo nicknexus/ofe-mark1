@@ -32,6 +32,7 @@ interface TeamContextType {
  canEditTags: boolean
  canExportReports: boolean
  canEditOrgContext: boolean
+ canUseContentStudio: boolean
  /** team_member initiative/location scope; owners/admins are unrestricted. */
  scope?: TeamMemberScope
  /** Review gate: this user's evidence uploads await admin approval. */
@@ -86,6 +87,7 @@ const TeamContext = createContext<TeamContextType>({
  canEditTags: false,
  canExportReports: false,
  canEditOrgContext: false,
+ canUseContentStudio: false,
  requiresEvidenceApproval: false,
  canAccessInitiative: () => true,
  canAccessLocation: () => true,
@@ -259,6 +261,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
  canEditTags: cap('canEditTags'),
  canExportReports: cap('canExportReports'),
  canEditOrgContext: cap('canEditOrgContext'),
+ canUseContentStudio: cap('canUseContentStudio'),
  scope,
  requiresEvidenceApproval: !unrestricted && !!permissions?.requiresEvidenceApproval,
  canAccessInitiative,

@@ -45,6 +45,7 @@ export interface CapabilityFlags {
  canEditTags: boolean
  canExportReports: boolean
  canEditOrgContext: boolean
+ canUseContentStudio: boolean
  canDelete: boolean
 }
 
@@ -152,6 +153,9 @@ export interface AccessibleOrganization {
  statement?: string
  website_url?: string
  donation_url?: string
+ public_hero?: 'classic' | 'image' | 'video'
+ hero_image_url?: string | null
+ hero_video_url?: string | null
 }
 
 export class TeamService {
