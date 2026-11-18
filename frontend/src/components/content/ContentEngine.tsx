@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { FacebookIcon, InstagramIcon, LinkedInIcon, isQueued, socialColor } from '../../pages/studio/StudioFrame'
 import {
   BookOpen,
   Check,
@@ -11,13 +13,9 @@ import {
   ChevronRight,
   Copy,
   Download,
-  Facebook,
-  Globe,
   Heart,
   Image as ImageIcon,
-  Instagram,
   Lightbulb,
-  Linkedin,
   Mail,
   MessageCircle,
   MessageSquare,
@@ -38,13 +36,14 @@ import ConfirmDialog from '../ConfirmDialog'
 import ContentUploadModal from './ContentUploadModal'
 import { CaptureTodos, CaptureToolbar, IdeaBrief } from './ContentIdeas'
 import { ContentImpactWeb } from './ContentImpactWeb'
-import { JourneyDetail, JourneyFilters, JourneyGrid, JourneyModal, PublishBadge, PublishSoon, usePrograms, type JourneyFilter } from './ContentJourneys'
+import { JourneyDetail, JourneyFilters, JourneyGrid, JourneyModal, PublishBadge, usePrograms, type JourneyFilter } from './ContentJourneys'
 import { ContentWorkspace, NewMenu, PostToolbar, StudioBar, filterPosts, type KindFilter, type LibraryView, type SocialFilter, type StatusFilter } from './ContentWorkspace'
 import { useTeam } from '../../context/TeamContext'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
 import { useSocialAccount } from '../../pages/studio/useSocialAccount'
-import { formatDate } from '../../utils'
+import { formatDate, getLocalDateString } from '../../utils'
+import DateRangePicker from '../DateRangePicker'
 import { triggerDownload } from '../../utils/contentExport'
 import {
   EmptyState,
@@ -54,7 +53,7 @@ import {
   Skeleton,
   Spinner,
 } from '../ui'
-import { patchStudioPackage } from '../../pages/studio/useStudioLibrary'
+import { patchStudioPackage, removeStudioJourney, removeStudioPackage, upsertStudioPackage } from '../../pages/studio/useStudioLibrary'
 import SocialPostPreview, { socialCaption } from '../studio/SocialPostPreview'
 import type {
   ContentChannel,
@@ -78,7 +77,7 @@ import type {
   ContentIdeaWeb,
 } from '../../types'
 
-type Step = 'home' | 'moment' | 'journeys' | 'journey' | 'idea' | 'capture' | 'todos' | 'material' | 'working' | 'master' | 'post'
+type Step = 'home' | 'journeys' | 'journey' | 'idea' | 'capture' | 'todos' | 'material' | 'working' | 'master' | 'post'
 type TypeFilter = 'all' | ContentSource['source_type']
 type View =
   | { view: 'home' }
@@ -92,7 +91,7 @@ type View =
   | { view: 'todos' }
 
 const BASE = '/studio'
-const FLOW_STEPS: Step[] = ['moment', 'material', 'working', 'master']
+const FLOW_STEPS: Step[] = ['material', 'working', 'master']
 const POST_STEPS: Step[] = ['post', 'master', 'material', 'working']
 
 function parseView(pathname: string): View {
@@ -109,10 +108,12 @@ function parseView(pathname: string): View {
 
 const PAGE_SIZE = 21
 const MAX_PHOTOS = 10
-const CHANNELS: { id: ContentChannel; label: string; body: string; icon: typeof Sparkles; soon?: boolean }[] = [
-  { id: 'instagram', label: 'Instagram', body: 'Square post. Short lines, a few emojis.', icon: Instagram },
-  { id: 'facebook', label: 'Facebook', body: 'A page update people will share.', icon: Facebook },
-  { id: 'linkedin', label: 'LinkedIn', body: 'Professional, still human.', icon: Linkedin },
+type ChannelIcon = ComponentType<{ className?: string; style?: CSSProperties }>
+
+const CHANNELS: { id: ContentChannel; label: string; body: string; icon: ChannelIcon; soon?: boolean }[] = [
+  { id: 'instagram', label: 'Instagram', body: 'Square post. Short lines, a few emojis.', icon: InstagramIcon },
+  { id: 'facebook', label: 'Facebook', body: 'A page update people will share.', icon: FacebookIcon },
+  { id: 'linkedin', label: 'LinkedIn', body: 'Professional, still human.', icon: LinkedInIcon },
   { id: 'donor_email', label: 'Donor email', body: 'Deeper letter. Landscape header.', icon: Mail },
   { id: 'newsletter', label: 'Newsletter', body: 'Richer update for subscribers.', icon: Newspaper, soon: true },
   { id: 'sms', label: 'SMS', body: 'A short text with the photo.', icon: MessageSquare },
@@ -284,68 +285,9 @@ function hydrateVersions(rows: Array<{ channel: ContentChannel; caption?: string
 function Help() {
   return (
     <div className="space-y-3 text-sm text-secondary-600 leading-relaxed">
-      <p>Moments are single posts. Journeys are folders of updates that follow something over time, like a class through the school year.</p>
-      <p>Every moment and update is a post for your public page. Save it as a draft. Publishing is coming soon.</p>
-      <p>Social posts are optional. Open any post and create versions for Instagram, Facebook, LinkedIn, email, or SMS. Nexus does not post for you yet.</p>
+      <p>Moments are single posts. Journeys are a series of updates that follow something over time, like a class through the school year.</p>
+      <p>Send a post to Instagram, Facebook, or LinkedIn once those accounts are connected. A sent post also goes on your Nexus page. A scheduled post stays a draft until it goes out.</p>
     </div>
-  )
-}
-
-function FlowBack({ onClick }: { onClick: () => void }) {
-  return (
-    <div className="flex justify-center mb-4">
-      <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={onClick}>
-        <ChevronLeft className="w-4 h-4" /> Back
-      </button>
-    </div>
-  )
-}
-
-function ChoiceCard({
-  icon: Icon,
-  accent,
-  kicker,
-  title,
-  body,
-  soon,
-  onClick,
-}: {
-  icon: typeof Sparkles
-  accent?: boolean
-  kicker?: string
-  title: string
-  body: string
-  soon?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={soon ? undefined : onClick}
-      disabled={soon}
-      className={`group relative h-full min-h-[16.5rem] app-tile shadow-card-lg text-left px-6 pt-6 pb-5 flex flex-col ${
-        soon ? 'opacity-55 cursor-not-allowed hover:shadow-card hover:translate-y-0' : ''
-      }`}
-    >
-      <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-primary-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <span className={`app-icon-tile ${accent && !soon ? 'app-icon-tile-accent' : ''}`}>
-        <Icon className="w-4 h-4" />
-      </span>
-      {(kicker || soon) && (
-        <p className={`mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] ${soon ? 'text-secondary-400' : 'text-primary-800'}`}>
-          {soon ? 'Coming soon' : kicker}
-        </p>
-      )}
-      <div className={`${kicker || soon ? 'mt-2' : 'mt-5'} flex items-start gap-1 min-w-0`}>
-        <h2 className={`text-[17px] font-semibold tracking-tight leading-snug ${soon ? 'text-secondary-600' : 'text-secondary-900 group-hover:text-primary-800'}`}>
-          {title}
-        </h2>
-        {!soon && (
-          <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" aria-hidden />
-        )}
-      </div>
-      <p className="mt-2 text-sm text-secondary-500 leading-relaxed">{body}</p>
-    </button>
   )
 }
 
@@ -402,6 +344,51 @@ function WorkingStage({ label }: { label: string }) {
         </AnimatePresence>
       </div>
     </div>
+  )
+}
+
+function SendScreen({
+  names,
+  scheduling,
+  whenLabel,
+  done,
+}: {
+  names: string
+  scheduling: boolean
+  whenLabel: string
+  done: boolean
+}) {
+  const reduce = useReducedMotion()
+  const steps = scheduling
+    ? ['Getting the post ready', `Scheduling it for ${names}`, whenLabel ? `It goes out ${whenLabel}` : 'Saving the schedule']
+    : ['Getting the post ready', `Sending it to ${names}`, 'Adding it to your Nexus page']
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    if (done) return
+    const id = window.setInterval(() => setIndex(current => Math.min(current + 1, steps.length - 2)), 1100)
+    return () => window.clearInterval(id)
+  }, [done, steps.length])
+  const shown = done ? steps.length - 1 : index
+  const progress = done ? 100 : Math.min(88, ((shown + 1) / steps.length) * 78)
+  return createPortal(
+    <div className="fixed inset-0 z-[80] bg-[#F4F7F2] flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm text-center">
+        <img src="/Nexuslogo.png" alt="" className="w-14 h-14 mx-auto object-contain" />
+        <p className="mt-6 text-xl font-semibold tracking-tight text-secondary-900">
+          {scheduling ? 'Scheduling your post' : 'Posting'}
+        </p>
+        <p className="mt-2 text-sm text-secondary-500 min-h-5">{steps[shown]}</p>
+        <div className="mt-6 h-1.5 rounded-full bg-[#E7F3DF] overflow-hidden">
+          <motion.div
+            className="h-full rounded-full bg-[#14352A]"
+            initial={false}
+            animate={{ width: `${progress}%` }}
+            transition={reduce ? { duration: 0 } : { duration: 0.45, ease: EASE }}
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -470,7 +457,6 @@ export default function ContentEngine() {
   const [journeyModal, setJourneyModal] = useState<{ journey: ContentJourney | null } | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [publishing, setPublishing] = useState(false)
   const [exportingChannel, setExportingChannel] = useState<ContentChannel | null>(null)
   const [chrome, setChrome] = useState<GraphicChrome>({ logo: false, orgName: false, title: false, metric: false, location: false })
   const [copy, setCopy] = useState<GraphicCopy>({ orgName: '', title: '', metricText: '', metricLabel: '', location: '' })
@@ -620,14 +606,10 @@ export default function ContentEngine() {
 
   const upsertPackage = (pkg: ContentPackage) => {
     setPackages(prev => (prev.some(p => p.id === pkg.id) ? prev.map(p => (p.id === pkg.id ? pkg : p)) : [pkg, ...prev]))
+    if (activeOrganization?.id) upsertStudioPackage(activeOrganization.id, pkg)
   }
 
   const startMoment = () => go(`${BASE}/new`)
-
-  const startMomentDiy = () => {
-    setProgramFilter('')
-    setStep('material')
-  }
 
   const startUpdate = (target: ContentJourney) => go(`${journeyPath(target.id)}/new`)
   const openJourney = (target: ContentJourney) => go(journeyPath(target.id))
@@ -777,7 +759,7 @@ export default function ContentEngine() {
       }
       if (route.view === 'new' && studioStart === 'nexus') {
         resetDraft()
-        setBackStep('moment')
+        setBackStep('home')
         setWorkingLabel('Picking the strongest story')
         setStep('working')
         let cancelled = false
@@ -791,7 +773,7 @@ export default function ContentEngine() {
           .catch(error => {
             if (cancelled) return
             fail(error, 'Could not pick a story')
-            setStep('moment')
+            setStep('material')
           })
         return () => { cancelled = true }
       }
@@ -813,12 +795,10 @@ export default function ContentEngine() {
       }
       if (FLOW_STEPS.includes(current) && !editingRef.current && !postRef.current) return
       resetDraft()
-      if (route.view === 'new') {
-        setStep('moment')
-      } else {
+      if (route.view === 'update') {
         setProgramFilter(journeysRef.current.find(j => j.id === route.journeyId)?.initiative_id || '')
-        setStep('material')
       }
+      setStep('material')
       return
     }
     if (postRef.current?.id === route.postId) {
@@ -856,30 +836,18 @@ export default function ContentEngine() {
       const original = masterFromPackage(post)
       if (original) applyMaster(original)
       setEditingId(null)
+      setStep('post')
+      return
     }
-    setStep(backStep)
+    if (backStep === 'material') setStep('material')
+    else goBack(BASE)
   }
 
   const materialBack = () => {
     if (master) setStep('master')
     else if (draftIdea) goBack(`${BASE}/idea/${draftIdea.id}`)
     else if (route.view === 'update') goBack(journeyPath(route.journeyId))
-    else setStep('moment')
-  }
-
-  const runRecommend = async () => {
-    setBackStep('moment')
-    setWorkingLabel('Picking the strongest story')
-    setStep('working')
-    try {
-      const next = await apiService.recommendContent('moment')
-      applyMaster(next)
-      setExtraContext('')
-      setStep('master')
-    } catch (error) {
-      fail(error, 'Could not pick a story')
-      setStep('moment')
-    }
+    else goBack(BASE)
   }
 
   const togglePick = (source: ContentSource) => {
@@ -918,8 +886,9 @@ export default function ContentEngine() {
     setStep('material')
   }
 
-  const draftFrom = async (current: ContentMaster, targetJourneyId: string | null, ideaId?: string | null) => {
-    setWorkingLabel(ideaId ? 'Building the post around what they said' : targetJourneyId ? 'Drafting the next update' : 'Drafting with Nexus')
+  const draftFrom = async (current: ContentMaster, targetJourneyId: string | null, ideaId?: string | null, context?: string) => {
+    const note = context?.trim() || ''
+    setWorkingLabel(ideaId ? 'Building the post around what they said' : note ? 'Drafting with your context' : targetJourneyId ? 'Drafting the next update' : 'Drafting with Nexus')
     setStep('working')
     try {
       const next = await apiService.generateContentMaster({
@@ -930,6 +899,10 @@ export default function ContentEngine() {
         package_id: editingRef.current,
         extras: refsOf(current.extras),
         idea_id: ideaId || undefined,
+        context: note || undefined,
+        hook: note ? current.hook : undefined,
+        body: note ? current.body : undefined,
+        cta: note ? current.cta : undefined,
       })
       applyMaster({ ...next, extras: next.extras?.length ? next.extras : current.extras })
       setStep('master')
@@ -940,40 +913,11 @@ export default function ContentEngine() {
   }
 
   const draftWithNexus = () => {
-    if (master) draftFrom(master, journeyId, editingId ? null : draftIdea?.id)
+    if (master) draftFrom(master, journeyId, editingId ? null : draftIdea?.id, extraContext)
   }
 
-  const applyContext = async () => {
-    if (!master || !extraContext.trim()) return
-    setWorkingLabel('Weaving in your context')
-    setStep('working')
-    try {
-      const next = await apiService.refineContentMaster({
-        source_type: master.source.source_type,
-        source_id: master.source.source_id,
-        story_type: master.story_type,
-        hook: master.hook,
-        body: master.body,
-        evidence_line: master.evidence_line,
-        cta: master.cta,
-        context: extraContext.trim(),
-        why: master.why,
-        journey_id: journeyId,
-        package_id: editingId,
-        extras: refsOf(master.extras),
-      })
-      setMaster(hydrateMaster({ ...master, body: next.body }))
-      notify.success('Body updated')
-      setStep('master')
-    } catch (error) {
-      fail(error, 'Could not update the story')
-      setStep('master')
-    }
-  }
-
-  const save = async (publish?: boolean) => {
+  const save = async () => {
     if (!master) return
-    const journeyWasDraft = !!journey && !journey.published_at
     setSaving(true)
     try {
       const pkg = await apiService.saveContentPackage({
@@ -989,13 +933,8 @@ export default function ContentEngine() {
         layout: layoutFromChrome(chrome),
         source_type: master.source.source_type,
         source_id: master.source.source_id,
-        publish,
       })
-      notify.success(
-        publish
-          ? journeyWasDraft ? 'Published. The journey is live too.' : 'Published to your public page'
-          : editingId ? 'Saved' : 'Saved as a draft'
-      )
+      notify.success(editingId ? 'Saved' : 'Saved as a draft')
       if (journeyId) loadJourneys()
       upsertPackage(pkg)
       if (draftIdea && !editingId) {
@@ -1009,23 +948,6 @@ export default function ContentEngine() {
       fail(error, 'Failed to save')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const togglePublish = async () => {
-    if (!post) return
-    const nextPublished = !post.published_at
-    setPublishing(true)
-    try {
-      const next = await apiService.publishContentPackage(post.id, nextPublished)
-      setPost(next)
-      upsertPackage(next)
-      if (journeyId) loadJourneys()
-      notify.success(nextPublished ? 'Marked for your Nexus page' : 'Removed from your Nexus page')
-    } catch (error) {
-      fail(error, 'Could not update')
-    } finally {
-      setPublishing(false)
     }
   }
 
@@ -1139,17 +1061,19 @@ export default function ContentEngine() {
 
   const hasVersions = versions.length > 0
   const hasCopy = !!master && !!master.hook.trim() && !!master.body.trim()
+  const contextOn = extraContext.trim().length > 0
+  const nexusLabel = hasCopy ? 'Redraft with Nexus' : 'Draft with Nexus'
   const published = !!post?.published_at
   const draftLabel = journey ? `Update · ${journey.title}` : 'Moment'
   const subtitle =
-    step === 'journey' ? 'Add updates as it happens. Save each one as a draft for now.'
+    step === 'journey' ? 'Add updates as they happen. Show the journey on your public page when it is ready.'
       : step === 'idea' ? 'A story worth capturing. Who to find, what to ask, and how to get the photo.'
         : step === 'material' ? (journey ? `Pick photos for the next update to ${journey.title}.` : 'Pick or upload photos. The first one is the cover.')
-          : step === 'post' ? 'This is what goes out. The button names every account it will use.'
+          : step === 'post' ? 'Sending it puts it on your Nexus page. Scheduling does not.'
             : step === 'master' ? 'Review the story. Save it when the headline, body, and call to action are right.'
               : 'A post is one story. Nexus can write it, or you can.'
 
-  const chooser = step === 'moment' || step === 'working'
+  const chooser = step === 'working'
   const library = step === 'home' || step === 'journeys' || step === 'capture' || step === 'todos'
   const libraryView: LibraryView = step === 'journeys' ? 'journeys' : postKind === 'moments' ? 'moments' : 'all'
   const createViewRef = useRef<LibraryView>('all')
@@ -1204,10 +1128,8 @@ export default function ContentEngine() {
     ? 'Craft your post'
     : step === 'post'
     ? 'Your post'
-    : step === 'material'
-      ? 'Choose a photo'
-      : step === 'moment'
-        ? 'Create a post'
+      : step === 'material'
+        ? 'Choose a photo'
         : 'Content'
 
   if (!revealed) return <StudioBoot />
@@ -1278,7 +1200,7 @@ export default function ContentEngine() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.38, ease: EASE }}
-              className={step === 'capture' || step === 'master' ? 'w-full h-full overflow-hidden' : chooser ? 'w-full h-full overflow-hidden flex items-center justify-center' : `w-full h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] ${step === 'post' || step === 'journey' ? 'pr-8' : ''}`}
+              className={`w-full h-full overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable] ${chooser ? 'flex items-center justify-center' : ''} ${step === 'post' || step === 'journey' ? 'pr-8' : ''}`}
             >
           {step === 'home' && (
             <ContentWorkspace
@@ -1333,33 +1255,6 @@ export default function ContentEngine() {
             />
           )}
 
-          {step === 'moment' && (
-            <div className="w-full max-w-3xl mx-auto">
-              <FlowBack onClick={() => goBack(BASE)} />
-              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-800">Moment</p>
-              <h2 className="mt-2 text-center text-2xl font-semibold tracking-tight text-secondary-900">Who makes it?</h2>
-              <p className="mt-2 mb-7 text-center text-sm text-secondary-500 max-w-md mx-auto leading-relaxed">
-                Either way you can edit everything before you save it.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ChoiceCard
-                  icon={Sparkles}
-                  accent
-                  kicker="Easiest"
-                  title="Nexus writes it"
-                  body="Nexus picks the strongest photo you have logged and writes the post. You can edit every line."
-                  onClick={runRecommend}
-                />
-                <ChoiceCard
-                  icon={Pencil}
-                  title="I'll write it"
-                  body="Pick or upload a photo, then write the headline, body, and call to action yourself."
-                  onClick={startMomentDiy}
-                />
-              </div>
-            </div>
-          )}
-
           {step === 'journeys' && (
             <div className="pb-8">
               <JourneyGrid
@@ -1397,10 +1292,10 @@ export default function ContentEngine() {
                 { status: journey.status === 'completed' ? 'ongoing' : 'completed' },
                 journey.status === 'completed' ? 'Marked ongoing' : 'Marked completed'
               )}
-              onTogglePublished={() => {
-                if (!journey.published_at) return
-                patchJourney({ published: false }, 'Journey moved to drafts')
-              }}
+              onTogglePublished={() => patchJourney(
+                { published: !journey.published_at },
+                journey.published_at ? 'Journey hidden from your public page' : 'Journey is on your public page'
+              )}
               onDelete={() => setDeleteJourneyOpen(true)}
             />
           )}
@@ -1431,98 +1326,110 @@ export default function ContentEngine() {
           )}
 
           {step === 'master' && master && (
-            <div className="h-full min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
-              <article className="studio-panel h-full min-h-0 flex flex-col overflow-hidden">
-                <div className="shrink-0 p-3 pb-0 flex gap-3">
-                  <div className="relative h-28 w-44 sm:h-32 sm:w-52 rounded-xl overflow-hidden bg-[#E7F3DF] flex-shrink-0">
-                    <img src={master.source.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  </div>
-                  <div className="min-w-0 flex-1 pt-1">
-                    <PhotoStrip photos={photosOf(master)} onChange={setPhotos} onAdd={addMorePhotos} />
-                    {draftIdea && !editingId && (
-                      <span className="app-chip app-chip-accent text-[11px] inline-flex items-center gap-1 max-w-full mt-2">
-                        <Lightbulb className="w-3 h-3 flex-shrink-0" />
-                        <span className="truncate">{draftIdea.card.title}</span>
-                        <button type="button" className="flex-shrink-0 p-0.5 rounded hover:bg-black/5" onClick={() => setDraftIdea(null)} aria-label="Unlink idea">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-3 flex flex-col gap-3">
-                  {master.why && (
-                    <p className="text-[12px] leading-snug text-[#2A6B4A]">{master.why}</p>
+            <div className="flex flex-wrap gap-4 items-start pb-8">
+              <div className="w-full lg:w-[340px] lg:shrink-0">
+                <SocialPostPreview
+                  only="instagram"
+                  caption={socialCaption([master.hook, master.body, master.cta])}
+                  media={[master.source, ...(master.extras || [])].filter(item => item.image_url).map(item => ({ url: item.image_url }))}
+                  profileName={activeOrganization?.name || 'Your account'}
+                  profileImage={activeOrganization?.logo_url}
+                  names={{ instagram: socialAccount?.connections?.instagram?.label }}
+                  captionEditor={(
+                    <div className="space-y-3">
+                      <label className="block">
+                        <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Headline</span>
+                        <FitText
+                          value={master.hook}
+                          onChange={v => setMaster({ ...master, hook: v })}
+                          placeholder="Headline"
+                          minRows={1}
+                          className="text-[13px] font-semibold leading-snug text-[#1C2B24]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Body</span>
+                        <FitText
+                          value={master.body}
+                          onChange={v => setMaster({ ...master, body: v })}
+                          placeholder="Write the post."
+                          minRows={4}
+                          className="text-[13px] leading-snug text-[#1C2B24]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Call to action</span>
+                        <FitText
+                          value={master.cta}
+                          onChange={v => setMaster({ ...master, cta: v })}
+                          placeholder="Call to action"
+                          minRows={1}
+                          className="text-[13px] font-medium leading-snug text-[#1C2B24]"
+                        />
+                      </label>
+                    </div>
                   )}
-                  <label className="block shrink-0">
-                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Headline</span>
-                    <GrowField
-                      value={master.hook}
-                      onChange={v => setMaster({ ...master, hook: v })}
-                      placeholder="Headline"
-                      maxRows={2}
-                      className="text-[15px] font-semibold"
-                    />
-                  </label>
-                  <label className="block shrink-0">
-                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Body</span>
-                    <GrowField
-                      value={master.body}
-                      onChange={v => setMaster({ ...master, body: v })}
-                      placeholder="Write the post."
-                      minRows={3}
-                      maxRows={5}
-                      className="text-[14px] leading-relaxed"
-                    />
-                  </label>
-                  <label className="block shrink-0">
-                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Call to action</span>
-                    <GrowField
-                      value={master.cta}
-                      onChange={v => setMaster({ ...master, cta: v })}
-                      placeholder="Learn more about our work."
-                      maxRows={2}
-                    />
-                  </label>
-                </div>
-              </article>
-              <aside className="h-full min-h-0">
-                <div className="studio-panel h-full min-h-0 flex flex-col overflow-hidden p-4">
-                  <p className="text-[15px] font-semibold text-[#1C2B24] shrink-0">Post settings</p>
-                  <button type="button" className="studio-hero-btn studio-hero-btn-mint mt-3 shrink-0" onClick={draftWithNexus}>
-                    <Sparkles className="w-4 h-4" /> {hasCopy ? 'Redraft with Nexus' : 'Draft with Nexus'}
-                  </button>
-                  <p className="mt-2 text-[12px] text-secondary-500 leading-snug shrink-0">
-                    Rewrites the headline, body, and call to action from the photo.
-                  </p>
-                  <label className="block mt-4 flex-1 min-h-0 flex flex-col">
-                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1 shrink-0">Your context</span>
+                />
+              </div>
+
+              <div className="flex-1 min-w-[260px] space-y-4">
+                <section className="studio-panel p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[15px] font-semibold text-[#1C2B24]">Photos</p>
+                    <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={addMorePhotos}>Change photos</button>
+                  </div>
+                  <PhotoStrip photos={photosOf(master)} onChange={setPhotos} onAdd={addMorePhotos} />
+                  {draftIdea && !editingId && (
+                    <span className="app-chip app-chip-accent text-[11px] inline-flex items-center gap-1 max-w-full mt-3">
+                      <Lightbulb className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{draftIdea.card.title}</span>
+                      <button type="button" className="flex-shrink-0 p-0.5 rounded hover:bg-black/5" onClick={() => setDraftIdea(null)} aria-label="Unlink idea">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {master.why && <p className="mt-3 text-[12px] leading-snug text-[#2A6B4A]">{master.why}</p>}
+                </section>
+
+                <div className="flex flex-col sm:flex-row gap-3 items-start">
+                <section className="studio-panel p-4 flex-1 min-w-0">
+                  {!contextOn && (
+                    <>
+                      <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full" onClick={draftWithNexus}>
+                        <Sparkles className="w-4 h-4" /> {nexusLabel}
+                      </button>
+                      <p className="mt-2 text-[12px] text-secondary-500 leading-snug">Writes the headline, body, and call to action from the photo.</p>
+                    </>
+                  )}
+                  <label className={`block ${contextOn ? '' : 'mt-4'}`}>
+                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Context</span>
                     <GrowField
                       minRows={3}
                       value={extraContext}
                       onChange={setExtraContext}
                       placeholder="Audience, a quote, an event, a tone."
-                      className="flex-1"
                     />
                   </label>
-                  <button
-                    type="button"
-                    className="app-btn app-btn-secondary app-btn-sm mt-2 shrink-0"
-                    disabled={!extraContext.trim() || !hasCopy}
-                    onClick={applyContext}
-                  >
-                    Apply context
+                  {contextOn && (
+                    <>
+                      <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full mt-3" onClick={draftWithNexus}>
+                        <Sparkles className="w-4 h-4" /> {nexusLabel}
+                      </button>
+                      <p className="mt-2 text-[12px] text-secondary-500 leading-snug">Rewrites the post with this context.</p>
+                    </>
+                  )}
+                </section>
+
+                <div className="flex sm:flex-col gap-2 shrink-0">
+                  <button type="button" className="studio-hero-btn studio-hero-btn-mint justify-center min-w-[9.5rem]" disabled={!hasCopy || saving} onClick={() => save()}>
+                    {saving ? <Spinner className="w-3.5 h-3.5" /> : null} {editingId ? 'Save changes' : 'Save draft'}
                   </button>
-                  <div className="mt-4 pt-3 border-t border-black/5 flex flex-col gap-2 shrink-0">
-                    <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full" disabled={!hasCopy || saving} onClick={() => save()}>
-                      {saving ? <Spinner className="w-3.5 h-3.5" /> : null} {editingId ? 'Save changes' : 'Save draft'}
-                    </button>
-                    <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={cancelEdit}>
-                      {editingId ? 'Cancel' : 'Back'}
-                    </button>
-                  </div>
+                  <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={cancelEdit}>
+                    {editingId ? 'Cancel' : 'Back'}
+                  </button>
                 </div>
-              </aside>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1534,7 +1441,7 @@ export default function ContentEngine() {
                 <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={leavePost}>
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <PublishBadge published={published} />
+                <PublishBadge published={published} liveLabel="Posted" />
                 {journey && (
                   <button
                     type="button"
@@ -1545,7 +1452,7 @@ export default function ContentEngine() {
                   </button>
                 )}
                 <div className="ml-auto flex items-center gap-1">
-                  <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={editPost}>
+                  <button type="button" className="studio-hero-btn studio-hero-btn-mint h-8 px-3 text-[13px]" onClick={editPost}>
                     <Pencil className="w-3.5 h-3.5" /> Edit
                   </button>
                   <button type="button" className="app-btn app-btn-ghost app-btn-sm is-danger" onClick={() => setDeleteId(post.id)}>
@@ -1554,8 +1461,8 @@ export default function ContentEngine() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[340px_320px] gap-4 items-start max-w-[1080px] pb-8">
-                <div className="space-y-3 min-w-0">
+              <div className="flex flex-wrap gap-4 items-start pb-8">
+                <div className="w-full lg:w-[340px] lg:shrink-0">
                   <SocialPostPreview
                     caption={socialCaption([master.hook, master.body, master.cta])}
                     media={[master.source, ...(master.extras || [])].filter(item => item.image_url).map(item => ({ url: item.image_url }))}
@@ -1567,32 +1474,29 @@ export default function ContentEngine() {
                       linkedin: socialAccount?.connections?.linkedin?.label,
                     }}
                   />
-                  <div className="studio-panel px-3 py-3">
-                    <p className="text-[12px] text-secondary-500 leading-snug">Separate from the social send.</p>
-                    <button
-                      type="button"
-                      disabled={publishing}
-                      onClick={togglePublish}
-                      className={published
-                        ? 'app-btn app-btn-secondary app-btn-sm mt-2 w-full'
-                        : 'studio-hero-btn studio-hero-btn-mint mt-2 w-full justify-center !h-9 px-3 text-[13px]'}
-                    >
-                      {publishing ? <Spinner className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-                      {published ? 'Remove from Nexus page' : 'Show on Nexus page'}
-                    </button>
-                  </div>
                 </div>
-                <SendPanel
-                  packageId={post.id}
-                  publications={post.publications}
-                  connections={socialAccount?.connections}
-                  loaded={socialReady}
-                  onSent={publications => {
-                    setPost(current => current && current.id === post.id ? { ...current, publications } : current)
-                    setPackages(prev => prev.map(pkg => pkg.id === post.id ? { ...pkg, publications } : pkg))
-                    if (activeOrganization?.id) patchStudioPackage(activeOrganization.id, post.id, publications)
-                  }}
-                />
+                <div className="w-full sm:w-[320px]">
+                  <SendPanel
+                    packageId={post.id}
+                    publications={post.publications}
+                    connections={socialAccount?.connections}
+                    loaded={socialReady}
+                    onSent={(publications, publishedAt) => {
+                      setPost(current => current && current.id === post.id ? {
+                        ...current,
+                        publications,
+                        published_at: publishedAt || current.published_at,
+                      } : current)
+                      setPackages(prev => prev.map(pkg => pkg.id === post.id ? {
+                        ...pkg,
+                        publications,
+                        published_at: publishedAt || pkg.published_at,
+                      } : pkg))
+                      if (activeOrganization?.id) patchStudioPackage(activeOrganization.id, post.id, publications, publishedAt)
+                      if (publishedAt) loadJourneys()
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1612,6 +1516,7 @@ export default function ContentEngine() {
             try {
               await apiService.deleteContentPackage(deleteId)
               setPackages(prev => prev.filter(p => p.id !== deleteId))
+              if (activeOrganization?.id) removeStudioPackage(activeOrganization.id, deleteId)
               if (journeyId) loadJourneys()
               notify.success('Deleted')
               leavePost()
@@ -1636,6 +1541,7 @@ export default function ContentEngine() {
               await apiService.deleteContentJourney(journey.id)
               setJourneys(prev => prev.filter(j => j.id !== journey.id))
               setPackages(prev => prev.filter(p => p.journey_id !== journey.id))
+              if (activeOrganization?.id) removeStudioJourney(activeOrganization.id, journey.id)
               notify.success('Journey deleted')
               leaveJourney()
             } catch (error) {
@@ -1692,16 +1598,25 @@ export default function ContentEngine() {
   )
 }
 
-const SHARE_CHANNELS: { id: ContentChannel; label: string; icon: typeof Facebook }[] = [
-  { id: 'facebook', label: 'Facebook', icon: Facebook },
-  { id: 'instagram', label: 'Instagram', icon: Instagram },
-  { id: 'linkedin', label: 'LinkedIn', icon: Linkedin },
+const SHARE_CHANNELS: { id: ContentChannel; label: string; icon: typeof InstagramIcon }[] = [
+  { id: 'facebook', label: 'Facebook', icon: FacebookIcon },
+  { id: 'instagram', label: 'Instagram', icon: InstagramIcon },
+  { id: 'linkedin', label: 'LinkedIn', icon: LinkedInIcon },
 ]
 
 function accountList(names: string[]) {
   if (names.length <= 1) return names[0] || ''
   if (names.length === 2) return `${names[0]} and ${names[1]}`
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+function scheduleStamp(day: string, hour: string, minute: string, meridiem: 'AM' | 'PM') {
+  let h = Number(hour) % 12
+  if (meridiem === 'PM') h += 12
+  const stamp = `${day}T${String(h).padStart(2, '0')}:${minute}`
+  const parsed = new Date(stamp)
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now() + 60_000) return ''
+  return stamp
 }
 
 function scheduleLabel(value: string) {
@@ -1714,12 +1629,18 @@ function scheduleLabel(value: string) {
 
 function mergePublications(current: ContentPublication[] | undefined, incoming: ContentPublication[]) {
   const rank = { failed: 0, accepted: 1, scheduled: 2, published: 3 }
-  const byPlatform = new Map<string, ContentPublication>()
+  const live = new Map<string, ContentPublication>()
+  const scheduled = new Map<string, ContentPublication>()
   for (const item of [...(current || []), ...incoming]) {
-    const prev = byPlatform.get(item.platform)
-    if (!prev || rank[item.status] > rank[prev.status] || (item.post_url && !prev.post_url)) byPlatform.set(item.platform, item)
+    const bucket = item.status === 'scheduled' ? scheduled : live
+    const prev = bucket.get(item.platform)
+    if (!prev || (item.status === 'scheduled'
+      ? (item.scheduled_at || '') > (prev.scheduled_at || '')
+      : rank[item.status] > rank[prev.status] || (item.post_url && !prev.post_url))) {
+      bucket.set(item.platform, item)
+    }
   }
-  return [...byPlatform.values()]
+  return [...live.values(), ...scheduled.values()]
 }
 
 function sentWhen(value?: string | null) {
@@ -1740,7 +1661,7 @@ function SendPanel({
   publications?: ContentPublication[]
   connections?: Record<string, { connected: boolean; label: string | null }>
   loaded: boolean
-  onSent: (publications: ContentPublication[]) => void
+  onSent: (publications: ContentPublication[], publishedAt: string | null) => void
 }) {
   const linked = loaded ? SHARE_CHANNELS.filter(channel => connections?.[channel.id]?.connected) : []
   const missing = loaded ? SHARE_CHANNELS.filter(channel => !connections?.[channel.id]?.connected) : []
@@ -1752,8 +1673,14 @@ function SendPanel({
     .join(',')
   const [checked, setChecked] = useState<ContentChannel[]>([])
   const [scheduling, setScheduling] = useState(false)
-  const [when, setWhen] = useState('')
+  const [scheduleDate, setScheduleDate] = useState<{ singleDate?: string }>({})
+  const [scheduleHour, setScheduleHour] = useState('9')
+  const [scheduleMinute, setScheduleMinute] = useState('00')
+  const [scheduleMeridiem, setScheduleMeridiem] = useState<'AM' | 'PM'>('AM')
   const [sending, setSending] = useState(false)
+  const [sendDone, setSendDone] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [unscheduling, setUnscheduling] = useState<string | null>(null)
   const [panelError, setPanelError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1768,17 +1695,32 @@ function SendPanel({
   const sentNames = accountList(
     SHARE_CHANNELS.filter(channel => sentKey.split(',').includes(channel.id)).map(channel => channel.label)
   )
+  const when = scheduleDate.singleDate
+    ? scheduleStamp(scheduleDate.singleDate, scheduleHour, scheduleMinute, scheduleMeridiem)
+    : ''
   const whenLabel = scheduleLabel(when)
-  const canSend = loaded && chosen.length > 0 && (!scheduling || !!whenLabel)
+  const scheduleMax = (() => {
+    const date = new Date()
+    date.setFullYear(date.getFullYear() + 2)
+    return getLocalDateString(date)
+  })()
+  const canSend = loaded && chosen.length > 0 && (!scheduling || !!when)
+  const confirmLabel = scheduling ? `Confirm schedule for ${whenLabel}` : `Confirm post to ${names}`
   const button = sending
     ? `Sending to ${names}`
+    : confirming && canSend
+    ? confirmLabel
     : !loaded
     ? 'Checking accounts'
     : chosen.length === 0
     ? (sentNames ? `Sent to ${sentNames}` : linked.length === 0 ? 'Connect an account' : 'Select an account')
     : scheduling
-      ? (whenLabel ? `Schedule for ${whenLabel}` : 'Pick a time')
+      ? (whenLabel ? `Schedule for ${whenLabel}` : scheduleDate.singleDate ? 'Pick a future time' : 'Pick a date')
       : `Post now to ${names}`
+
+  useEffect(() => {
+    setConfirming(false)
+  }, [names, when, scheduling, chosen.length])
 
   const toggle = (id: ContentChannel) => {
     setChecked(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
@@ -1786,7 +1728,12 @@ function SendPanel({
 
   const send = async () => {
     if (!canSend || sending) return
+    if (!confirming) {
+      setConfirming(true)
+      return
+    }
     setSending(true)
+    setSendDone(false)
     setPanelError(null)
     try {
       const result = await apiService.publishSocial(packageId, {
@@ -1807,7 +1754,7 @@ function SendPanel({
           post_url: item.postUrl || null,
           error: item.error || null,
         }))
-      onSent(mergePublications(publications, incoming))
+      onSent(mergePublications(publications, incoming), result.published_at || null)
       const failed = result.results.filter(item => !item.ok)
       const sent = result.results.filter(item => item.ok)
       if (!sent.length) {
@@ -1816,17 +1763,19 @@ function SendPanel({
         notify.error(message)
         return
       }
+      setSendDone(true)
+      await new Promise(resolve => window.setTimeout(resolve, 700))
       const label = accountList(sent.map(item => SHARE_CHANNELS.find(channel => channel.id === item.platform)?.label || item.platform))
       if (failed.length) {
         const message = failed[0]?.error || 'One account failed.'
         setPanelError(message)
         notify.error(`Sent to ${label}. ${message}`)
       } else if (sent.some(item => item.status === 'scheduled')) {
-        notify.success(`Scheduled for ${label}`)
+        notify.success(`Scheduled for ${label}. It stays a draft until it goes out.`)
       } else if (sent.some(item => item.postUrl)) {
-        notify.success(`It is on ${label}`)
+        notify.success(`It is on ${label} and your Nexus page.`)
       } else {
-        notify.success(`Sent to ${label}`)
+        notify.success(`Sent to ${label}. It is on your Nexus page.`)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not post'
@@ -1834,6 +1783,24 @@ function SendPanel({
       notify.error(message)
     } finally {
       setSending(false)
+      setSendDone(false)
+      setConfirming(false)
+    }
+  }
+
+  const unschedule = async (platform: ContentPublication['platform']) => {
+    setUnscheduling(platform)
+    setPanelError(null)
+    try {
+      const next = await apiService.unscheduleSocial(packageId, platform)
+      onSent(next.publications || [], next.published_at || null)
+      notify.success('Removed from the schedule')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not unschedule'
+      setPanelError(message)
+      notify.error(message)
+    } finally {
+      setUnscheduling(null)
     }
   }
 
@@ -1841,6 +1808,9 @@ function SendPanel({
 
   return (
     <aside className="studio-panel p-4 lg:sticky lg:top-4">
+      {sending && (
+        <SendScreen names={names} scheduling={scheduling} whenLabel={whenLabel} done={sendDone} />
+      )}
       {receipts.length > 0 && (
         <div className="mb-3 space-y-2">
           {receipts.map(item => {
@@ -1848,16 +1818,16 @@ function SendPanel({
             const when = sentWhen(item.status === 'scheduled' ? item.scheduled_at : item.created_at)
             if (item.status === 'failed') {
               return (
-                <div key={item.platform} className="rounded-xl bg-red-50 px-3 py-2.5">
+                <div key={`${item.platform}-${item.status}-${item.scheduled_at || item.created_at}`} className="rounded-xl bg-red-50 px-3 py-2.5">
                   <p className="text-[13px] font-semibold text-red-700">{label} did not send</p>
                   <p className="mt-0.5 text-[12px] text-red-700 leading-snug">{item.error || 'Could not post'}</p>
                 </div>
               )
             }
-            const scheduled = item.status === 'scheduled'
+            const scheduled = isQueued(item)
             const live = item.status === 'published'
             return (
-              <div key={item.platform} className="rounded-xl bg-[#E7F3DF] px-3 py-2.5">
+              <div key={`${item.platform}-${item.status}-${item.scheduled_at || item.created_at}`} className="rounded-xl bg-[#E7F3DF] px-3 py-2.5">
                 <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#14352A]">
                   <Check className="w-3.5 h-3.5" />
                   {scheduled ? `Scheduled for ${label}` : live ? `On ${label}` : `Sent to ${label}`}
@@ -1873,6 +1843,16 @@ function SendPanel({
                   <a href={item.post_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[12px] font-semibold text-[#2A6B4A]">
                     View on {label}
                   </a>
+                )}
+                {scheduled && (
+                  <button
+                    type="button"
+                    className="mt-2 text-[12px] font-semibold text-[#2A6B4A] disabled:opacity-50"
+                    disabled={unscheduling === item.platform}
+                    onClick={() => unschedule(item.platform)}
+                  >
+                    {unscheduling === item.platform ? 'Removing' : 'Unschedule'}
+                  </button>
                 )}
               </div>
             )
@@ -1898,7 +1878,7 @@ function SendPanel({
                 checked={on}
                 onChange={() => toggle(channel.id)}
               />
-              <Icon className="w-4 h-4 text-[#14352A]" />
+              <Icon className="w-4 h-4" style={{ color: socialColor(channel.id) }} />
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold text-[#1C2B24]">{channel.label}</span>
                 {who && <span className="block text-[12px] text-secondary-500 truncate">{who}</span>}
@@ -1930,12 +1910,37 @@ function SendPanel({
         {scheduling ? 'Post now instead' : 'Schedule instead'}
       </button>
       {scheduling && (
-        <input
-          type="datetime-local"
-          className="app-input mt-2 min-w-0 max-w-full text-[13px]"
-          value={when}
-          onChange={event => setWhen(event.target.value)}
-        />
+        <div className="mt-2 space-y-2">
+          <DateRangePicker
+            variant="pill"
+            className="w-full h-9 justify-between"
+            value={scheduleDate}
+            minDate={getLocalDateString(new Date())}
+            maxDate={scheduleMax}
+            placeholder="Pick a date"
+            single
+            onChange={value => {
+              const day = value.singleDate || value.startDate
+              setScheduleDate(day ? { singleDate: day } : {})
+            }}
+          />
+          <div className="grid grid-cols-[1fr_1fr_4.5rem] gap-2">
+            <select className="app-input h-9 text-[13px]" value={scheduleHour} onChange={event => setScheduleHour(event.target.value)} aria-label="Hour">
+              {Array.from({ length: 12 }, (_, index) => String(index + 1)).map(hour => (
+                <option key={hour} value={hour}>{hour}</option>
+              ))}
+            </select>
+            <select className="app-input h-9 text-[13px]" value={scheduleMinute} onChange={event => setScheduleMinute(event.target.value)} aria-label="Minute">
+              {['00', '15', '30', '45'].map(minute => (
+                <option key={minute} value={minute}>{minute}</option>
+              ))}
+            </select>
+            <select className="app-input h-9 text-[13px]" value={scheduleMeridiem} onChange={event => setScheduleMeridiem(event.target.value as 'AM' | 'PM')} aria-label="AM or PM">
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+        </div>
       )}
       <button
         type="button"
@@ -1946,6 +1951,11 @@ function SendPanel({
         {button}
       </button>
       <p className="mt-2 text-[12px] text-secondary-400 leading-snug">
+        {scheduling
+          ? 'A scheduled post stays a draft until it goes out. Then it goes on your Nexus page.'
+          : 'Sending this also puts it on your Nexus page.'}
+      </p>
+      <p className="mt-1 text-[12px] text-secondary-400 leading-snug">
         {receipts.some(item => item.status !== 'failed')
           ? 'This stays on the post, in the library, and on the calendar.'
           : 'One post per checked account. A second click of the same send will not post it twice.'}
@@ -2071,7 +2081,7 @@ function ChannelPicker({
                 </motion.span>
               )}
               <span className={`app-icon-tile w-10 h-10 rounded-xl transition-transform group-hover:scale-105 ${on && !soon ? 'app-icon-tile-accent' : ''}`}>
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5" style={socialColor(ch.id) ? { color: socialColor(ch.id) } : undefined} />
               </span>
               <span className={`mt-2 text-[13px] font-semibold tracking-tight ${soon ? 'text-secondary-600' : 'text-secondary-900 group-hover:text-primary-800'}`}>
                 {ch.label}
@@ -2416,7 +2426,7 @@ function ChannelPreview({
   if (channel === 'instagram') {
     return (
       <div className="w-[248px]">
-        <PreviewLabel icon={meta?.icon} label="Instagram" onCopy={() => onCopy(version.caption || '', 'Caption')} />
+        <PreviewLabel icon={meta?.icon} color={socialColor('instagram')} label="Instagram" onCopy={() => onCopy(version.caption || '', 'Caption')} />
         <article className="rounded-2xl studio-panel border border-white/15 overflow-hidden">
           <div className="flex items-center gap-2 px-2.5 py-2">
             <OrgAvatar logoUrl={logoUrl} name={orgName} />
@@ -2446,7 +2456,7 @@ function ChannelPreview({
   if (channel === 'facebook') {
     return (
       <div className="w-[280px]">
-        <PreviewLabel icon={meta?.icon} label="Facebook" onCopy={() => onCopy(version.caption || '', 'Caption')} />
+        <PreviewLabel icon={meta?.icon} color={socialColor('facebook')} label="Facebook" onCopy={() => onCopy(version.caption || '', 'Caption')} />
         <article className="rounded-2xl studio-panel border border-white/15 overflow-hidden">
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
             <OrgAvatar logoUrl={logoUrl} name={orgName} />
@@ -2476,7 +2486,7 @@ function ChannelPreview({
 
   return (
     <div className="w-[300px]">
-      <PreviewLabel icon={meta?.icon} label="LinkedIn" onCopy={() => onCopy(version.caption || '', 'Caption')} />
+      <PreviewLabel icon={meta?.icon} color={socialColor('linkedin')} label="LinkedIn" onCopy={() => onCopy(version.caption || '', 'Caption')} />
       <article className="rounded-2xl studio-panel border border-white/15 overflow-hidden">
         <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
           <OrgAvatar logoUrl={logoUrl} name={orgName} />
@@ -2564,30 +2574,55 @@ function PhotoStrip({
   onChange: (photos: ContentSource[]) => void
   onAdd: () => void
 }) {
+  const dragFrom = useRef<number | null>(null)
+  const [over, setOver] = useState<number | null>(null)
   const makeCover = (i: number) => onChange([photos[i], ...photos.filter((_, idx) => idx !== i)])
   const remove = (i: number) => onChange(photos.filter((_, idx) => idx !== i))
+  const dropOn = (index: number) => (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const from = dragFrom.current
+    dragFrom.current = null
+    setOver(null)
+    if (from == null || from === index) return
+    const next = [...photos]
+    const [moved] = next.splice(from, 1)
+    next.splice(index, 0, moved)
+    onChange(next)
+  }
   return (
     <div className="mt-2">
       <div className="flex flex-wrap gap-1.5">
         {photos.map((photo, i) => (
-          <div key={sourceKey(photo)} className={`group/thumb relative w-12 h-12 rounded-lg overflow-hidden border ${i === 0 ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200/80'}`}>
-            <img src={photo.thumb_url || photo.image_url} alt="" className="w-full h-full object-cover" />
+          <div
+            key={sourceKey(photo)}
+            draggable={photos.length > 1}
+            onDragStart={() => { dragFrom.current = i }}
+            onDragOver={event => { event.preventDefault(); setOver(i) }}
+            onDrop={dropOn(i)}
+            onDragEnd={() => { dragFrom.current = null; setOver(null) }}
+            className={`group/thumb relative w-12 h-12 rounded-lg overflow-hidden border cursor-grab active:cursor-grabbing ${
+              i === 0 ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200/80'
+            } ${over === i ? 'ring-2 ring-primary-400' : ''}`}
+          >
+            <img src={photo.thumb_url || photo.image_url} alt="" className="w-full h-full object-cover pointer-events-none" />
             {i === 0 ? (
-              <span className="absolute inset-x-0 bottom-0 bg-primary-600 text-white text-[9px] font-semibold text-center leading-4">Cover</span>
+              <span className="absolute inset-x-0 bottom-0 bg-primary-600 text-white text-[9px] font-semibold text-center leading-4 pointer-events-none">Cover</span>
             ) : (
               <button
                 type="button"
+                draggable={false}
                 aria-label="Make cover"
                 title="Make cover"
                 onClick={() => makeCover(i)}
-                className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 group-hover/thumb:bg-black/45 group-hover/thumb:opacity-100 transition-all"
+                className="absolute bottom-0.5 left-0.5 w-4 h-4 rounded-full bg-black/65 text-white flex items-center justify-center opacity-0 group-hover/thumb:opacity-100"
               >
-                <Star className="w-4 h-4" />
+                <Star className="w-2.5 h-2.5" />
               </button>
             )}
             {photos.length > 1 && (
               <button
                 type="button"
+                draggable={false}
                 aria-label="Remove photo"
                 onClick={() => remove(i)}
                 className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/65 text-white flex items-center justify-center opacity-0 group-hover/thumb:opacity-100"
@@ -2609,7 +2644,7 @@ function PhotoStrip({
         )}
       </div>
       {photos.length > 1 && (
-        <p className="mt-1 text-[11px] text-secondary-400">The first photo is the cover.</p>
+        <p className="mt-1 text-[11px] text-secondary-400">Drag to reorder. The first photo is the cover.</p>
       )}
     </div>
   )
@@ -2618,19 +2653,21 @@ function PhotoStrip({
 function PreviewLabel({
   label,
   icon: Icon,
+  color,
   onCopy,
   copyLabel = 'Copy',
   extra,
 }: {
   label: string
-  icon?: typeof Sparkles
+  icon?: ChannelIcon
+  color?: string
   onCopy: () => void
   copyLabel?: string
   extra?: ReactNode
 }) {
   return (
     <div className="flex items-center gap-1.5 px-0.5 pb-1.5">
-      {Icon ? <Icon className="w-3.5 h-3.5 text-secondary-600" /> : null}
+      {Icon ? <Icon className="w-3.5 h-3.5 text-secondary-600" style={color ? { color } : undefined} /> : null}
       <p className="text-[10px] font-semibold uppercase tracking-wide text-secondary-500">{label}</p>
       <div className="ml-auto flex items-center gap-0.5">
         {extra}
@@ -2692,77 +2729,40 @@ function FitText({
   onChange,
   className,
   minRows = 2,
+  placeholder,
 }: {
   value: string
   onChange: (v: string) => void
   className?: string
   minRows?: number
+  placeholder?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
-  const chipRef = useRef<HTMLSpanElement>(null)
-  const editing = useRef(false)
-  const hovering = useRef(false)
-  const raf = useRef(0)
-  const target = useRef({ x: 0, y: 0 })
-  const current = useRef({ x: 0, y: 0 })
   useEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.max(el.scrollHeight, minRows * 16)}px`
   }, [value, minRows])
-  useEffect(() => () => cancelAnimationFrame(raf.current), [])
-  const tick = () => {
-    const chip = chipRef.current
-    if (!chip) return
-    const cur = current.current
-    const next = target.current
-    cur.x += (next.x - cur.x) * 0.16
-    cur.y += (next.y - cur.y) * 0.16
-    chip.style.transform = `translate3d(${cur.x}px, ${cur.y}px, 0)`
-    if (hovering.current && !editing.current) raf.current = requestAnimationFrame(tick)
-  }
-  const moveChip = (e: MouseEvent<HTMLDivElement>) => {
-    const chip = chipRef.current
-    if (!chip || editing.current) return
-    const box = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - box.left + 12
-    const y = e.clientY - box.top - 18
-    target.current = { x, y }
-    if (!hovering.current) {
-      hovering.current = true
-      current.current = { x, y }
-      chip.style.opacity = '1'
-      raf.current = requestAnimationFrame(tick)
-    }
-  }
-  const hideChip = () => {
-    hovering.current = false
-    cancelAnimationFrame(raf.current)
-    if (chipRef.current) chipRef.current.style.opacity = '0'
-  }
   return (
-    <div
-      className="relative"
-      onMouseMove={moveChip}
-      onMouseLeave={hideChip}
-    >
+    <div className="group/edit relative">
       <textarea
         ref={ref}
         rows={minRows}
         value={value}
         onChange={e => onChange(e.target.value)}
-        onFocus={() => { editing.current = true; hideChip() }}
-        onBlur={() => { editing.current = false }}
-        className={`block w-full bg-transparent border-0 p-0 m-0 shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 resize-none overflow-hidden whitespace-pre-wrap break-words ${className || ''}`}
+        placeholder={placeholder}
+        className={`block w-full bg-transparent border-0 p-0 pr-8 m-0 shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 resize-none overflow-hidden whitespace-pre-wrap break-words placeholder:text-secondary-300 ${className || ''}`}
       />
-      <span
-        ref={chipRef}
-        className="pointer-events-none absolute left-0 top-0 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary-500 text-white shadow-card opacity-0"
-        style={{ willChange: 'transform' }}
+      <button
+        type="button"
+        aria-label="Edit"
+        onMouseDown={event => event.preventDefault()}
+        onClick={() => ref.current?.focus()}
+        className="absolute right-0 top-0 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary-500 text-white shadow-card opacity-0 group-hover/edit:opacity-100 focus:opacity-100"
       >
         <Pencil className="w-3 h-3" />
-      </span>
+      </button>
     </div>
   )
 }
@@ -2809,7 +2809,7 @@ function MaterialPicker({
   const order = new Map(picked.map((s, i) => [sourceKey(s), i + 1]))
   return (
     <div className="space-y-3 pb-6">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 flex flex-wrap items-center gap-2 bg-[#F3F6F1]">
         <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={onBack}>
           <ChevronLeft className="w-4 h-4" /> Back
         </button>

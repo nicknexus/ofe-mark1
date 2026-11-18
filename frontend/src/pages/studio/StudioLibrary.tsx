@@ -7,34 +7,30 @@ import { formatDate } from '../../utils'
 import { SocialMarks, StudioFrame, StudioPanel, socialSendLabel } from './StudioFrame'
 import { useStudioLibrary } from './useStudioLibrary'
 
-type LibraryFilter = 'all' | 'standalone' | 'journey' | 'draft' | 'public'
+type LibraryFilter = 'all' | 'draft' | 'public'
 
 const FILTERS: { id: LibraryFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'standalone', label: 'Standalone' },
-  { id: 'journey', label: 'In a journey' },
   { id: 'draft', label: 'Drafts' },
-  { id: 'public', label: 'Public page' },
+  { id: 'public', label: 'Posted' },
 ]
 
 export default function StudioLibrary() {
-  const { packages, journeys, loading, error } = useStudioLibrary()
+  const { packages, loading, error } = useStudioLibrary()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<LibraryFilter>('all')
-  const journeyById = useMemo(() => new Map(journeys.map(journey => [journey.id, journey])), [journeys])
 
   const visible = useMemo(() => {
-    const kind = filter === 'standalone' ? 'moments' : filter === 'journey' ? 'updates' : 'all'
     const status = filter === 'draft' ? 'draft' : filter === 'public' ? 'published' : 'all'
-    return filterPosts(packages, query, kind, status, 'all')
+    return filterPosts(packages, query, 'all', status, 'all')
   }, [packages, query, filter])
 
   return (
     <StudioFrame
       title="Library"
-      subtitle="Every post you have drafted, including updates that live in a journey."
+      subtitle="Every post you have drafted."
       actions={
-        <Link to="/studio/new" state={{ studioStart: 'diy' }} className="studio-hero-btn studio-hero-btn-mint">
+        <Link to="/studio/new" state={{ studioStart: 'diy', from: '/studio/library' }} className="studio-hero-btn studio-hero-btn-mint">
           <Plus className="w-4 h-4" /> Create a post
         </Link>
       }
@@ -79,7 +75,6 @@ export default function StudioLibrary() {
       ) : (
         <StudioPanel className="divide-y divide-[#14352A]/[0.06]">
           {visible.map(pkg => {
-            const journey = pkg.journey_id ? journeyById.get(pkg.journey_id) : undefined
             const sent = socialSendLabel(pkg.publications)
             return (
               <div key={pkg.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7FAF4] transition-colors">
@@ -92,8 +87,6 @@ export default function StudioLibrary() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-[15px] font-semibold text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
                     <span className="block text-[12px] text-secondary-500 truncate mt-0.5">
-                      {journey ? journey.title : 'Standalone'}
-                      {' · '}
                       {formatDate(pkg.updated_at || pkg.created_at, { month: 'short', day: 'numeric' })}
                       {sent ? ` · ${sent}` : ''}
                     </span>
@@ -104,7 +97,7 @@ export default function StudioLibrary() {
                   <span className={`inline-flex h-7 w-[108px] items-center justify-center rounded-full text-[12px] font-medium border ${
                     pkg.published_at ? 'bg-[#14352A] text-white border-[#14352A]' : 'bg-white text-[#3d4352] border-[rgba(20,53,42,0.08)]'
                   }`}>
-                    {pkg.published_at ? 'Public page' : 'Draft'}
+                    {pkg.published_at ? 'Posted' : 'Draft'}
                   </span>
                   <Link to={`/studio/post/${pkg.id}`} className="app-btn app-btn-secondary app-btn-sm w-[132px] justify-center">
                     Post to socials

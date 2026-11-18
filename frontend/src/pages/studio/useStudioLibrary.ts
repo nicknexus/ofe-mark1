@@ -4,14 +4,55 @@ import { apiService } from '../../services/api'
 import type { ContentJourney, ContentPackage, ContentPublication } from '../../types'
 
 const cache = new Map<string, { packages: ContentPackage[]; journeys: ContentJourney[] }>()
+const listeners = new Set<() => void>()
 
-export function patchStudioPackage(orgId: string, packageId: string, publications: ContentPublication[]) {
+function emitLibrary() {
+  listeners.forEach(listener => listener())
+}
+
+export function upsertStudioPackage(orgId: string, pkg: ContentPackage) {
+  const hit = cache.get(orgId)
+  if (!hit) return
+  const existing = hit.packages.find(item => item.id === pkg.id)
+  const next = existing
+    ? { ...existing, ...pkg, publications: pkg.publications ?? existing.publications }
+    : pkg
+  cache.set(orgId, {
+    ...hit,
+    packages: existing
+      ? hit.packages.map(item => item.id === pkg.id ? next : item)
+      : [next, ...hit.packages],
+  })
+  emitLibrary()
+}
+
+export function removeStudioPackage(orgId: string, packageId: string) {
+  const hit = cache.get(orgId)
+  if (!hit) return
+  cache.set(orgId, { ...hit, packages: hit.packages.filter(pkg => pkg.id !== packageId) })
+}
+
+export function removeStudioJourney(orgId: string, journeyId: string) {
   const hit = cache.get(orgId)
   if (!hit) return
   cache.set(orgId, {
     ...hit,
-    packages: hit.packages.map(pkg => pkg.id === packageId ? { ...pkg, publications } : pkg),
+    journeys: hit.journeys.filter(journey => journey.id !== journeyId),
+    packages: hit.packages.filter(pkg => pkg.journey_id !== journeyId),
   })
+}
+export function patchStudioPackage(orgId: string, packageId: string, publications: ContentPublication[], publishedAt?: string | null) {
+  const hit = cache.get(orgId)
+  if (!hit) return
+  cache.set(orgId, {
+    ...hit,
+    packages: hit.packages.map(pkg => pkg.id === packageId ? {
+      ...pkg,
+      publications,
+      published_at: publishedAt || pkg.published_at,
+    } : pkg),
+  })
+  emitLibrary()
 }
 
 export function useStudioLibrary() {
@@ -22,6 +63,17 @@ export function useStudioLibrary() {
   const [journeys, setJourneys] = useState<ContentJourney[]>(hit?.journeys ?? [])
   const [loading, setLoading] = useState(!hit)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const listener = () => {
+      const cached = orgId ? cache.get(orgId) : undefined
+      if (!cached) return
+      setPackages(cached.packages)
+      setJourneys(cached.journeys)
+    }
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+  }, [orgId])
 
   useEffect(() => {
     const cached = orgId ? cache.get(orgId) : undefined

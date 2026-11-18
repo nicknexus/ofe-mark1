@@ -35,7 +35,7 @@ export function useSocialAccount() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Could not reach Upload Post')
+        setError(err instanceof Error ? err.message : 'Could not load your accounts')
         setReady(true)
       })
     return () => { cancelled = true }

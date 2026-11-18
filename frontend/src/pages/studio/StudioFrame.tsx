@@ -1,13 +1,40 @@
-import type { ReactNode } from 'react'
-import { Facebook, Instagram, Linkedin, Sparkles } from 'lucide-react'
+import type { CSSProperties, ReactNode } from 'react'
+import { Sparkles } from 'lucide-react'
+import { siFacebook, siInstagram } from 'simple-icons'
 import { cn } from '../../lib/utils'
 import type { ContentPublication } from '../../types'
 
+const LINKEDIN_PATH = 'M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124zM7.119 20.452H3.56V9h3.559v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z'
+
+function BrandMark({ path, className, style }: { path: string; className?: string; style?: CSSProperties }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} style={style} aria-hidden>
+      <path fill="currentColor" d={path} />
+    </svg>
+  )
+}
+
+export function InstagramIcon(props: { className?: string; style?: CSSProperties }) {
+  return <BrandMark path={siInstagram.path} {...props} />
+}
+
+export function FacebookIcon(props: { className?: string; style?: CSSProperties }) {
+  return <BrandMark path={siFacebook.path} {...props} />
+}
+
+export function LinkedInIcon(props: { className?: string; style?: CSSProperties }) {
+  return <BrandMark path={LINKEDIN_PATH} {...props} />
+}
+
 export const STUDIO_PLATFORMS = [
-  { id: 'instagram', label: 'Instagram', icon: Instagram },
-  { id: 'facebook', label: 'Facebook', icon: Facebook },
-  { id: 'linkedin', label: 'LinkedIn', icon: Linkedin },
+  { id: 'instagram', label: 'Instagram', icon: InstagramIcon, color: `#${siInstagram.hex}` },
+  { id: 'facebook', label: 'Facebook', icon: FacebookIcon, color: `#${siFacebook.hex}` },
+  { id: 'linkedin', label: 'LinkedIn', icon: LinkedInIcon, color: '#0A66C2' },
 ] as const
+
+export function socialColor(id: string) {
+  return STUDIO_PLATFORMS.find(platform => platform.id === id)?.color
+}
 
 export function StudioFrame({
   title,
@@ -50,6 +77,14 @@ export function StudioPanel({ className, children }: { className?: string; child
 
 const LIVE = new Set(['accepted', 'scheduled', 'published'])
 
+export function isQueued(item: { status: string; scheduled_at?: string | null }) {
+  if (item.status === 'published' || item.status === 'failed') return false
+  if (item.status === 'scheduled') return true
+  if (!item.scheduled_at) return false
+  const time = new Date(item.scheduled_at).getTime()
+  return !Number.isNaN(time) && time > Date.now()
+}
+
 export function livePublications(items?: ContentPublication[]) {
   return (items || []).filter(item => LIVE.has(item.status))
 }
@@ -75,9 +110,9 @@ export function SocialMarks({ items }: { items?: ContentPublication[] }) {
           <span
             key={platform.id}
             title={sent?.status === 'scheduled' ? `${platform.label} scheduled` : `Sent to ${platform.label}`}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#E7F3DF] text-[#14352A]"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-black/5"
           >
-            <Icon className="w-3.5 h-3.5" />
+            <Icon className="w-3.5 h-3.5" style={{ color: platform.color }} />
           </span>
         )
       })}

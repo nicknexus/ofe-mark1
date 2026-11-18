@@ -4,6 +4,7 @@ import { notify } from '../../lib/notify'
 import { apiService } from '../../services/api'
 import type { AccessibleOrganization } from '../../services/team'
 import { getVideoThumbnailUrl, isValidVideoUrl } from '../../utils/videoEmbed'
+import { PUBLIC_HERO_LAYOUTS_ENABLED } from './publicHeroRelease'
 
 type HeroMode = 'classic' | 'image' | 'video'
 
@@ -110,6 +111,8 @@ export function PublicHeroSettings({
     }, [org.id])
 
     const mode: HeroMode = hero?.public_hero || 'classic'
+    const choices = PUBLIC_HERO_LAYOUTS_ENABLED ? CHOICES : CHOICES.filter(choice => choice.id === 'classic')
+    const shownMode: HeroMode = PUBLIC_HERO_LAYOUTS_ENABLED ? mode : 'classic'
 
     const saveMode = async (next: HeroMode) => {
         if (!canEdit || !org.id || next === mode) return
@@ -178,20 +181,24 @@ export function PublicHeroSettings({
     return (
         <section className="app-card p-6 sm:p-8 mt-4">
             <h2 className="text-[15px] font-semibold text-secondary-900">Hero</h2>
-            <p className="text-sm text-secondary-500 mt-1">How the top of the public page looks. Image and video only show after you set them here.</p>
-            {hero && !hero.ready && (
+            <p className="text-sm text-secondary-500 mt-1">
+                {PUBLIC_HERO_LAYOUTS_ENABLED
+                    ? 'How the top of the public page looks. Image and video only show after you set them here.'
+                    : 'How the top of the public page looks.'}
+            </p>
+            {PUBLIC_HERO_LAYOUTS_ENABLED && hero && !hero.ready && (
                 <p className="mt-3 text-sm text-amber-800">Hero settings are not available until the database update is applied.</p>
             )}
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-                {CHOICES.map(choice => {
-                    const selected = mode === choice.id
+            <div className={`mt-5 grid grid-cols-1 gap-3 ${choices.length > 1 ? 'md:grid-cols-3' : 'max-w-sm'}`}>
+                {choices.map(choice => {
+                    const selected = shownMode === choice.id
                     return (
                         <button
                             key={choice.id}
                             type="button"
-                            disabled={!canEdit || busy || !hero?.ready}
+                            disabled={!PUBLIC_HERO_LAYOUTS_ENABLED || !canEdit || busy || !hero?.ready}
                             onClick={() => saveMode(choice.id)}
-                            className={`text-left rounded-2xl border overflow-hidden transition-colors ${selected ? 'border-primary-400 bg-primary-50 ring-1 ring-primary-400' : 'border-gray-200 hover:border-gray-300'} disabled:opacity-60`}
+                            className={`text-left rounded-2xl border overflow-hidden transition-colors ${selected ? 'border-primary-400 bg-primary-50 ring-1 ring-primary-400' : 'border-gray-200 hover:border-gray-300'} ${PUBLIC_HERO_LAYOUTS_ENABLED ? 'disabled:opacity-60' : 'disabled:opacity-100 cursor-default'}`}
                         >
                             <HeroSketch mode={choice.id} org={org} imageUrl={hero?.hero_image_url} videoUrl={hero?.hero_video_url} />
                             <span className="block px-4 pt-3 text-sm font-semibold text-secondary-900">{choice.title}</span>
@@ -201,7 +208,7 @@ export function PublicHeroSettings({
                 })}
             </div>
 
-            {mode === 'image' && (
+            {PUBLIC_HERO_LAYOUTS_ENABLED && mode === 'image' && (
                 <div className="mt-6">
                     {hero?.hero_image_url ? (
                         <img src={hero.hero_image_url} alt="" className="h-40 w-full max-w-md object-cover rounded-2xl border border-gray-100" />
@@ -236,7 +243,7 @@ export function PublicHeroSettings({
                 </div>
             )}
 
-            {mode === 'video' && (
+            {PUBLIC_HERO_LAYOUTS_ENABLED && mode === 'video' && (
                 <div className="mt-6 max-w-xl">
                     {!isValidVideoUrl(hero?.hero_video_url) && (
                         <p className="text-sm text-amber-800 mb-3">The live page stays on Classic until a video link is saved.</p>

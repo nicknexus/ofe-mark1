@@ -308,22 +308,26 @@ function publicationFromUpload(item: UploadReceipt): ContentPublication {
 
 function dedupePublications(items: ContentPublication[]): ContentPublication[] {
     const rank = { failed: 0, accepted: 1, scheduled: 2, published: 3 }
-    const byPlatform = new Map<string, ContentPublication>()
+    const live = new Map<string, ContentPublication>()
+    const scheduled = new Map<string, ContentPublication>()
     for (const item of items) {
-        const prev = byPlatform.get(item.platform)
+        const bucket = item.status === 'scheduled' ? scheduled : live
+        const prev = bucket.get(item.platform)
         if (!prev) {
-            byPlatform.set(item.platform, item)
+            bucket.set(item.platform, item)
             continue
         }
-        const better = rank[item.status] > rank[prev.status]
-            || (rank[item.status] === rank[prev.status] && !!item.post_url && !prev.post_url)
-            || (rank[item.status] === rank[prev.status] && item.created_at > prev.created_at && !prev.post_url)
-        if (better) byPlatform.set(item.platform, item)
+        const better = item.status === 'scheduled'
+            ? (item.scheduled_at || '') > (prev.scheduled_at || '')
+            : rank[item.status] > rank[prev.status]
+                || (rank[item.status] === rank[prev.status] && !!item.post_url && !prev.post_url)
+                || (rank[item.status] === rank[prev.status] && item.created_at > prev.created_at && !prev.post_url)
+        if (better) bucket.set(item.platform, item)
     }
-    return [...byPlatform.values()]
+    return [...live.values(), ...scheduled.values()]
 }
 
-function receiptOverlay(item: UploadReceipt) {
+function receiptOverlay(item: UploadReceipt, idempotencyKey?: string | null) {
     return {
         upload_post: {
             status: item.status,
@@ -334,6 +338,7 @@ function receiptOverlay(item: UploadReceipt) {
             external_id: item.externalId,
             sent_at: item.sentAt,
             scheduled_at: item.scheduledAt,
+            ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
         },
     }
 }
@@ -1127,7 +1132,14 @@ email_body: donor-email depth, line breaks, no emojis.`,
         storyType: ContentStoryType,
         why?: string,
         requestedOrgId?: string,
-        opts?: { journeyId?: string | null; packageId?: string | null; extras?: ContentSourceRef[]; ideaId?: string | null }
+        opts?: {
+            journeyId?: string | null
+            packageId?: string | null
+            extras?: ContentSourceRef[]
+            ideaId?: string | null
+            context?: string | null
+            draft?: { hook?: string; body?: string; cta?: string } | null
+        }
     ): Promise<ContentMaster> {
         const { organizationId, org } = await this.assertStudioAccess(userId, requestedOrgId)
         this.assertOpenAi()
@@ -1150,6 +1162,15 @@ email_body: donor-email depth, line breaks, no emojis.`,
 
         const ideaFacts = opts?.ideaId ? await this.loadIdeaFacts(organizationId, opts.ideaId) : ''
         const facts = [await this.loadCopyFacts(source, org), extrasFacts(extras), journeyFacts, ideaFacts].filter(Boolean).join('\n\n')
+        const context = String(opts?.context || '').trim().slice(0, 4000)
+        const draftHook = String(opts?.draft?.hook || '').trim()
+        const draftBody = String(opts?.draft?.body || '').trim()
+        const notes = [
+            context ? `USER CONTEXT (weave this in, do not invent beyond it):\n${context}` : '',
+            context && (draftHook || draftBody)
+                ? `CURRENT DRAFT (rewrite it with the context, keep the logged facts):\nHOOK: ${draftHook}\nBODY: ${draftBody}\nCTA: ${String(opts?.draft?.cta || '').trim()}`
+                : '',
+        ].filter(Boolean).join('\n\n')
         const completion = await openai!.chat.completions.create({
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
@@ -1160,7 +1181,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
                     role: 'system',
                     content: masterWriterPrompt(storyType),
                 },
-                { role: 'user', content: facts },
+                { role: 'user', content: notes ? `${facts}\n\n${notes}` : facts },
             ],
         })
         const parsed = this.parseJson(completion.choices[0]?.message?.content)
@@ -1471,6 +1492,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
         requestId?: string | null
         jobId?: string | null
         externalId: string
+        idempotencyKey?: string | null
         sentAt: string
         scheduledAt?: string | null
     }): Promise<ContentPublication> {
@@ -1503,8 +1525,11 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 return raw?.external_id === input.externalId
             })
             if (prior) {
-                if (input.postUrl || input.status === 'failed') {
-                    await supabase.from('content_posts').update({ overlay: receiptOverlay(item) }).eq('id', prior.id)
+                const priorRaw = receiptPayload(prior.overlay)
+                const priorFailed = priorRaw?.status === 'failed'
+                if (input.postUrl || input.status === 'failed' || priorFailed) {
+                    const key = input.idempotencyKey || (typeof priorRaw?.idempotency_key === 'string' ? priorRaw.idempotency_key : null)
+                    await supabase.from('content_posts').update({ overlay: receiptOverlay(item, key) }).eq('id', prior.id)
                 }
                 return publication
             }
@@ -1519,7 +1544,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 source_type: input.sourceType,
                 source_id: input.sourceId,
                 image_url: input.imageUrl || null,
-                overlay: receiptOverlay(item),
+                overlay: receiptOverlay(item, input.idempotencyKey),
                 created_by: input.userId || null,
                 package_id: input.packageId,
                 channel: input.platform,
@@ -1534,6 +1559,52 @@ email_body: donor-email depth, line breaks, no emojis.`,
             console.error('social receipt', error instanceof Error ? error.message : error)
         }
         return publication
+    }
+
+    /** Reuse the key from a live send so a second click does not post twice. A failed send gets a new key. */
+    static async socialIdempotencyKey(
+        organizationId: string,
+        packageId: string,
+        platform: string,
+        externalId: string
+    ): Promise<string | null> {
+        const { data: rows, error } = await supabase
+            .from('content_posts')
+            .select('channel, overlay')
+            .eq('organization_id', organizationId)
+            .eq('package_id', packageId)
+            .eq('channel', platform)
+        if (error || !rows) return null
+        const prior = (rows as ContentPost[]).find(row => receiptPayload(row.overlay)?.external_id === externalId)
+        const raw = prior ? receiptPayload(prior.overlay) : null
+        const status = raw?.status
+        if (!raw || status === 'failed') return null
+        if (status !== 'accepted' && status !== 'scheduled' && status !== 'published') return null
+        return typeof raw.idempotency_key === 'string' && raw.idempotency_key ? raw.idempotency_key : externalId
+    }
+
+    static async unscheduleSocial(
+        userId: string,
+        packageId: string,
+        platform: 'instagram' | 'facebook' | 'linkedin',
+        requestedOrgId?: string
+    ): Promise<ContentPackage> {
+        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
+        const { data: rows, error } = await supabase
+            .from('content_posts')
+            .select('id, channel, overlay')
+            .eq('organization_id', organizationId)
+            .eq('package_id', packageId)
+            .eq('channel', platform)
+        if (error) throw new Error(`Failed to load the schedule: ${error.message}`)
+        const scheduled = ((rows || []) as ContentPost[]).find(row => receiptPayload(row.overlay)?.status === 'scheduled')
+        if (!scheduled) throw httpError(404, 'That post is not scheduled')
+        const raw = receiptPayload(scheduled.overlay)
+        const jobId = typeof raw?.job_id === 'string' ? raw.job_id : ''
+        if (jobId) await UploadPostService.cancelSchedule(jobId)
+        const { error: deleteError } = await supabase.from('content_posts').delete().eq('id', scheduled.id)
+        if (deleteError) throw new Error(`Failed to clear the schedule: ${deleteError.message}`)
+        return this.getPackage(userId, packageId, requestedOrgId)
     }
 
     /** Pulls Upload Post history so a send still shows if the first write was missed. */
@@ -1564,8 +1635,11 @@ email_body: donor-email depth, line breaks, no emojis.`,
             const prior = existing.get(item.externalId)
             if (prior) {
                 const current = publicationFromPost(prior)
-                if (current && item.postUrl && current.post_url !== item.postUrl) {
-                    await supabase.from('content_posts').update({ overlay: receiptOverlay(item) }).eq('id', prior.id)
+                const advanced = !!current && current.status === 'scheduled' && (item.status === 'published' || item.status === 'accepted')
+                if (current && ((item.postUrl && current.post_url !== item.postUrl) || advanced)) {
+                    const raw = receiptPayload(prior.overlay)
+                    const key = typeof raw?.idempotency_key === 'string' ? raw.idempotency_key : null
+                    await supabase.from('content_posts').update({ overlay: receiptOverlay(item, key) }).eq('id', prior.id)
                 }
                 pkg.publications = dedupePublications([...(pkg.publications || []), publicationFromUpload(item)])
                 continue
@@ -1595,9 +1669,22 @@ email_body: donor-email depth, line breaks, no emojis.`,
             }
             pkg.publications = dedupePublications([...(pkg.publications || []), publicationFromUpload(item)])
         }
+        const liveIds = wanted
+            .filter(item => item.status === 'published' || (item.status === 'accepted' && !item.scheduledAt))
+            .map(item => item.packageId)
+            .filter(id => {
+                const pkg = byId.get(id)
+                return !!pkg && !pkg.published_at
+            })
+        if (!liveIds.length) return
+        const stamped = await this.noteSocialLive(organizationId, liveIds)
+        for (const [id, at] of stamped) {
+            const pkg = byId.get(id)
+            if (pkg) pkg.published_at = at
+        }
     }
 
-    /** Saves the master only (the public-page post). Channel versions are separate. */
+    /** Saves the master. The Nexus page turns on only after a real social send. */
     static async savePackage(
         userId: string,
         input: {
@@ -1613,7 +1700,6 @@ email_body: donor-email depth, line breaks, no emojis.`,
             extras?: ContentSourceRef[]
             journey_id?: string | null
             idea_id?: string | null
-            publish?: boolean
         },
         requestedOrgId?: string
     ): Promise<ContentPackage> {
@@ -1653,8 +1739,6 @@ email_body: donor-email depth, line breaks, no emojis.`,
             layout,
             edited_at: now,
         }
-        if (input.publish === true) fields.published_at = existing?.published_at || now
-        else if (input.publish === false) fields.published_at = null
 
         const { data: pkg, error } = existing
             ? await supabase
@@ -1676,10 +1760,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
             throw new Error(`Failed to save: ${error.message}`)
         }
 
-        if (journeyId) {
-            await this.touchJourney(organizationId, journeyId)
-            if (fields.published_at) await this.publishJourneyIfDraft(organizationId, journeyId)
-        }
+        if (journeyId) await this.touchJourney(organizationId, journeyId)
         if (ideaId) {
             await supabase
                 .from('content_ideas')
@@ -1696,22 +1777,30 @@ email_body: donor-email depth, line breaks, no emojis.`,
         return this.getPackage(userId, pkg.id, requestedOrgId)
     }
 
-    static async setPackagePublished(
-        userId: string,
-        packageId: string,
-        published: boolean,
-        requestedOrgId?: string
-    ): Promise<ContentPackage> {
-        const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
-        const existing = await this.loadPackageRow(organizationId, packageId)
-        const { error } = await supabase
+    /** Puts a post on the Nexus page after a real social send. A schedule does not count. */
+    static async noteSocialLive(organizationId: string, packageIds: string[]): Promise<Map<string, string>> {
+        const ids = [...new Set(packageIds)].filter(Boolean)
+        const stamped = new Map<string, string>()
+        if (!ids.length) return stamped
+        const now = new Date().toISOString()
+        const { data, error } = await supabase
             .from('content_packages')
-            .update({ published_at: published ? existing.published_at || new Date().toISOString() : null })
-            .eq('id', packageId)
+            .update({ published_at: now })
             .eq('organization_id', organizationId)
-        if (error) throw new Error(`Failed to update: ${error.message}`)
-        if (published && existing.journey_id) await this.publishJourneyIfDraft(organizationId, existing.journey_id)
-        return this.getPackage(userId, packageId, requestedOrgId)
+            .in('id', ids)
+            .is('published_at', null)
+            .select('id, journey_id')
+        if (error) {
+            console.error('publish from send', error.message)
+            return stamped
+        }
+        const journeys = new Set<string>()
+        for (const row of data || []) {
+            stamped.set(row.id, now)
+            if (row.journey_id) journeys.add(row.journey_id)
+        }
+        for (const journeyId of journeys) await this.publishJourneyIfDraft(organizationId, journeyId)
+        return stamped
     }
 
     /** Writes channel versions from the saved master, then stores them. */

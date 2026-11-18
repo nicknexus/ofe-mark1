@@ -1694,6 +1694,10 @@ class ApiService {
  package_id?: string | null
  extras?: ContentSourceRef[]
  idea_id?: string | null
+ context?: string
+ hook?: string
+ body?: string
+ cta?: string
  }): Promise<ContentMaster> {
  return this.request<ContentMaster>('/content/generate-master', {
  method: 'POST',
@@ -1829,7 +1833,6 @@ class ApiService {
  layout?: GraphicLayout
  source_type: ContentSourceType
  source_id: string
- publish?: boolean
  }): Promise<ContentPackage> {
  const { id, ...body } = input
  return this.request<ContentPackage>(id ? `/content/packages/${id}` : '/content/packages', {
@@ -1884,6 +1887,10 @@ class ApiService {
  return this.request('/content/social/insights')
  }
 
+ async releaseSocialProfile(): Promise<{ removed: boolean }> {
+ return this.request('/content/social/release', { method: 'POST' })
+ }
+
  async connectSocial(platform: 'instagram' | 'facebook' | 'linkedin'): Promise<{ url: string }> {
  return this.request('/content/social/connect', {
  method: 'POST',
@@ -1902,18 +1909,15 @@ class ApiService {
  platforms: Array<'instagram' | 'facebook' | 'linkedin'>
  scheduled_at?: string
  timezone?: string
- }): Promise<{ results: Array<{ platform: string; ok: boolean; status?: 'accepted' | 'scheduled' | 'published' | 'failed'; error?: string | null; postUrl?: string | null; sentAt?: string }> }> {
+ }): Promise<{ results: Array<{ platform: string; ok: boolean; status?: 'accepted' | 'scheduled' | 'published' | 'failed'; error?: string | null; postUrl?: string | null; sentAt?: string }>; published_at: string | null }> {
  return this.request(`/content/packages/${id}/social`, {
  method: 'POST',
  body: JSON.stringify(input),
  })
  }
 
- async publishContentPackage(id: string, published: boolean): Promise<ContentPackage> {
- return this.request<ContentPackage>(`/content/packages/${id}/publish`, {
- method: 'PATCH',
- body: JSON.stringify({ published }),
- })
+ async unscheduleSocial(id: string, platform: 'instagram' | 'facebook' | 'linkedin'): Promise<ContentPackage> {
+ return this.request<ContentPackage>(`/content/packages/${id}/social?platform=${platform}`, { method: 'DELETE' })
  }
 
  async generateContentChannels(id: string, input: { channels: ContentChannel[]; context?: string }): Promise<ContentPackage> {

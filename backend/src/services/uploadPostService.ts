@@ -153,6 +153,7 @@ function parseUploads(body: any): UploadReceipt[] {
         let status: UploadReceipt['status'] = 'accepted'
         if (row?.success === false) status = 'failed'
         else if (row?.success === true && postUrl) status = 'published'
+        else if (scheduledAt && !postUrl) status = 'scheduled'
         else if (row?.success === true) status = 'accepted'
         else if (scheduledAt) status = 'scheduled'
         out.push({
@@ -178,9 +179,10 @@ export class UploadPostService {
         return !!process.env.UPLOAD_POST_API_KEY
     }
 
-    /** Off unless someone explicitly opts in. Do not set this on the free trial. */
+    /** Locked only when explicitly set to 0. A configured key can connect, send, and unschedule. */
     static mutationsEnabled(): boolean {
-        return process.env.UPLOAD_POST_MUTATIONS === '1'
+        if (process.env.UPLOAD_POST_MUTATIONS === '0') return false
+        return this.configured()
     }
 
     static assertMutations(): void {
@@ -324,11 +326,14 @@ export class UploadPostService {
             return postMetricsCache.value
         }
         const uploads = await this.uploadsForProfile(username)
-        const published = uploads.filter(row => row.status === 'published' && row.platformPostId)
+        const published = uploads.filter(row => row.status === 'published' && row.platformPostId).slice(0, 8)
+        const measured = await Promise.all(published.map(async row => ({
+            row,
+            metrics: await this.livePostMetrics(username, row.platform, row.platformPostId as string),
+        })))
         const posts: SocialPostMetrics[] = []
         let removed = 0
-        for (const row of published.slice(0, 8)) {
-            const metrics = await this.livePostMetrics(username, row.platform, row.platformPostId as string)
+        for (const { row, metrics } of measured) {
             if (!metrics) {
                 removed += 1
                 continue
@@ -380,15 +385,21 @@ export class UploadPostService {
                 social_platform: platform,
             }),
         })
+        return { removedProfile: await this.releaseIfUnused(organizationId) }
+    }
+
+    /** Drops the org profile when no network finished connecting, so an abandoned approval does not keep a slot. */
+    static async releaseIfUnused(organizationId: string): Promise<boolean> {
+        const username = this.profileUsername(organizationId)
         const body = await this.request(`/api/uploadposts/users/${encodeURIComponent(username)}`, undefined, true)
+        if (!body) return false
         const social = body?.profile?.social_accounts || {}
-        const stillLinked = Object.values(social).some(value => accountConnected(value).connected)
-        if (stillLinked || !body) return { removedProfile: false }
+        if (Object.values(social).some(value => accountConnected(value).connected)) return false
         await this.request('/api/uploadposts/users', {
             method: 'DELETE',
             body: JSON.stringify({ username }),
         })
-        return { removedProfile: true }
+        return true
     }
 
     static async connections(organizationId: string): Promise<UploadPostAccount['connections']> {
@@ -417,7 +428,7 @@ export class UploadPostService {
         })
         const url = body?.authorize_url
         if (typeof url !== 'string' || !url.startsWith('https://')) {
-            throw httpError(502, 'Upload Post did not return a connect link.', 'NO_CONNECT_URL')
+            throw httpError(502, 'Could not open the approval screen. Try again.', 'NO_CONNECT_URL')
         }
         return url
     }
@@ -441,9 +452,15 @@ export class UploadPostService {
         return username
     }
 
+    static async cancelSchedule(jobId: string): Promise<void> {
+        this.assertMutations()
+        await this.request(`/api/uploadposts/schedule/${encodeURIComponent(jobId)}`, { method: 'DELETE' }, true)
+        this.clearUploadCache()
+    }
+
     private static async request(path: string, init?: RequestInit, allow404 = false): Promise<any> {
         const key = process.env.UPLOAD_POST_API_KEY
-        if (!key) throw httpError(503, 'Upload Post is not configured.', 'NOT_CONFIGURED')
+        if (!key) throw httpError(503, 'Account connections are not available right now.', 'NOT_CONFIGURED')
         const headers = new Headers(init?.headers)
         headers.set('Authorization', `Apikey ${key}`)
         if (typeof init?.body === 'string' && !headers.has('Content-Type')) {
@@ -455,7 +472,10 @@ export class UploadPostService {
         let body: any = null
         try { body = text ? JSON.parse(text) : null } catch { body = null }
         if (!response.ok) {
-            const message = body?.message || body?.error || `Upload Post returned ${response.status}`
+            const raw = body?.message || body?.error || ''
+            const message = typeof raw === 'string' && raw.trim() && !/upload post/i.test(raw)
+                ? raw
+                : 'Could not complete that. Try again.'
             throw httpError(response.status, message, body?.error_code)
         }
         return body

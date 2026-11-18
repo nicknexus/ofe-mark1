@@ -97,17 +97,16 @@ function Pills<T extends string>({ value, options, onChange }: { value: T; optio
   )
 }
 
-const LIBRARY_VIEWS: { id: 'all' | 'moments' | 'journeys'; label: string }[] = [
+const LIBRARY_VIEWS: { id: 'all' | 'moments'; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'moments', label: 'Moments' },
-  { id: 'journeys', label: 'Journeys' },
 ]
 
 const MODES = [
   {
     id: 'create' as const,
     label: 'Create Content',
-    hint: 'Posts, moments and journeys',
+    hint: 'Posts you can draft and send',
     icon: LayoutGrid,
     fill: 'bg-primary-500',
     glow: 'rgba(192,223,161,0.5)',
@@ -261,7 +260,7 @@ export function PostToolbar({
           placeholder={scope === 'moments' ? 'Search moments' : 'Search posts'}
         />
       </div>
-      <Pills value={status} onChange={onStatus} options={[['all', 'All'], ['published', 'Published'], ['draft', 'Drafts']] as const} />
+      <Pills value={status} onChange={onStatus} options={[['all', 'All'], ['published', 'Posted'], ['draft', 'Drafts']] as const} />
       <select
         className="app-input h-8 w-auto py-0 text-[13px]"
         value={social}
@@ -416,7 +415,7 @@ function PostCard({ pkg, journey, onOpen }: { pkg: ContentPackage; journey?: Con
         <p className="text-[15px] font-semibold text-white leading-snug line-clamp-2">{pkg.hook}</p>
         <p className="text-[13px] text-white/80 leading-snug line-clamp-2">{pkg.body}</p>
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-0.5">
-          <PublishBadge published={!!pkg.published_at} />
+          <PublishBadge published={!!pkg.published_at} liveLabel="Posted" />
           <SocialCount count={pkg.versions?.length || 0} stale={pkg.channels_stale} />
         </div>
       </div>

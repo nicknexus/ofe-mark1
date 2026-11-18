@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Bookmark, ChevronLeft, ChevronRight, Heart, MessageCircle, Repeat2, Send, Share2, ThumbsUp } from 'lucide-react'
 
 export type PreviewPlatform = 'instagram' | 'facebook' | 'linkedin'
@@ -34,14 +34,18 @@ export default function SocialPostPreview({
   profileName,
   profileImage,
   names,
+  only,
+  captionEditor,
 }: {
   caption: string
   media: { url: string }[]
   profileName: string
   profileImage?: string | null
   names?: Partial<Record<PreviewPlatform, string | null>>
+  only?: PreviewPlatform
+  captionEditor?: ReactNode
 }) {
-  const [platform, setPlatform] = useState<PreviewPlatform>('instagram')
+  const [platform, setPlatform] = useState<PreviewPlatform>(only || 'instagram')
   const [index, setIndex] = useState(0)
   const [open, setOpen] = useState(false)
   const who = names?.[platform] || profileName || 'Your account'
@@ -101,6 +105,7 @@ export default function SocialPostPreview({
 
   return (
     <div className="studio-panel overflow-hidden max-w-[340px]">
+      {!only && (
       <div className="flex flex-wrap gap-1.5 p-2.5">
         {(['instagram', 'facebook', 'linkedin'] as const).map(id => (
           <button
@@ -113,7 +118,8 @@ export default function SocialPostPreview({
           </button>
         ))}
       </div>
-      <div className="border-t border-[#14352A]/[0.06]">
+      )}
+      <div className={only ? '' : 'border-t border-[#14352A]/[0.06]'}>
         <div className="flex items-center gap-2 px-3 py-2">
           <Avatar name={who} image={profileImage} />
           <span className="min-w-0">
@@ -121,7 +127,7 @@ export default function SocialPostPreview({
             <span className="block text-[11px] text-secondary-400">{LABEL[platform]}</span>
           </span>
         </div>
-        {textFirst && <div className="px-3 pb-2">{words}</div>}
+        {textFirst && <div className="px-3 pb-2">{captionEditor || words}</div>}
         {frame}
         <div className="px-3 py-2 flex items-center gap-3 text-[#14352A]">
           {platform === 'linkedin' ? (
@@ -146,13 +152,15 @@ export default function SocialPostPreview({
             </>
           )}
         </div>
-        {!textFirst && <div className="px-3 pb-2.5">{words}</div>}
+        {!textFirst && <div className="px-3 pb-2.5">{captionEditor || words}</div>}
       </div>
       <div className="px-3 pb-3">
-        <p className="text-[11px] text-secondary-400 leading-snug">
-          Caption under the photo, not printed on it.
-        </p>
-        <p className={`mt-1 text-[11px] ${over ? 'font-semibold text-red-700' : 'text-secondary-400'}`}>
+        {!captionEditor && (
+          <p className="text-[11px] text-secondary-400 leading-snug">
+            Caption under the photo, not printed on it.
+          </p>
+        )}
+        <p className={`${captionEditor ? '' : 'mt-1'} text-[11px] ${over ? 'font-semibold text-red-700' : 'text-secondary-400'}`}>
           {over ? `${caption.length} / ${limit}` : `${caption.length} characters`}
         </p>
       </div>

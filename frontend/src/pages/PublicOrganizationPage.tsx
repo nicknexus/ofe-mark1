@@ -40,6 +40,7 @@ import { PublicOrganizationViewToggles } from '../components/public/organization
 import { PublicOrganizationFeatureArea } from '../components/public/organization/PublicOrganizationFeatureArea'
 import { PublicOrganizationRightPanel } from '../components/public/organization/PublicOrganizationRightPanel'
 import { PublicOrganizationScroll } from '../components/public/organization/PublicOrganizationScroll'
+import { PUBLIC_HERO_LAYOUTS_ENABLED } from '../components/share/publicHeroRelease'
 import { parseVideoUrl } from '../utils/videoEmbed'
 
 
@@ -843,11 +844,13 @@ export default function PublicOrganizationPage() {
     }
 
     const featureVideo = parseVideoUrl(organization.hero_video_url)
-    const featureMode: 'image' | 'video' | null = organization.public_hero === 'image' && organization.hero_image_url
-        ? 'image'
-        : organization.public_hero === 'video' && featureVideo
-            ? 'video'
-            : null
+    const featureMode: 'image' | 'video' | null = !PUBLIC_HERO_LAYOUTS_ENABLED
+        ? null
+        : organization.public_hero === 'image' && organization.hero_image_url
+            ? 'image'
+            : organization.public_hero === 'video' && featureVideo
+                ? 'video'
+                : null
 
     return (
         <div className={featureMode

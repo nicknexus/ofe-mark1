@@ -246,7 +246,7 @@ router.post('/recommend', authenticateUser, async (req: AuthenticatedRequest, re
 router.post('/generate-master', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const { source_type, source_id, story_type, why, journey_id, package_id, extras, idea_id } = req.body || {}
+        const { source_type, source_id, story_type, why, journey_id, package_id, extras, idea_id, context, hook, body, cta } = req.body || {}
         if (source_type !== 'evidence' && source_type !== 'story') {
             res.status(400).json({ error: 'source_type must be evidence or story' })
             return
@@ -266,7 +266,7 @@ router.post('/generate-master', authenticateUser, async (req: AuthenticatedReque
             story_type,
             why,
             requestedOrgId,
-            { journeyId: journey_id, packageId: package_id, extras, ideaId: idea_id }
+            { journeyId: journey_id, packageId: package_id, extras, ideaId: idea_id, context, draft: context && (hook || body) ? { hook, body, cta } : undefined }
         )
         res.json(master)
     } catch (error) {
@@ -362,19 +362,8 @@ router.put('/packages/:id', authenticateUser, async (req: AuthenticatedRequest, 
     }
 })
 
-router.patch('/packages/:id/publish', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const published = req.body?.published
-        if (typeof published !== 'boolean') {
-            res.status(400).json({ error: 'published must be true or false' })
-            return
-        }
-        const pkg = await ContentService.setPackagePublished(req.user!.id, req.params.id, published, requestedOrgId)
-        res.json(pkg)
-    } catch (error) {
-        sendError(res, error)
-    }
+router.patch('/packages/:id/publish', authenticateUser, async (_req: AuthenticatedRequest, res) => {
+    res.status(400).json({ error: 'A post goes on your Nexus page when it is sent to a connected account.' })
 })
 
 router.post('/packages/:id/channels/generate', authenticateUser, async (req: AuthenticatedRequest, res) => {
@@ -567,8 +556,11 @@ router.get('/social/insights', authenticateUser, async (req: AuthenticatedReques
         const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, req.headers['x-organization-id'] as string | undefined)
         const connections = await UploadPostService.connections(organizationId).catch(() => ({} as Record<string, { connected: boolean; label: string | null }>))
         const platforms = (['instagram', 'facebook', 'linkedin'] as const).filter(platform => connections[platform]?.connected)
-        const stats = await UploadPostService.profileAnalytics(organizationId, platforms)
-        const { posts, removed } = await UploadPostService.publishedPostMetrics(organizationId)
+        const [stats, metrics] = await Promise.all([
+            UploadPostService.profileAnalytics(organizationId, platforms),
+            UploadPostService.publishedPostMetrics(organizationId),
+        ])
+        const { posts, removed } = metrics
         const context = await ContentService.socialInsightContext(organizationId, posts.map(post => post.packageId))
         res.json({
             platforms: stats.map(row => ({
@@ -591,10 +583,27 @@ router.get('/social/insights', authenticateUser, async (req: AuthenticatedReques
     }
 })
 
-router.post('/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.post('/social/release', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
-        const { organizationId, org } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        if (!(await TeamService.canEditOrgSettings(req.user!.id, organizationId))) {
+            res.status(403).json({ error: 'Only an owner or admin can connect accounts.', code: 'FORBIDDEN' })
+            return
+        }
+        const removed = await UploadPostService.releaseIfUnused(organizationId)
+        res.json({ removed })
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.post('/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    let organizationId: string | undefined
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const resolved = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
+        organizationId = resolved.organizationId
         if (!(await TeamService.canEditOrgSettings(req.user!.id, organizationId))) {
             res.status(403).json({ error: 'Only an owner or admin can connect accounts.', code: 'FORBIDDEN' })
             return
@@ -604,9 +613,10 @@ router.post('/social/connect', authenticateUser, async (req: AuthenticatedReques
             res.status(400).json({ error: 'platform must be instagram, facebook, or linkedin' })
             return
         }
-        const url = await UploadPostService.connectUrl(organizationId, org.name || 'Organization', platform, connectRedirect(req))
+        const url = await UploadPostService.connectUrl(organizationId, resolved.org.name || 'Organization', platform, connectRedirect(req))
         res.json({ url })
     } catch (error) {
+        if (organizationId) await UploadPostService.releaseIfUnused(organizationId).catch(() => {})
         sendError(res, error)
     }
 })
@@ -635,10 +645,6 @@ router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedR
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         const { organizationId } = await ContentService.assertStudioAccess(req.user!.id, requestedOrgId)
-        if (!(await TeamService.canEditOrgSettings(req.user!.id, organizationId))) {
-            res.status(403).json({ error: 'Only an owner or admin can send posts.', code: 'FORBIDDEN' })
-            return
-        }
         const platforms = Array.isArray(req.body?.platforms) ? req.body.platforms : []
         const allowed = platforms.filter((platform: string) => platform === 'instagram' || platform === 'facebook' || platform === 'linkedin')
         if (!allowed.length) {
@@ -673,7 +679,9 @@ router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedR
                 results.push({ platform, ok: false, error: `${platform} is not connected` })
                 continue
             }
-            const requestId = `pkg_${pkg.id}_${platform}_${scheduledAt || 'now'}`.slice(0, 120)
+            const externalId = `pkg_${pkg.id}_${platform}_${scheduledAt || 'now'}`.slice(0, 120)
+            const reusedKey = await ContentService.socialIdempotencyKey(organizationId, pkg.id, platform, externalId)
+            const idempotencyKey = reusedKey || `${externalId}_${Date.now()}`.slice(0, 180)
             const sourceType = pkg.visual_source_type || (Array.isArray(pkg.media) ? pkg.media[0]?.source_type : null)
             const sourceId = pkg.visual_source_id || (Array.isArray(pkg.media) ? pkg.media[0]?.source_id : null)
             try {
@@ -681,9 +689,9 @@ router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedR
                     profileUsername: username,
                     platform,
                     text,
-                    idempotencyKey: requestId,
-                    requestId,
-                    externalId: requestId,
+                    idempotencyKey,
+                    requestId: externalId,
+                    externalId,
                     scheduledDate: scheduledAt,
                     timezone: scheduledAt ? timezone : undefined,
                     imageUrls: images,
@@ -693,7 +701,7 @@ router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedR
                 let failure: string | null = null
                 let sentAt = new Date().toISOString()
                 if (!scheduledAt) {
-                    const found = await UploadPostService.findUpload(requestId).catch(() => null)
+                    const found = await UploadPostService.findUpload(externalId).catch(() => null)
                     if (found?.postUrl) {
                         status = 'published'
                         postUrl = found.postUrl
@@ -716,7 +724,8 @@ router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedR
                     error: failure,
                     requestId: sent.requestId,
                     jobId: sent.jobId,
-                    externalId: requestId,
+                    externalId,
+                    idempotencyKey,
                     sentAt,
                     scheduledAt: scheduledAt || null,
                 })
@@ -742,14 +751,36 @@ router.post('/packages/:id/social', authenticateUser, async (req: AuthenticatedR
                     platform,
                     status: 'failed',
                     error: err.message,
-                    externalId: requestId,
+                    externalId,
+                    idempotencyKey,
                     sentAt: new Date().toISOString(),
                     scheduledAt: scheduledAt || null,
                 })
                 results.push({ platform, ok: false, status: 'failed', error: err.message })
             }
         }
-        res.json({ results })
+        const live = results.some(item => item.status === 'accepted' || item.status === 'published')
+        let publishedAt = pkg.published_at || null
+        if (live) {
+            const stamped = await ContentService.noteSocialLive(organizationId, [pkg.id])
+            publishedAt = stamped.get(pkg.id) || publishedAt
+        }
+        res.json({ results, published_at: publishedAt })
+    } catch (error) {
+        sendError(res, error)
+    }
+})
+
+router.delete('/packages/:id/social', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const platform = typeof req.query.platform === 'string' ? req.query.platform : ''
+        if (platform !== 'instagram' && platform !== 'facebook' && platform !== 'linkedin') {
+            res.status(400).json({ error: 'platform must be instagram, facebook, or linkedin' })
+            return
+        }
+        const pkg = await ContentService.unscheduleSocial(req.user!.id, req.params.id, platform, requestedOrgId)
+        res.json(pkg)
     } catch (error) {
         sendError(res, error)
     }

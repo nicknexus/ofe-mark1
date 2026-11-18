@@ -27,6 +27,8 @@ interface DateRangePickerProps {
   topSlot?: React.ReactNode
   /** Tighter spacing for embedded inline use (e.g. upload wizard scope step). */
   compact?: boolean
+  /** One day only. A second click replaces the first instead of making a range. */
+  single?: boolean
 }
 
 export type DateRangePickerHandle = {
@@ -45,6 +47,7 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
   variant = 'default',
   topSlot,
   compact = false,
+  single = false,
 }, ref) {
  const [isOpen, setIsOpen] = useState(false)
  const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -56,7 +59,7 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
  const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null)
  const containerRef = useRef<HTMLDivElement>(null)
  const buttonRef = useRef<HTMLButtonElement>(null)
- const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+ const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, maxHeight: 460, width: 300 })
 
  // Parse initial value and set applied state
  useEffect(() => {
@@ -111,59 +114,26 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
  const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
  if (!isOpen && buttonRef.current) {
  const rect = buttonRef.current.getBoundingClientRect()
-      // Height accounts for: year row (~28px) + month row (~40px) + day labels (~30px) + 6 rows (~212px) + preview (~40px) + buttons (~56px) + padding (~24px) ≈ 460px
       const dropdownHeight = 460
-      const dropdownWidth = 300 // Approximate width of the calendar dropdown
- const padding = 8 // Padding from viewport edges
- 
- // Calculate available space below and above
- const spaceBelow = window.innerHeight - rect.bottom - padding
- const spaceAbove = rect.top - padding
- 
- // Determine if we should show above or below
- // Prefer position where we have more space, but ensure we have at least dropdownHeight
- const showAbove = spaceBelow < dropdownHeight && spaceAbove >= dropdownHeight
- 
- // Calculate vertical position
- let top: number
- if (showAbove) {
- top = rect.top - dropdownHeight - 4
- } else {
- top = rect.bottom + 4
- }
- 
- // Ensure it doesn't go above viewport
- top = Math.max(padding, top)
- 
- // If we don't have enough space, adjust to fit
- const availableSpace = showAbove ? spaceAbove : spaceBelow
- if (availableSpace < dropdownHeight) {
- // If showing below but not enough space, try showing above
- if (!showAbove && spaceAbove >= dropdownHeight) {
- top = rect.top - dropdownHeight - 4
- } else if (showAbove && spaceBelow >= dropdownHeight) {
- top = rect.bottom + 4
- } else {
- // Not enough space in either direction - use available space
- top = showAbove ? padding : window.innerHeight - Math.min(dropdownHeight, availableSpace) - padding
- }
- }
- 
- // Ensure it doesn't overflow viewport
- top = Math.max(padding, Math.min(top, window.innerHeight - Math.min(dropdownHeight, availableSpace) - padding))
- 
- // Calculate horizontal position (prevent overflow)
- let left = rect.left
- // If dropdown would overflow right edge, align to right
- if (left + dropdownWidth > window.innerWidth - padding) {
- left = window.innerWidth - dropdownWidth - padding
- }
- // Ensure it doesn't go below left edge
- left = Math.max(padding, left)
+      const padding = 8
+      const dropdownWidth = Math.min(300, window.innerWidth - padding * 2)
+      const maxHeight = Math.min(dropdownHeight, window.innerHeight - padding * 2)
+      const spaceBelow = window.innerHeight - rect.bottom - padding
+      const spaceAbove = rect.top - padding
+      const showAbove = spaceBelow < maxHeight && spaceAbove > spaceBelow
+      let top = showAbove ? rect.top - maxHeight - 4 : rect.bottom + 4
+      top = Math.max(padding, Math.min(top, window.innerHeight - maxHeight - padding))
+      let left = rect.left
+      if (left + dropdownWidth > window.innerWidth - padding) {
+        left = window.innerWidth - dropdownWidth - padding
+      }
+      left = Math.max(padding, left)
  
  setDropdownPosition({
  top,
- left
+ left,
+ maxHeight,
+ width: dropdownWidth,
  })
  setCurrentMonth(
  appliedStartDate ? appliedStartDate :
@@ -202,6 +172,13 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
  const handleDateClick = (date: Date) => {
  if (isAfter(date, maxDateObj)) return
  if (minDateObj && isBefore(date, minDateObj)) return
+
+ if (single) {
+   setTempStartDate(date)
+   setTempEndDate(null)
+   if (variant === 'inline') commitSelection(date, null)
+   return
+ }
 
  let newStart = tempStartDate
  let newEnd = tempEndDate
@@ -422,7 +399,7 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
           })}
         </div>
       </div>
-      <div className={`${compact ? 'p-2.5 pt-1.5' : 'p-4 pt-2'} flex-shrink-0 border-t border-gray-100`}>
+      <div className={`sticky bottom-0 bg-white ${compact ? 'p-2.5 pt-1.5' : 'p-4 pt-2'} flex-shrink-0 border-t border-gray-100`}>
         {previewStartDate && (
           <div className={`${compact ? 'p-1.5' : 'p-2'} bg-primary-50 rounded text-xs text-primary-700 text-center`}>
             {getPreviewText()}
@@ -529,10 +506,12 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
  }} 
  />
  <div 
- className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] w-[300px] flex flex-col"
+ className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] flex flex-col overflow-y-auto"
  style={{
  top: `${dropdownPosition.top}px`,
  left: `${dropdownPosition.left}px`,
+ width: `${dropdownPosition.width}px`,
+ maxHeight: `${dropdownPosition.maxHeight}px`,
  }}
  onClick={(e) => e.stopPropagation()}
  >

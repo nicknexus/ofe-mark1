@@ -5,25 +5,41 @@ import { apiService } from '../../services/api'
 import { useTeam } from '../../context/TeamContext'
 import { notify } from '../../lib/notify'
 import { InlineAlert, SectionLoader } from '../../components/ui'
+import ModalFrame, { ModalBody, ModalFooter, ModalHeader } from '../../components/ModalFrame'
 import { parseLocalDate } from '../../utils'
-import { SocialMarks, StudioFrame, StudioPanel, STUDIO_PLATFORMS, socialSendLabel } from './StudioFrame'
-import { useStudioLibrary } from './useStudioLibrary'
+import { SocialMarks, StudioFrame, StudioPanel, STUDIO_PLATFORMS, isQueued, socialSendLabel } from './StudioFrame'
+import { useStudioLibrary, upsertStudioPackage } from './useStudioLibrary'
 import { useSocialAccount } from './useSocialAccount'
 
 type TimelineFilter = 'all' | 'draft' | 'public'
 
 function dayKey(value: string) {
-  const date = parseLocalDate(value)
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 }
 
 export function StudioCalendar() {
-  const { packages, journeys, loading, error } = useStudioLibrary()
+  const { packages, loading, error } = useStudioLibrary()
+  const { activeOrganization } = useTeam()
   const [filter, setFilter] = useState<TimelineFilter>('all')
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(() => new Date())
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const journeyById = useMemo(() => new Map(journeys.map(journey => [journey.id, journey])), [journeys])
+  const [clearing, setClearing] = useState<string | null>(null)
+
+  const unschedule = async (packageId: string, platform: 'instagram' | 'facebook' | 'linkedin') => {
+    setClearing(`${packageId}:${platform}`)
+    try {
+      const next = await apiService.unscheduleSocial(packageId, platform)
+      if (activeOrganization?.id) upsertStudioPackage(activeOrganization.id, next)
+      notify.success('Removed from the schedule')
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Could not unschedule')
+    } finally {
+      setClearing(null)
+    }
+  }
 
   const posts = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -64,7 +80,7 @@ export function StudioCalendar() {
         {([
           ['all', `All (${counts.all})`],
           ['draft', `Drafts (${counts.draft})`],
-          ['public', `Public page (${counts.public})`],
+          ['public', `Posted (${counts.public})`],
         ] as const).map(([id, label]) => (
           <button
             key={id}
@@ -95,31 +111,43 @@ export function StudioCalendar() {
               <p className="mt-1 text-[13px] text-secondary-500">Try another day or filter.</p>
             </div>
           ) : posts.map(pkg => {
-            const journey = pkg.journey_id ? journeyById.get(pkg.journey_id) : undefined
             const when = parseLocalDate(pkg.created_at)
             const sent = socialSendLabel(pkg.publications)
+            const queued = (pkg.publications || []).filter(item => isQueued(item))
             return (
-              <Link key={pkg.id} to={`/studio/post/${pkg.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7FAF4]">
-                {pkg.image_url ? (
-                  <img src={pkg.image_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
-                ) : (
-                  <span className="w-14 h-14 rounded-xl bg-[#E7F3DF] flex-shrink-0" />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-semibold text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
-                  <span className="mt-0.5 block text-[12px] text-secondary-500 truncate">{journey?.title || 'Standalone'}</span>
-                  {sent && <span className="mt-0.5 block text-[12px] font-medium text-[#2A6B4A] truncate">{sent}</span>}
-                </span>
+              <div key={pkg.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7FAF4]">
+                <Link to={`/studio/post/${pkg.id}`} className="flex items-center gap-3 min-w-0 flex-1">
+                  {pkg.image_url ? (
+                    <img src={pkg.image_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                  ) : (
+                    <span className="w-14 h-14 rounded-xl bg-[#E7F3DF] flex-shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
+                    {sent && <span className="mt-0.5 block text-[12px] font-medium text-[#2A6B4A] truncate">{sent}</span>}
+                  </span>
+                </Link>
                 <SocialMarks items={pkg.publications} />
                 <span className="text-right flex-shrink-0">
                   <span className={`studio-pill h-6 text-[11px] ${pkg.published_at ? 'studio-pill-on' : ''}`}>
-                    {pkg.published_at ? 'Public page' : 'Draft'}
+                    {pkg.published_at ? 'Posted' : 'Draft'}
                   </span>
                   <span className="block mt-1 text-[11px] text-secondary-400">
                     {when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                 </span>
-              </Link>
+                {queued.map(item => (
+                  <button
+                    key={item.platform}
+                    type="button"
+                    className="text-[12px] font-semibold text-[#2A6B4A] shrink-0 disabled:opacity-50"
+                    disabled={clearing === `${pkg.id}:${item.platform}`}
+                    onClick={() => unschedule(pkg.id, item.platform as 'instagram' | 'facebook' | 'linkedin')}
+                  >
+                    {clearing === `${pkg.id}:${item.platform}` ? 'Removing' : 'Unschedule'}
+                  </button>
+                ))}
+              </div>
             )
           })}
         </StudioPanel>
@@ -131,7 +159,7 @@ export function StudioCalendar() {
             onCursor={setCursor}
             onSelect={day => setSelectedDay(current => current === day ? null : day)}
           />
-          <ScheduledList packages={packages} />
+          <ScheduledList packages={packages} clearing={clearing} onUnschedule={unschedule} />
         </div>
       </div>
     </StudioFrame>
@@ -145,9 +173,17 @@ function queueWhen(value?: string | null) {
   return date.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-function ScheduledList({ packages }: { packages: { id: string; hook?: string | null; publications?: { platform: string; status: string; scheduled_at?: string | null }[] }[] }) {
+function ScheduledList({
+  packages,
+  clearing,
+  onUnschedule,
+}: {
+  packages: { id: string; hook?: string | null; publications?: { platform: string; status: string; scheduled_at?: string | null }[] }[]
+  clearing: string | null
+  onUnschedule: (packageId: string, platform: 'instagram' | 'facebook' | 'linkedin') => void
+}) {
   const queued = packages.flatMap(pkg => (pkg.publications || [])
-    .filter(item => item.status === 'scheduled')
+    .filter(item => isQueued(item))
     .map(item => ({ pkg, item })))
     .sort((a, b) => (a.item.scheduled_at || '').localeCompare(b.item.scheduled_at || ''))
   return (
@@ -158,13 +194,23 @@ function ScheduledList({ packages }: { packages: { id: string; hook?: string | n
       ) : (
         <div className="mt-3 space-y-2">
           {queued.map(({ pkg, item }) => (
-            <Link key={`${pkg.id}-${item.platform}`} to={`/studio/post/${pkg.id}`} className="block rounded-xl px-2 py-1.5 hover:bg-[#F7FAF4]">
-              <span className="block text-[13px] font-medium text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
-              <span className="block text-[12px] text-secondary-500">
-                {STUDIO_PLATFORMS.find(platform => platform.id === item.platform)?.label || item.platform}
-                {queueWhen(item.scheduled_at) ? ` · ${queueWhen(item.scheduled_at)}` : ''}
-              </span>
-            </Link>
+            <div key={`${pkg.id}-${item.platform}`} className="flex items-start gap-2 rounded-xl px-2 py-1.5 hover:bg-[#F7FAF4]">
+              <Link to={`/studio/post/${pkg.id}`} className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
+                <span className="block text-[12px] text-secondary-500">
+                  {STUDIO_PLATFORMS.find(platform => platform.id === item.platform)?.label || item.platform}
+                  {queueWhen(item.scheduled_at) ? ` · ${queueWhen(item.scheduled_at)}` : ''}
+                </span>
+              </Link>
+              <button
+                type="button"
+                className="text-[12px] font-semibold text-[#2A6B4A] shrink-0 disabled:opacity-50"
+                disabled={clearing === `${pkg.id}:${item.platform}`}
+                onClick={() => onUnschedule(pkg.id, item.platform as 'instagram' | 'facebook' | 'linkedin')}
+              >
+                {clearing === `${pkg.id}:${item.platform}` ? 'Removing' : 'Unschedule'}
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -177,10 +223,19 @@ export function StudioAccounts() {
   const { isOwner, isAdmin } = useTeam()
   const [connecting, setConnecting] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
+  const [confirmDisconnect, setConfirmDisconnect] = useState<{ id: 'instagram' | 'facebook' | 'linkedin'; label: string } | null>(null)
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const canConnect = isOwner || isAdmin
   const told = useRef(false)
+  const released = useRef(false)
+
+  useEffect(() => {
+    if (!canConnect || released.current) return
+    if (params.get('connect_status') === 'success') return
+    released.current = true
+    apiService.releaseSocialProfile().catch(() => {})
+  }, [canConnect, params])
 
   useEffect(() => {
     const status = params.get('connect_status')
@@ -190,7 +245,7 @@ export function StudioAccounts() {
     const name = platform.charAt(0).toUpperCase() + platform.slice(1)
     if (status === 'success') notify.success(`${name} connected`)
     else if (status === 'cancelled') notify.error(`${name} connection cancelled`)
-    else notify.error(params.get('error_code') || `Could not connect ${name}`)
+    else notify.error(`Could not connect ${name}`)
     navigate('/studio/accounts', { replace: true })
   }, [params, navigate])
 
@@ -200,22 +255,30 @@ export function StudioAccounts() {
       const { url } = await apiService.connectSocial(platform)
       window.location.assign(url)
     } catch (err) {
-      notify.error(err instanceof Error ? err.message : 'Could not open the consent screen')
+      notify.error(err instanceof Error ? err.message : 'Could not open the approval screen')
       setConnecting(null)
     }
   }
 
+  const connectedCount = STUDIO_PLATFORMS.filter(platform => account?.connections?.[platform.id]?.connected).length
+
   const disconnect = async (platform: 'instagram' | 'facebook' | 'linkedin', label: string) => {
+    setConfirmDisconnect(null)
     setDisconnecting(platform)
     try {
-      const result = await apiService.disconnectSocial(platform)
-      notify.success(result.removedProfile ? `${label} disconnected. That profile slot is free.` : `${label} disconnected`)
+      await apiService.disconnectSocial(platform)
+      notify.success(`${label} disconnected`)
       reload()
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Could not disconnect')
     } finally {
       setDisconnecting(null)
     }
+  }
+
+  const askDisconnect = (platform: 'instagram' | 'facebook' | 'linkedin', label: string) => {
+    if (connectedCount <= 1) setConfirmDisconnect({ id: platform, label })
+    else disconnect(platform, label)
   }
 
   return (
@@ -228,73 +291,88 @@ export function StudioAccounts() {
           const Icon = platform.icon
           const linked = account?.connections?.[platform.id]
           return (
-            <StudioPanel key={platform.id} className="px-4 py-4 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <span className="w-10 h-10 rounded-xl bg-[#E7F3DF] text-[#14352A] inline-flex items-center justify-center">
-                  <Icon className="w-4 h-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-[#1C2B24]">{platform.label}</span>
-                  {!ready ? (
-                    <span className="mt-1 block h-3 w-24 rounded-full bg-[#E7F3DF] animate-pulse" />
-                  ) : (
-                    <span className={`block text-[12px] font-medium truncate ${linked?.connected ? 'text-[#2A6B4A]' : 'text-amber-700'}`}>
-                      {linked?.connected ? (linked.label || 'Connected') : 'Not connected'}
-                    </span>
-                  )}
-                </span>
-              </div>
+            <StudioPanel key={platform.id} className="px-3 py-3 flex items-center gap-3">
+              <span className="h-10 w-10 rounded-xl bg-white border border-black/5 inline-flex items-center justify-center shrink-0">
+                <Icon className="w-5 h-5" style={{ color: platform.color }} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-[#1C2B24]">{platform.label}</span>
+                {!ready ? (
+                  <span className="mt-1 block h-3 w-20 rounded-full bg-[#E7F3DF] animate-pulse" />
+                ) : (
+                  <span className={`block text-[12px] font-medium truncate ${linked?.connected ? 'text-[#2A6B4A]' : 'text-secondary-500'}`}>
+                    {linked?.connected ? (linked.label || 'Connected') : 'Not connected'}
+                  </span>
+                )}
+              </span>
               {ready && canConnect && !linked?.connected && (
                 <button
                   type="button"
-                  className="studio-hero-btn studio-hero-btn-mint h-8 text-[13px]"
+                  className="h-10 px-3 rounded-xl bg-[#14352A] text-white text-[13px] font-semibold shrink-0 disabled:opacity-50"
                   disabled={!!connecting || !!disconnecting || !account?.configured}
                   onClick={() => connect(platform.id)}
                 >
-                  {connecting === platform.id ? 'Opening' : `Connect ${platform.label}`}
+                  {connecting === platform.id ? 'Opening' : 'Connect'}
                 </button>
               )}
               {ready && canConnect && linked?.connected && (
                 <button
                   type="button"
-                  className="app-btn app-btn-secondary app-btn-sm"
+                  aria-label={`Disconnect ${platform.label}`}
+                  className="h-10 px-3 rounded-xl border border-black/10 text-[12px] font-semibold text-[#1C2B24] shrink-0 disabled:opacity-50"
                   disabled={!!connecting || !!disconnecting}
-                  onClick={() => disconnect(platform.id, platform.label)}
+                  onClick={() => askDisconnect(platform.id, platform.label)}
                 >
-                  {disconnecting === platform.id ? 'Disconnecting' : 'Disconnect'}
+                  {disconnecting === platform.id ? '...' : 'Disconnect'}
                 </button>
               )}
             </StudioPanel>
           )
         })}
       </div>
-      <StudioPanel className="mt-4 px-5 py-4">
-        {error ? (
-          <p className="text-sm text-amber-800">{error}</p>
-        ) : account ? (
-          <p className="text-sm text-secondary-600 leading-relaxed">
-            {account.configured
-              ? `Upload Post account ${account.email}. Plan ${account.plan || 'free'}: ${account.usage.limit ?? 10} uploads a month. Connecting does not use an upload.`
-              : 'No Upload Post key is configured.'}
-          </p>
-        ) : (
-          <p className="text-sm text-secondary-500">Checking the Upload Post account.</p>
-        )}
-      </StudioPanel>
       <StudioPanel className="mt-4 px-5 py-5 flex items-start gap-3">
         <span className="w-10 h-10 rounded-xl bg-[#14352A] text-[#C0DFA1] inline-flex items-center justify-center flex-shrink-0">
           <Link2 className="w-4 h-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#1C2B24]">Connect from here</p>
-          <p className="mt-1 text-sm text-secondary-500 leading-relaxed max-w-xl">
-            Each button opens that network's approval screen{account?.email ? ` for ${account.email}` : ''}, then brings you back here. Sending posts stays off.
-          </p>
-          {!canConnect && (
+          <p className="text-sm font-semibold text-[#1C2B24]">Connect an account</p>
+          {error ? (
+            <p className="mt-1 text-sm text-amber-800 leading-relaxed">{error}</p>
+          ) : !ready ? (
+            <p className="mt-1 text-sm text-secondary-500">Checking your accounts.</p>
+          ) : account && !account.configured ? (
+            <p className="mt-1 text-sm text-secondary-500 leading-relaxed">Account connections are not available right now.</p>
+          ) : (
+            <p className="mt-1 text-sm text-secondary-500 leading-relaxed max-w-xl">
+              Each button opens that network so you can approve access, then brings you back here. You can post once an account is connected.
+            </p>
+          )}
+          {ready && !canConnect && (
             <p className="mt-2 text-[13px] text-secondary-500">Only an owner or admin can connect accounts.</p>
           )}
         </div>
       </StudioPanel>
+      {confirmDisconnect && (
+        <ModalFrame size="sm" onClose={() => setConfirmDisconnect(null)}>
+          <ModalHeader title={`Disconnect ${confirmDisconnect.label}?`} onClose={() => setConfirmDisconnect(null)} />
+          <ModalBody>
+            <p className="text-sm text-secondary-600 leading-relaxed">
+              This is the last account connected. Insights from posts you already sent will be removed. Connecting again starts insights over. Posts already on {confirmDisconnect.label} stay there.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="app-btn app-btn-secondary" onClick={() => setConfirmDisconnect(null)}>Cancel</button>
+            <button
+              type="button"
+              className="app-btn app-btn-danger"
+              disabled={!!disconnecting}
+              onClick={() => disconnect(confirmDisconnect.id, confirmDisconnect.label)}
+            >
+              {disconnecting ? 'Disconnecting' : 'Disconnect'}
+            </button>
+          </ModalFooter>
+        </ModalFrame>
+      )}
     </StudioFrame>
   )
 }

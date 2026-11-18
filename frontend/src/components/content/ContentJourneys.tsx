@@ -1,34 +1,17 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, ChevronLeft, Globe, Image as Images, Pencil, Plus, RotateCcw, Route, Share2, Trash2 } from 'lucide-react'
 import ModalFrame, { ModalBody, ModalFooter, ModalHeader } from '../ModalFrame'
-import { EmptyState, PageHelpTip, SectionLoader, Spinner } from '../ui'
+import { EmptyState, SectionLoader, Spinner } from '../ui'
 import { apiService } from '../../services/api'
 import { formatDate } from '../../utils'
 import type { ContentJourney, ContentJourneyStatus, ContentPackage, Initiative } from '../../types'
 
 export type JourneyFilter = 'all' | ContentJourneyStatus
 
-export function PublishSoon({ small }: { small?: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <button
-        type="button"
-        disabled
-        className={`app-btn app-btn-secondary pointer-events-none cursor-not-allowed opacity-40 ${small ? 'app-btn-sm' : ''}`}
-      >
-        <Globe className={small ? 'w-3.5 h-3.5' : 'w-4 h-4'} /> Publish
-      </button>
-      <PageHelpTip label="Publishing" align="end">
-        <p>Publishing to your Nexus public page is coming very soon. Save everything as a draft for now. Drafts stay with your team until you can publish.</p>
-      </PageHelpTip>
-    </span>
-  )
-}
-
-export function PublishBadge({ published }: { published: boolean }) {
+export function PublishBadge({ published, liveLabel = 'Published' }: { published: boolean; liveLabel?: string }) {
   return published ? (
     <span className="app-chip app-chip-impact text-[10px] uppercase tracking-wide inline-flex items-center gap-1">
-      <Globe className="w-3 h-3" /> Published
+      <Globe className="w-3 h-3" /> {liveLabel}
     </span>
   ) : (
     <span className="app-chip text-[10px] uppercase tracking-wide">Draft</span>
@@ -295,13 +278,9 @@ export function JourneyDetail({
             {completed ? <RotateCcw className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
             {completed ? 'Mark ongoing' : 'Mark completed'}
           </button>
-          {published ? (
-            <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={onTogglePublished}>
-              <Globe className="w-3.5 h-3.5" /> Move to draft
-            </button>
-          ) : (
-            <PublishSoon small />
-          )}
+          <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={onTogglePublished}>
+            <Globe className="w-3.5 h-3.5" /> {published ? 'Hide from public page' : 'Show on public page'}
+          </button>
           <button type="button" className="app-btn app-btn-ghost app-btn-sm text-secondary-500 hover:text-red-600" onClick={onDelete}>
             <Trash2 className="w-3.5 h-3.5" /> Delete
           </button>
@@ -324,12 +303,12 @@ export function JourneyDetail({
           <p className="mt-2 text-[12px] text-secondary-400">
             {journey.initiative_title ? `${journey.initiative_title} · ` : ''}
             {updates.length} {updates.length === 1 ? 'update' : 'updates'}
-            {updates.length ? ` (${updates.filter(u => u.published_at).length} published)` : ''}
+            {updates.length ? ` (${updates.filter(u => u.published_at).length} posted)` : ''}
             {' · '}Started {formatDate(journey.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
           {!published && (
             <p className="mt-2 text-[12px] text-secondary-500">
-              This journey is a draft. Save updates as drafts until publishing is on.
+              This journey is hidden. An update shows on your Nexus page after you send it.
             </p>
           )}
         </div>
@@ -372,7 +351,7 @@ export function JourneyDetail({
                     <span className="text-[11px] text-secondary-400">{formatDate(pkg.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     <span className="ml-auto flex items-center gap-1">
                       <SocialCount count={pkg.versions?.length || 0} stale={pkg.channels_stale} />
-                      <PublishBadge published={!!pkg.published_at} />
+                      <PublishBadge published={!!pkg.published_at} liveLabel="Posted" />
                     </span>
                   </div>
                   <p className="text-sm font-semibold text-secondary-900">{pkg.hook}</p>

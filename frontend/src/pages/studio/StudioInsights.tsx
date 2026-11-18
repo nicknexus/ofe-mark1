@@ -143,28 +143,38 @@ function ReachChart({ rows }: { rows: ChartRow[] }) {
   )
 }
 
+const insightCache = new Map<string, { platforms: InsightPlatform[]; posts: InsightPost[]; removed: number }>()
+
 export default function StudioInsights() {
   const { activeOrganization } = useTeam()
   const orgId = activeOrganization?.id || ''
-  const [platforms, setPlatforms] = useState<InsightPlatform[] | null>(null)
-  const [posts, setPosts] = useState<InsightPost[]>([])
-  const [removed, setRemoved] = useState(0)
+  const cached = orgId ? insightCache.get(orgId) : undefined
+  const [platforms, setPlatforms] = useState<InsightPlatform[] | null>(cached?.platforms ?? null)
+  const [posts, setPosts] = useState<InsightPost[]>(cached?.posts ?? [])
+  const [removed, setRemoved] = useState(cached?.removed ?? 0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!orgId) return
     let cancelled = false
-    setPlatforms(null)
+    const hit = insightCache.get(orgId)
+    if (!hit) {
+      setPlatforms(null)
+      setPosts([])
+      setRemoved(0)
+    }
     setError(null)
     apiService.getSocialInsights()
       .then(result => {
         if (cancelled) return
-        setPlatforms(result.platforms)
-        setPosts(result.posts || [])
-        setRemoved(result.removed || 0)
+        const next = { platforms: result.platforms, posts: result.posts || [], removed: result.removed || 0 }
+        insightCache.set(orgId, next)
+        setPlatforms(next.platforms)
+        setPosts(next.posts)
+        setRemoved(next.removed)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load insights')
+        if (!cancelled && !insightCache.has(orgId)) setError(err instanceof Error ? err.message : 'Could not load insights')
       })
     return () => { cancelled = true }
   }, [orgId])
@@ -234,7 +244,7 @@ export default function StudioInsights() {
             const Icon = platform?.icon
             return (
               <div key={row.platform} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-sm border border-[#14352A]/10">
-                {Icon && <Icon className="w-3.5 h-3.5 text-[#14352A]" />}
+                {Icon && <Icon className="w-3.5 h-3.5" style={{ color: platform?.color }} />}
                 <span className="text-[13px] font-semibold text-[#1C2B24]">{row.label}</span>
                 <span className="text-[12px] text-secondary-500">{formatCount(count(row.reach))} reach</span>
               </div>
@@ -323,7 +333,7 @@ export default function StudioInsights() {
                     <Link to={`/studio/post/${post.packageId}`} className="min-w-0 flex-1">
                       <span className="block text-[14px] font-semibold text-[#1C2B24] truncate">{post.title}</span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-secondary-500">
-                        {Icon && <Icon className="w-3 h-3" />}
+                        {Icon && <Icon className="w-3 h-3" style={{ color: platform?.color }} />}
                         {platform?.label}
                         {' · '}
                         {dayLabel(post.sentAt.slice(0, 10))}
