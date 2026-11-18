@@ -1497,6 +1497,143 @@
 
 @media (max-width: 767px) {
 
+    /* Capture-first mobile shell. Keep its forest palette local to this surface. */
+    .mobile-workspace {
+        --mobile-forest: #07543b;
+        --mobile-forest-dark: #064630;
+        padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .mobile-home-canvas {
+        background: #fbf8f2;
+    }
+
+    .mobile-home-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: calc(18px + env(safe-area-inset-top, 0px)) 24px 18px;
+        background: var(--mobile-forest);
+        color: white;
+    }
+
+    .mobile-home-wordmark {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .mobile-home-help {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 44px;
+        padding: 0 14px;
+        border: 1px solid rgb(255 255 255 / 55%);
+        border-radius: 9999px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .mobile-home-identity {
+        min-height: 176px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 28px 8px;
+    }
+
+    .mobile-home-org-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        background: #e8f0e8;
+        color: var(--mobile-forest);
+    }
+
+    .mobile-home-section-title {
+        margin-bottom: 14px;
+        font-size: 20px;
+        line-height: 1.35;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+        color: var(--mobile-forest-dark);
+    }
+
+    .mobile-capture-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        min-height: 190px;
+        padding: 20px 16px;
+        border: 1px solid rgb(7 84 59 / 30%);
+        color: var(--mobile-forest);
+        text-align: left;
+    }
+
+    .mobile-share-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        padding: 24px 20px;
+        border-radius: 12px;
+        background: var(--mobile-forest);
+        color: white;
+        text-align: left;
+    }
+
+    .mobile-home-nav {
+        position: fixed;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        left: 16px;
+        right: 16px;
+        max-width: 480px;
+        margin-inline: auto;
+        border: 1px solid rgb(255 255 255 / 15%);
+        border-radius: 24px;
+        background: var(--mobile-forest);
+        box-shadow: 0 4px 12px rgb(6 70 48 / 12%);
+        z-index: 50;
+    }
+
+    .mobile-home-nav-item {
+        min-width: 0;
+        border-radius: 16px;
+    }
+
+    .mobile-workspace button:focus-visible,
+    .mobile-workspace a:focus-visible {
+        outline: 3px solid #97c7cb;
+        outline-offset: 3px;
+    }
+
+    .mobile-capture-card:disabled,
+    .mobile-share-card:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .mobile-share-card:active:not(:disabled),
+    .mobile-home-help:active {
+        background: var(--mobile-forest-dark);
+    }
+
+    /* The composer owns its scroll area; leave room for the floating nav. */
+    .mobile-studio > .relative.h-screen {
+        height: calc(100dvh - 104px - env(safe-area-inset-bottom, 0px));
+    }
+
+    .mobile-studio .mobile-content-padding {
+        padding-bottom: 16px !important;
+    }
+
     /* Hide desktop sidebar on mobile */
     .desktop-sidebar {
         display: none !important;

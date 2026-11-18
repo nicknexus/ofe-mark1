@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
@@ -17,6 +17,12 @@ import {
   Plus,
   X,
   BarChart3,
+  Home,
+  FileText,
+  MoreHorizontal,
+  HelpCircle,
+  ChevronRight,
+  Mail,
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { CreateKPIForm, Initiative, User as UserType, SubscriptionStatus } from '../types'
@@ -26,13 +32,16 @@ import MobileDashboard from './mobile/MobileDashboard'
 import MobileOrgMetricsTab from './mobile/MobileOrgMetricsTab'
 import { PageLoader } from './ui'
 import MobileLocationsTab from './mobile/MobileLocationsTab'
-import MobileStoriesTab from './mobile/MobileStoriesTab'
+import MobileStoriesTab, { MobileStoryForm } from './mobile/MobileStoriesTab'
+import MobileHome from './mobile/MobileHome'
 import MobileAccountTab from './mobile/MobileAccountTab'
 import TimelineTab from './InitiativeTabs/TimelineTab'
 import MobileOverview from './overview/MobileOverview'
 import UploadWizardLauncher from './upload/UploadWizardLauncher'
 import CreateKPIModal from './CreateKPIModal'
 import ExplorePage from '../pages/ExplorePage'
+import ModalFrame, { ModalHeader, ModalBody } from './ModalFrame'
+import { isStudioMode, isStudioComposer } from '../pages/studio/studioPaths'
 import {
   springSoft,
   springSnappy,
@@ -42,13 +51,21 @@ import {
   dropdownPop,
 } from './mobile/motion'
 
+const ContentCreatePage = lazy(() => import('../pages/ContentCreatePage'))
+
 interface MobileAppProps {
   user: UserType
   subscriptionStatus: SubscriptionStatus | null
 }
 
-type TopLevelView = 'initiatives' | 'metrics' | 'explore' | 'account'
+type TopLevelView = 'home' | 'initiatives' | 'content' | 'more' | 'metrics' | 'explore' | 'account'
 type InitiativeTab = 'logs' | 'overview' | 'stories' | 'locations'
+type CaptureAction = 'log' | 'story'
+
+const mobilePaths: Record<TopLevelView, string> = {
+  home: '/', initiatives: '/tracking/programs', content: '/studio',
+  more: '/more', metrics: '/metrics', explore: '/explore', account: '/account',
+}
 
 function MobileNavItem({
   active,
@@ -56,35 +73,38 @@ function MobileNavItem({
   onClick,
   icon: Icon,
   label,
+  dark = false,
 }: {
   active: boolean
   layoutId: string
   onClick: () => void
   icon: React.ComponentType<{ className?: string }>
   label: string
+  dark?: boolean
 }) {
   return (
     <motion.button
       type="button"
       onClick={onClick}
+      aria-current={active ? 'page' : undefined}
       whileTap={tapScale}
-      className="relative flex flex-col items-center justify-center flex-1 h-full"
+      className={`relative flex flex-col items-center justify-center flex-1 h-full ${dark ? 'mobile-home-nav-item' : ''}`}
     >
       {active && (
         <motion.span
           layoutId={layoutId}
-          className="absolute inset-x-1.5 inset-y-1.5 rounded-xl bg-primary-50"
+          className={`absolute inset-x-1.5 inset-y-1.5 rounded-xl ${dark ? 'bg-white/15' : 'bg-primary-50'}`}
           transition={springSoft}
         />
       )}
       <Icon
         className={`relative z-10 w-5 h-5 transition-colors ${
-          active ? 'text-primary-700 stroke-[2.5]' : 'text-gray-400'
+          dark ? 'text-white' : active ? 'text-primary-700 stroke-[2.5]' : 'text-gray-400'
         }`}
       />
       <span
-        className={`relative z-10 text-[11px] mt-0.5 transition-colors ${
-          active ? 'font-semibold text-primary-800' : 'font-medium text-gray-400'
+        className={`relative z-10 text-xs mt-1 transition-colors ${
+          dark ? `${active ? 'font-semibold' : 'font-medium'} text-white` : active ? 'font-semibold text-primary-800' : 'font-medium text-gray-400'
         }`}
       >
         {label}
@@ -120,17 +140,17 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
     hasMultipleOrgs,
     isSharedMember,
     canAddMetrics,
+    canAddImpactClaims,
+    canAddEvidence,
+    canAddStories,
+    canUseContentStudio,
   } = useTeam()
-  const [view, setViewRaw] = useState<TopLevelView>(() => {
-    const saved = sessionStorage.getItem('mobile-view')
-    if (saved === 'explore' || saved === 'account' || saved === 'initiatives' || saved === 'metrics') {
-      return saved
-    }
-    return 'initiatives'
-  })
+  const view: TopLevelView = isStudioMode(location.pathname) ? 'content'
+    : (Object.entries(mobilePaths).find(([, path]) => path === location.pathname)?.[0] as TopLevelView | undefined) || 'home'
   const setView = (v: TopLevelView) => {
-    sessionStorage.setItem('mobile-view', v)
-    setViewRaw(v)
+    setSelectedInitiative(null)
+    setOrgDropdownOpen(false)
+    navigate(mobilePaths[v])
   }
   const [initiatives, setInitiatives] = useState<Initiative[]>([])
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
@@ -138,18 +158,49 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   const [loading, setLoading] = useState(true)
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false)
   const orgDropdownRef = useRef<HTMLDivElement>(null)
+  const capturePickerRef = useRef<HTMLDivElement>(null)
+  const initiativeRequest = useRef(0)
 
-  const [showAddPicker, setShowAddPicker] = useState(false)
+  const [captureAction, setCaptureAction] = useState<CaptureAction | null>(null)
   const [addInitiativeId, setAddInitiativeId] = useState<string | null>(null)
+  const [storyInitiativeId, setStoryInitiativeId] = useState<string | null>(null)
+  const [showHelp, setShowHelp] = useState(false)
   const [showAddMetricModal, setShowAddMetricModal] = useState(false)
   const [metricsRefreshKey, setMetricsRefreshKey] = useState(0)
 
   useEffect(() => {
-    if (location.pathname === '/explore') {
-      setView('explore')
-      navigate('/', { replace: true })
-    }
+    window.scrollTo(0, 0)
+    setSelectedInitiative(null)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!captureAction) return
+    const previousOverflow = document.body.style.overflow
+    const previousFocus = document.activeElement as HTMLElement | null
+    document.body.style.overflow = 'hidden'
+    capturePickerRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    const handlePickerKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCaptureAction(null)
+      if (event.key !== 'Tab') return
+      const buttons = capturePickerRef.current?.querySelectorAll<HTMLButtonElement>('button')
+      if (!buttons?.length) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handlePickerKey)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handlePickerKey)
+      previousFocus?.focus()
+    }
+  }, [captureAction])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -162,14 +213,15 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   }, [orgDropdownOpen])
 
   const loadInitiatives = async () => {
+    const request = ++initiativeRequest.current
     try {
       const data = await apiService.getInitiatives()
-      setInitiatives(data)
+      if (request === initiativeRequest.current) setInitiatives(data)
     } catch (error) {
       console.error('Failed to load programs:', error)
-      setInitiatives([])
+      if (request === initiativeRequest.current) setInitiatives([])
     } finally {
-      setLoading(false)
+      if (request === initiativeRequest.current) setLoading(false)
     }
   }
 
@@ -177,8 +229,9 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   useEffect(() => {
     if (!activeOrganization?.id) return
     setSelectedInitiative(null)
-    setShowAddPicker(false)
+    setCaptureAction(null)
     setAddInitiativeId(null)
+    setStoryInitiativeId(null)
     setShowAddMetricModal(false)
     setInitiatives([])
     setLoading(true)
@@ -206,30 +259,38 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   }
 
   const handleExitInitiative = () => {
-    setSelectedInitiative(null)
+    setView('initiatives')
   }
 
-  const handlePlusClick = () => {
+  const openCapture = (action: CaptureAction, initiativeId: string) => {
+    setCaptureAction(null)
+    if (action === 'story') setStoryInitiativeId(initiativeId)
+    else setAddInitiativeId(initiativeId)
+  }
+
+  const handleCapture = (action: CaptureAction) => {
+    if (action === 'story' ? !canAddStories : !(canAddImpactClaims || canAddEvidence)) return
     if (initiatives.length === 0) {
       notify.error('Create a program first')
       setView('initiatives')
       return
     }
     if (initiatives.length === 1) {
-      setAddInitiativeId(initiatives[0].id!)
+      openCapture(action, initiatives[0].id!)
       return
     }
-    setShowAddPicker(true)
+    setCaptureAction(action)
   }
 
   const openTimelineForMetric = (kpiId: string) => {
     setInitiativeTab('logs')
-    navigate(`/?metric=${kpiId}`, { replace: true })
+    navigate(`${location.pathname}?metric=${kpiId}`, { replace: true })
   }
 
   const wizard = addInitiativeId ? (
     <UploadWizardLauncher
       initiativeId={addInitiativeId}
+      programTitle={initiatives.find(initiative => initiative.id === addInitiativeId)?.title}
       onClose={() => setAddInitiativeId(null)}
       onCreated={loadInitiatives}
     />
@@ -237,26 +298,30 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
 
   const addPicker = (
     <AnimatePresence>
-      {showAddPicker && (
+      {captureAction && (
         <div className="fixed inset-0 z-[90]">
           <motion.div
             className="absolute inset-0 bg-black/40"
-            onClick={() => setShowAddPicker(false)}
+            onClick={() => setCaptureAction(null)}
             {...sheetBackdrop}
           />
           <motion.div
+            ref={capturePickerRef}
             className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl safe-area-pb max-h-[70vh] flex flex-col shadow-app-modal border-t border-gray-100"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-capture-picker-title"
             {...sheetPanel}
           >
             <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-gray-200" />
             <div className="flex items-center justify-between px-5 pt-2 pb-3">
               <div className="min-w-0 pr-3">
-                <h2 className="text-base font-semibold text-gray-900">Add a log</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Pick a program for this claim or evidence</p>
+                <h2 id="mobile-capture-picker-title" className="text-base font-semibold text-gray-900">{captureAction === 'story' ? 'Add a story' : 'Add a log'}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Choose the program this {captureAction} belongs to.</p>
               </div>
               <motion.button
                 type="button"
-                onClick={() => setShowAddPicker(false)}
+                onClick={() => setCaptureAction(null)}
                 whileTap={tapScale}
                 className="p-2 -mr-1 rounded-xl text-gray-400 active:bg-gray-50"
                 aria-label="Close"
@@ -271,8 +336,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                   type="button"
                   whileTap={tapScale}
                   onClick={() => {
-                    setShowAddPicker(false)
-                    setAddInitiativeId(initiative.id!)
+                    openCapture(captureAction, initiative.id!)
                   }}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border border-gray-200/70 bg-white shadow-card text-left active:border-primary-300/70"
                 >
@@ -411,8 +475,19 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   }
 
   return (
-    <div className="min-h-screen pb-24 bg-white">
-      {hasMultipleOrgs && (view === 'initiatives' || view === 'metrics') && (
+    <div className={`mobile-workspace min-h-[100dvh] ${view === 'home' ? 'mobile-home-canvas' : 'bg-white'}`}>
+      {!isStudioComposer(location.pathname) && (
+        <header className="mobile-home-header">
+          <button type="button" onClick={() => setView('home')} className="mobile-home-wordmark" aria-label="Nexus home">
+            <span className="text-[32px] leading-none font-bold tracking-tight">nexus.</span>
+            <span className="mt-1 text-[9px] font-semibold tracking-[0.42em]">IMPACT</span>
+          </button>
+          <button type="button" onClick={() => setShowHelp(true)} className="mobile-home-help">
+            <HelpCircle className="h-4 w-4" aria-hidden="true" /> Help
+          </button>
+        </header>
+      )}
+      {hasMultipleOrgs && view !== 'content' && (
         <div
           className="bg-white border-b border-gray-100/80 px-4 py-2.5 sticky top-0 z-40"
           ref={orgDropdownRef}
@@ -420,6 +495,8 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
           <motion.button
             type="button"
             onClick={() => setOrgDropdownOpen(!orgDropdownOpen)}
+            aria-expanded={orgDropdownOpen}
+            aria-label={`Switch organization, currently ${activeOrganization?.name || 'none selected'}`}
             whileTap={tapScale}
             className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-2xl border transition-colors ${
               isSharedMember
@@ -508,6 +585,18 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
       )}
 
       <div className="flex-1">
+        {view === 'home' && (
+          <MobileHome
+            organizationName={activeOrganization?.name || user.organization || 'Your organization'}
+            logoUrl={activeOrganization?.logo_url}
+            canAddLog={canAddImpactClaims || canAddEvidence}
+            canAddStory={canAddStories}
+            canCreatePost={canUseContentStudio}
+            onAddLog={() => handleCapture('log')}
+            onAddStory={() => handleCapture('story')}
+            onCreatePost={() => navigate('/studio/new', { state: { studioStart: 'diy' } })}
+          />
+        )}
         {view === 'initiatives' && (
           <MobileDashboard
             initiatives={initiatives}
@@ -524,56 +613,108 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         {view === 'account' && (
           <MobileAccountTab user={user} subscriptionStatus={subscriptionStatus} />
         )}
+        {view === 'content' && (
+          <div className="mobile-studio">
+            {!isStudioComposer(location.pathname) && (
+              <nav aria-label="Content Studio" className="flex gap-1 overflow-x-auto border-b border-gray-100 px-4 py-3">
+                {[
+                  ['/studio', 'Overview'], ['/studio/library', 'Posts'], ['/studio/calendar', 'Schedule'],
+                  ['/studio/accounts', 'Accounts'], ['/studio/insights', 'Insights'],
+                ].map(([path, label]) => (
+                  <Link key={path} to={path} aria-current={location.pathname === path ? 'page' : undefined}
+                    className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium ${location.pathname === path ? 'bg-primary-100 text-secondary-900' : 'text-secondary-600'}`}>
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            <Suspense fallback={<PageLoader label="Loading Content Studio..." />}>
+              <ContentCreatePage key={activeOrganization?.id} />
+            </Suspense>
+          </div>
+        )}
+        {view === 'more' && (
+          <main className="mx-auto max-w-lg px-5 py-7">
+            <h1 className="app-page-title mb-2">More from Nexus</h1>
+            <p className="text-sm text-secondary-500 mb-6">Your organization, insights and settings.</p>
+            <div className="app-card divide-y divide-gray-100 overflow-hidden">
+              {[
+                { view: 'metrics' as const, label: 'Metrics', description: 'See your impact across programs', icon: BarChart3 },
+                { view: 'explore' as const, label: 'Explore', description: 'Discover work from other organizations', icon: Compass },
+                { view: 'account' as const, label: 'Account', description: 'Profile, organization and settings', icon: User },
+              ].map(({ view: nextView, label, description, icon: Icon }) => (
+                <button key={nextView} type="button" onClick={() => setView(nextView)} className="flex w-full items-center gap-3 p-4 text-left active:bg-primary-50">
+                  <Icon className="h-5 w-5 shrink-0 text-primary-950" aria-hidden="true" />
+                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-secondary-900">{label}</span><span className="block mt-1 text-xs leading-relaxed text-secondary-500">{description}</span></span>
+                  <ChevronRight className="h-4 w-4 text-secondary-400" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setShowHelp(true)} className="app-btn app-btn-secondary mt-5 w-full"><HelpCircle className="h-4 w-4" /> Help and support</button>
+          </main>
+        )}
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200/80 safe-area-pb z-50">
-        <div className="flex justify-around items-center h-16 px-0.5">
+      <nav aria-label="Main navigation" className="mobile-home-nav">
+        <div className="flex items-center h-[72px] px-1">
+          <MobileNavItem
+            active={view === 'home'}
+            layoutId="mobileTopNav"
+            onClick={() => setView('home')}
+            icon={Home}
+            label="Home"
+            dark
+          />
           <MobileNavItem
             active={view === 'initiatives'}
             layoutId="mobileTopNav"
-            onClick={() => {
-              setView('initiatives')
-              if (location.pathname !== '/') navigate('/', { replace: true })
-            }}
+            onClick={() => setView('initiatives')}
             icon={Layers}
             label="Programs"
+            dark
           />
           <MobileNavItem
-            active={view === 'metrics'}
+            active={view === 'content'}
             layoutId="mobileTopNav"
-            onClick={() => {
-              setView('metrics')
-              if (location.pathname !== '/') navigate('/', { replace: true })
-            }}
-            icon={BarChart3}
-            label="Metrics"
-          />
-          <AddLogFab onClick={handlePlusClick} />
-          <MobileNavItem
-            active={view === 'explore'}
-            layoutId="mobileTopNav"
-            onClick={() => {
-              setView('explore')
-              if (location.pathname !== '/') navigate('/', { replace: true })
-            }}
-            icon={Compass}
-            label="Explore"
+            onClick={() => setView('content')}
+            icon={FileText}
+            label="Content"
+            dark
           />
           <MobileNavItem
-            active={view === 'account'}
+            active={['more', 'metrics', 'explore', 'account'].includes(view)}
             layoutId="mobileTopNav"
-            onClick={() => {
-              setView('account')
-              if (location.pathname !== '/') navigate('/', { replace: true })
-            }}
-            icon={User}
-            label="Account"
+            onClick={() => setView('more')}
+            icon={MoreHorizontal}
+            label="More"
+            dark
           />
         </div>
       </nav>
 
       {addPicker}
       {wizard}
+      {storyInitiativeId && (
+        <MobileStoryForm
+          key={storyInitiativeId}
+          initiativeId={storyInitiativeId}
+          onClose={() => setStoryInitiativeId(null)}
+          onSuccess={() => { setStoryInitiativeId(null); loadInitiatives() }}
+        />
+      )}
+      {showHelp && (
+        <ModalFrame size="sm" onClose={() => setShowHelp(false)}>
+          <ModalHeader title="How can we help?" icon={HelpCircle} onClose={() => setShowHelp(false)} />
+          <ModalBody>
+            <dl className="space-y-5 text-sm text-secondary-600 leading-relaxed">
+              <div><dt className="font-semibold text-secondary-900">Add log</dt><dd>Record a result or upload evidence. Choose a program, add the details, then review and save.</dd></div>
+              <div><dt className="font-semibold text-secondary-900">Add story</dt><dd>Capture a meaningful moment with a photo, video, audio recording or written story.</dd></div>
+              <div><dt className="font-semibold text-secondary-900">Create social post</dt><dd>Choose materials from your work, craft your post and pick where to share it in Content Studio.</dd></div>
+            </dl>
+            <a href="mailto:support@nexusimpacts.com" className="app-btn app-btn-secondary w-full mt-6"><Mail className="h-4 w-4" /> Contact support</a>
+          </ModalBody>
+        </ModalFrame>
+      )}
     </div>
   )
 }

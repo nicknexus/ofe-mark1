@@ -211,7 +211,7 @@ interface StoryFormProps {
  onSuccess: () => void
 }
 
-function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
+export function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
  const [loading, setLoading] = useState(false)
  const [locations, setLocations] = useState<Location[]>([])
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
@@ -326,7 +326,7 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
  <div className="fixed inset-0 bg-white z-[100] flex flex-col">
  {/* Header */}
  <div className="flex items-center justify-between p-4 border-b border-gray-100">
- <button onClick={onClose} className="p-2 -ml-2">
+ <button type="button" onClick={onClose} aria-label="Close story" className="p-2 -ml-2">
  <X className="w-5 h-5 text-gray-500" />
  </button>
  <span className="font-semibold text-gray-800">Create Story</span>
