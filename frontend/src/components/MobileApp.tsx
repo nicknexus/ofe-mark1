@@ -30,7 +30,7 @@ import { useTeam } from '../context/TeamContext'
 import { notify } from '../lib/notify'
 import MobileDashboard from './mobile/MobileDashboard'
 import MobileOrgMetricsTab from './mobile/MobileOrgMetricsTab'
-import { PageLoader } from './ui'
+import { Button, PageLoader } from './ui'
 import MobileLocationsTab from './mobile/MobileLocationsTab'
 import MobileStoriesTab, { MobileStoryForm } from './mobile/MobileStoriesTab'
 import MobileHome from './mobile/MobileHome'
@@ -73,14 +73,12 @@ function MobileNavItem({
   onClick,
   icon: Icon,
   label,
-  dark = false,
 }: {
   active: boolean
   layoutId: string
   onClick: () => void
   icon: React.ComponentType<{ className?: string }>
   label: string
-  dark?: boolean
 }) {
   return (
     <motion.button
@@ -88,23 +86,23 @@ function MobileNavItem({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       whileTap={tapScale}
-      className={`relative flex flex-col items-center justify-center flex-1 h-full ${dark ? 'mobile-home-nav-item' : ''}`}
+      className="relative flex flex-col items-center justify-center flex-1 min-w-0 h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
     >
       {active && (
         <motion.span
           layoutId={layoutId}
-          className={`absolute inset-x-1.5 inset-y-1.5 rounded-xl ${dark ? 'bg-white/15' : 'bg-primary-50'}`}
+          className="absolute inset-x-1.5 inset-y-1.5 rounded-xl bg-primary-50"
           transition={springSoft}
         />
       )}
       <Icon
         className={`relative z-10 w-5 h-5 transition-colors ${
-          dark ? 'text-white' : active ? 'text-primary-700 stroke-[2.5]' : 'text-gray-400'
+          active ? 'text-primary-800 stroke-[2.5]' : 'text-secondary-500'
         }`}
       />
       <span
         className={`relative z-10 text-xs mt-1 transition-colors ${
-          dark ? `${active ? 'font-semibold' : 'font-medium'} text-white` : active ? 'font-semibold text-primary-800' : 'font-medium text-gray-400'
+          active ? 'font-semibold text-primary-800' : 'font-medium text-secondary-500'
         }`}
       >
         {label}
@@ -475,16 +473,16 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   }
 
   return (
-    <div className={`mobile-workspace min-h-[100dvh] ${view === 'home' ? 'mobile-home-canvas' : 'bg-white'}`}>
+    <div className="mobile-workspace app-canvas min-h-[100dvh]">
       {!isStudioComposer(location.pathname) && (
-        <header className="mobile-home-header">
-          <button type="button" onClick={() => setView('home')} className="mobile-home-wordmark" aria-label="Nexus home">
-            <span className="text-[32px] leading-none font-bold tracking-tight">nexus.</span>
-            <span className="mt-1 text-[9px] font-semibold tracking-[0.42em]">IMPACT</span>
+        <header className="flex items-center justify-between gap-3 bg-white border-b border-gray-200/80 px-5 pb-3 pt-[calc(12px+env(safe-area-inset-top,0px))]">
+          <button type="button" onClick={() => setView('home')} className="flex items-center gap-2 min-w-0 min-h-11 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Nexus home">
+            <img src="/Nexuslogo.png" alt="" className="h-7 w-auto shrink-0" />
+            <span className="text-[15px] font-newsreader font-extralight text-secondary-900 truncate leading-none pt-0.5">Nexus Impacts</span>
           </button>
-          <button type="button" onClick={() => setShowHelp(true)} className="mobile-home-help">
+          <Button type="button" variant="secondary" size="lg" onClick={() => setShowHelp(true)} className="px-3">
             <HelpCircle className="h-4 w-4" aria-hidden="true" /> Help
-          </button>
+          </Button>
         </header>
       )}
       {hasMultipleOrgs && view !== 'content' && (
@@ -655,15 +653,14 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         )}
       </div>
 
-      <nav aria-label="Main navigation" className="mobile-home-nav">
-        <div className="flex items-center h-[72px] px-1">
+      <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200/80 safe-area-pb z-50">
+        <div className="flex items-center h-16 px-1">
           <MobileNavItem
             active={view === 'home'}
             layoutId="mobileTopNav"
             onClick={() => setView('home')}
             icon={Home}
             label="Home"
-            dark
           />
           <MobileNavItem
             active={view === 'initiatives'}
@@ -671,7 +668,6 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             onClick={() => setView('initiatives')}
             icon={Layers}
             label="Programs"
-            dark
           />
           <MobileNavItem
             active={view === 'content'}
@@ -679,7 +675,6 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             onClick={() => setView('content')}
             icon={FileText}
             label="Content"
-            dark
           />
           <MobileNavItem
             active={['more', 'metrics', 'explore', 'account'].includes(view)}
@@ -687,7 +682,6 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             onClick={() => setView('more')}
             icon={MoreHorizontal}
             label="More"
-            dark
           />
         </div>
       </nav>
