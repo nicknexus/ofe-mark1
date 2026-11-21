@@ -675,11 +675,11 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  {(!reportText || !reportDashboardData || !showDashboard) && (
  <div className="app-card overflow-hidden p-0">
  {/* Progress Steps Indicator */}
- <div className="px-5 py-4 border-b border-gray-100 bg-white">
+ <div className="px-3 sm:px-5 py-4 border-b border-gray-100 bg-white">
  <div className="flex items-center justify-center gap-1 sm:gap-0">
  {steps.map((step, index) => (
  <React.Fragment key={step.number}>
- <div className="flex flex-col items-center min-w-[4.5rem] sm:min-w-[5.5rem]">
+ <div className="flex flex-1 sm:flex-none flex-col items-center min-w-0 sm:min-w-[5.5rem]">
  <div className={`flex items-center justify-center w-9 h-9 rounded-xl border transition-all duration-200 ${currentStep > step.number
  ? 'bg-primary-500 border-primary-500 text-white'
  : currentStep === step.number

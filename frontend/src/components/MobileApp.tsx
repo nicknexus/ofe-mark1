@@ -19,6 +19,7 @@ import {
   BarChart3,
   Home,
   FileText,
+  FileBarChart,
   MoreHorizontal,
   HelpCircle,
   ChevronRight,
@@ -53,19 +54,20 @@ import {
 } from './mobile/motion'
 
 const ContentCreatePage = lazy(() => import('../pages/ContentCreatePage'))
+const MobileReportsTab = lazy(() => import('./mobile/MobileReportsTab'))
 
 interface MobileAppProps {
   user: UserType
   subscriptionStatus: SubscriptionStatus | null
 }
 
-type TopLevelView = 'home' | 'initiatives' | 'content' | 'more' | 'teams' | 'metrics' | 'explore' | 'account'
+type TopLevelView = 'home' | 'initiatives' | 'content' | 'more' | 'teams' | 'reports' | 'metrics' | 'explore' | 'account'
 type InitiativeTab = 'logs' | 'overview' | 'stories' | 'locations'
 type CaptureAction = 'log' | 'story'
 
 const mobilePaths: Record<TopLevelView, string> = {
   home: '/', initiatives: '/tracking/programs', content: '/studio',
-  more: '/more', teams: '/share/team', metrics: '/metrics', explore: '/explore', account: '/account',
+  more: '/more', teams: '/share/team', reports: '/reports', metrics: '/metrics', explore: '/explore', account: '/account',
 }
 
 function MobileNavItem({
@@ -617,6 +619,11 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
           <MobileAccountTab user={user} subscriptionStatus={subscriptionStatus} />
         )}
         {view === 'teams' && <ShareTeamPage key={activeOrganization?.id} />}
+        {view === 'reports' && (
+          <Suspense fallback={<PageLoader label="Loading reports..." />}>
+            <MobileReportsTab key={activeOrganization?.id} initiatives={initiatives} />
+          </Suspense>
+        )}
         {view === 'content' && (
           <div className="mobile-studio">
             {!isStudioComposer(location.pathname) && (
@@ -644,6 +651,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             <div className="app-card divide-y divide-gray-100 overflow-hidden">
               {[
                 ...(canManageTeam ? [{ view: 'teams' as const, label: 'Teams', description: 'Invite and manage team members', icon: Users }] : []),
+                { view: 'reports' as const, label: 'Reports', description: 'Create and download program impact reports', icon: FileBarChart },
                 { view: 'metrics' as const, label: 'Metrics', description: 'See your impact across programs', icon: BarChart3 },
                 { view: 'explore' as const, label: 'Explore', description: 'Discover work from other organizations', icon: Compass },
                 { view: 'account' as const, label: 'Account', description: 'Profile, organization and settings', icon: User },
@@ -685,7 +693,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             isNew
           />
           <MobileNavItem
-            active={['more', 'teams', 'metrics', 'explore', 'account'].includes(view)}
+            active={['more', 'teams', 'reports', 'metrics', 'explore', 'account'].includes(view)}
             layoutId="mobileTopNav"
             onClick={() => setView('more')}
             icon={MoreHorizontal}
