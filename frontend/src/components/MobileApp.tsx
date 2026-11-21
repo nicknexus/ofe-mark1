@@ -478,7 +478,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
   }
 
   return (
-    <div className="mobile-workspace app-canvas min-h-[100dvh]">
+    <div className={`mobile-workspace app-canvas min-h-[100dvh] ${view === 'home' ? 'flex flex-col' : ''}`}>
       {!isStudioComposer(location.pathname) && (
         <header className="flex items-center justify-between gap-3 bg-white border-b border-gray-200/80 px-5 pb-3 pt-[calc(12px+env(safe-area-inset-top,0px))]">
           <button type="button" onClick={() => setView('home')} className="flex items-center gap-2 min-w-0 min-h-11 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Nexus home">
@@ -587,7 +587,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         </div>
       )}
 
-      <div className="flex-1">
+      <div className={view === 'home' ? 'flex flex-1' : 'flex-1'}>
         {view === 'home' && (
           <MobileHome
             organizationName={activeOrganization?.name || user.organization || 'Your organization'}

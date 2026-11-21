@@ -1502,6 +1502,32 @@
         padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
     }
 
+    /* Home cards share the available height; taller phones get larger controls. */
+    @media (min-height: 760px) {
+        .mobile-home-action {
+            padding: 1.25rem;
+        }
+
+        .mobile-home .app-icon-tile {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        .mobile-home .app-icon-tile svg {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        .mobile-home .app-card-title {
+            font-size: 1.125rem;
+        }
+
+        .mobile-home-share {
+            min-height: 3.5rem;
+            font-size: 1rem;
+        }
+    }
+
     /* The composer owns its scroll area; leave room for the bottom nav. */
     .mobile-studio > .relative.h-screen {
         height: calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px));
