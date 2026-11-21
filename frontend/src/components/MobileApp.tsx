@@ -40,6 +40,7 @@ import MobileOverview from './overview/MobileOverview'
 import UploadWizardLauncher from './upload/UploadWizardLauncher'
 import CreateKPIModal from './CreateKPIModal'
 import ExplorePage from '../pages/ExplorePage'
+import ShareTeamPage from '../pages/ShareTeamPage'
 import ModalFrame, { ModalHeader, ModalBody } from './ModalFrame'
 import { isStudioMode, isStudioComposer } from '../pages/studio/studioPaths'
 import {
@@ -58,13 +59,13 @@ interface MobileAppProps {
   subscriptionStatus: SubscriptionStatus | null
 }
 
-type TopLevelView = 'home' | 'initiatives' | 'content' | 'more' | 'metrics' | 'explore' | 'account'
+type TopLevelView = 'home' | 'initiatives' | 'content' | 'more' | 'teams' | 'metrics' | 'explore' | 'account'
 type InitiativeTab = 'logs' | 'overview' | 'stories' | 'locations'
 type CaptureAction = 'log' | 'story'
 
 const mobilePaths: Record<TopLevelView, string> = {
   home: '/', initiatives: '/tracking/programs', content: '/studio',
-  more: '/more', metrics: '/metrics', explore: '/explore', account: '/account',
+  more: '/more', teams: '/share/team', metrics: '/metrics', explore: '/explore', account: '/account',
 }
 
 function MobileNavItem({
@@ -73,12 +74,14 @@ function MobileNavItem({
   onClick,
   icon: Icon,
   label,
+  isNew = false,
 }: {
   active: boolean
   layoutId: string
   onClick: () => void
   icon: React.ComponentType<{ className?: string }>
   label: string
+  isNew?: boolean
 }) {
   return (
     <motion.button
@@ -107,6 +110,7 @@ function MobileNavItem({
       >
         {label}
       </span>
+      {isNew && <span className="absolute right-1 top-1 rounded-full bg-claim-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none text-secondary-900">New</span>}
     </motion.button>
   )
 }
@@ -142,6 +146,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
     canAddEvidence,
     canAddStories,
     canUseContentStudio,
+    canManageTeam,
   } = useTeam()
   const view: TopLevelView = isStudioMode(location.pathname) ? 'content'
     : (Object.entries(mobilePaths).find(([, path]) => path === location.pathname)?.[0] as TopLevelView | undefined) || 'home'
@@ -611,6 +616,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         {view === 'account' && (
           <MobileAccountTab user={user} subscriptionStatus={subscriptionStatus} />
         )}
+        {view === 'teams' && <ShareTeamPage key={activeOrganization?.id} />}
         {view === 'content' && (
           <div className="mobile-studio">
             {!isStudioComposer(location.pathname) && (
@@ -620,7 +626,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                   ['/studio/accounts', 'Accounts'], ['/studio/insights', 'Insights'],
                 ].map(([path, label]) => (
                   <Link key={path} to={path} aria-current={location.pathname === path ? 'page' : undefined}
-                    className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium ${location.pathname === path ? 'bg-primary-100 text-secondary-900' : 'text-secondary-600'}`}>
+                    className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium ${location.pathname === path ? 'bg-claim-100 text-secondary-900' : 'text-secondary-600'}`}>
                     {label}
                   </Link>
                 ))}
@@ -637,6 +643,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             <p className="text-sm text-secondary-500 mb-6">Your organization, insights and settings.</p>
             <div className="app-card divide-y divide-gray-100 overflow-hidden">
               {[
+                ...(canManageTeam ? [{ view: 'teams' as const, label: 'Teams', description: 'Invite and manage team members', icon: Users }] : []),
                 { view: 'metrics' as const, label: 'Metrics', description: 'See your impact across programs', icon: BarChart3 },
                 { view: 'explore' as const, label: 'Explore', description: 'Discover work from other organizations', icon: Compass },
                 { view: 'account' as const, label: 'Account', description: 'Profile, organization and settings', icon: User },
@@ -675,9 +682,10 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             onClick={() => setView('content')}
             icon={FileText}
             label="Content"
+            isNew
           />
           <MobileNavItem
-            active={['more', 'metrics', 'explore', 'account'].includes(view)}
+            active={['more', 'teams', 'metrics', 'explore', 'account'].includes(view)}
             layoutId="mobileTopNav"
             onClick={() => setView('more')}
             icon={MoreHorizontal}

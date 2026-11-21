@@ -1511,6 +1511,32 @@
         padding-bottom: 16px !important;
     }
 
+    /* Use the shared slate and seafoam tokens for the mobile Studio. */
+    .mobile-studio .studio-hero {
+        @apply bg-secondary-800 text-white;
+        background-image: none;
+    }
+
+    .mobile-studio .studio-hero-btn {
+        @apply text-secondary-900;
+    }
+
+    .mobile-studio .studio-hero-btn:hover {
+        @apply bg-secondary-50;
+    }
+
+    .mobile-studio .studio-hero-btn-mint {
+        @apply bg-claim-500 text-secondary-900;
+    }
+
+    .mobile-studio .studio-hero-btn-mint:hover {
+        @apply bg-claim-600;
+    }
+
+    .mobile-studio .studio-pill-on {
+        @apply bg-secondary-800 border-secondary-800;
+    }
+
     /* Hide desktop sidebar on mobile */
     .desktop-sidebar {
         display: none !important;

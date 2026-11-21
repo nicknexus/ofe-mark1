@@ -1336,7 +1336,19 @@ export default function ContentEngine() {
                   profileImage={activeOrganization?.logo_url}
                   names={{ instagram: socialAccount?.connections?.instagram?.label }}
                   captionEditor={(
-                    <div className="space-y-3">
+                    <div className="space-y-2 md:space-y-3">
+                      <div className="md:hidden border-b border-gray-100 pb-3">
+                        <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full justify-center" onClick={draftWithNexus}>
+                          <Sparkles className="w-4 h-4" /> {nexusLabel}
+                        </button>
+                        <details className="mt-2">
+                          <summary className="cursor-pointer py-2 text-xs font-medium text-secondary-600">Draft with more context</summary>
+                          <label className="block mt-1">
+                            <span className="block text-xs font-semibold text-secondary-900 mb-1">Context</span>
+                            <GrowField minRows={2} value={extraContext} onChange={setExtraContext} placeholder="Audience, a quote, an event, a tone." />
+                          </label>
+                        </details>
+                      </div>
                       <label className="block">
                         <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Headline</span>
                         <FitText
@@ -1354,6 +1366,7 @@ export default function ContentEngine() {
                           onChange={v => setMaster({ ...master, body: v })}
                           placeholder="Write the post."
                           minRows={4}
+                          mobileMinRows={1}
                           className="text-[13px] leading-snug text-[#1C2B24]"
                         />
                       </label>
@@ -1392,7 +1405,7 @@ export default function ContentEngine() {
                 </section>
 
                 <div className="flex flex-col sm:flex-row gap-3 items-start">
-                <section className="studio-panel p-4 flex-1 min-w-0">
+                <section className="studio-panel hidden md:block p-4 flex-1 min-w-0">
                   {!contextOn && (
                     <>
                       <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full" onClick={draftWithNexus}>
@@ -2729,21 +2742,29 @@ function FitText({
   onChange,
   className,
   minRows = 2,
+  mobileMinRows = minRows,
   placeholder,
 }: {
   value: string
   onChange: (v: string) => void
   className?: string
   minRows?: number
+  mobileMinRows?: number
   placeholder?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.max(el.scrollHeight, minRows * 16)}px`
-  }, [value, minRows])
+    const resize = () => {
+      el.rows = window.innerWidth < 768 ? mobileMinRows : minRows
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [value, minRows, mobileMinRows])
   return (
     <div className="group/edit relative">
       <textarea

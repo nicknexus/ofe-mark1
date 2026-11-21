@@ -322,7 +322,9 @@ export default function UploadWizard({
   // Add-evidence-for-a-claim implies evidence kind + the claim's metric locked.
   const startKind = initialKind ?? (evidenceForClaim ? 'evidence' : undefined)
   const lockedMetric = lockedMetricId ?? evidenceForClaim?.kpi_id
-  const showChooser = !isEdit && !startKind
+  // Choose once per session so resizing cannot shift an in-progress log's steps.
+  // Phone captures open directly in the workspace; desktop keeps both flows.
+  const [showChooser] = useState(() => !isEdit && !startKind && window.innerWidth >= 768)
   const [flow, setFlow] = useState<'workspace' | 'classic'>('workspace')
 
   const availableKinds = KIND_OPTIONS.filter(o =>
