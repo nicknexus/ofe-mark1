@@ -1502,28 +1502,36 @@
         padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
     }
 
-    /* Home cards share the available height; taller phones get larger controls. */
+    /* Let home cards grow to comfortable sizes, then center the group. */
     @media (min-height: 760px) {
+        .mobile-home-capture {
+            max-height: 15rem;
+        }
+
+        .mobile-home-sharing {
+            max-height: 13rem;
+        }
+
         .mobile-home-action {
             padding: 1.25rem;
         }
 
         .mobile-home .app-icon-tile {
-            width: 3rem;
-            height: 3rem;
+            width: 2.5rem;
+            height: 2.5rem;
         }
 
         .mobile-home .app-icon-tile svg {
-            width: 1.5rem;
-            height: 1.5rem;
+            width: 1.25rem;
+            height: 1.25rem;
         }
 
         .mobile-home .app-card-title {
-            font-size: 1.125rem;
+            font-size: 1.0625rem;
         }
 
         .mobile-home-share {
-            min-height: 3.5rem;
+            min-height: 3.25rem;
             font-size: 1rem;
         }
     }

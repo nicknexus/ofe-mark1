@@ -21,7 +21,7 @@ export default function MobileHome({
   const showLogo = logoUrl && logoUrl !== failedLogo
 
   return (
-    <main className="mobile-home mx-auto flex flex-1 flex-col w-full max-w-lg px-4 pb-4">
+    <main className="mobile-home mx-auto flex flex-1 flex-col justify-center w-full max-w-lg px-4 pb-4">
       <div className="flex flex-col items-center justify-center gap-2 px-2 py-4">
         {showLogo ? (
           <img src={logoUrl} alt={organizationName} className="h-12 max-w-[220px] w-full object-contain" onError={() => setFailedLogo(logoUrl)} />
@@ -34,7 +34,7 @@ export default function MobileHome({
         <h1 className="app-page-subtitle text-center">Your impact workspace</h1>
       </div>
 
-      <section aria-labelledby="mobile-capture-title" className="flex flex-col grow-[3]">
+      <section aria-labelledby="mobile-capture-title" className="mobile-home-capture flex flex-col grow-[3]">
         <h2 id="mobile-capture-title" className="app-section-title mb-2">Capture your work</h2>
         <div className="grid flex-1 grid-cols-2 gap-3">
           <button type="button" onClick={onAddLog} disabled={!canAddLog} className="mobile-home-action app-card-interactive flex flex-col items-start justify-center p-3 text-left disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
@@ -54,7 +54,7 @@ export default function MobileHome({
         </div>
       </section>
 
-      <section aria-labelledby="mobile-share-title" className="mt-4 flex flex-col grow-[2]">
+      <section aria-labelledby="mobile-share-title" className="mobile-home-sharing mt-4 flex flex-col grow-[2]">
         <h2 id="mobile-share-title" className="app-section-title mb-2">Share your impact</h2>
         <div className="mobile-home-action app-card flex flex-1 flex-col p-3">
           <div className="flex flex-1 items-center gap-3">
