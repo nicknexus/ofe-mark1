@@ -157,15 +157,18 @@ STORY TYPE
 ${storyTypeBrief(storyType)}
 
 TASK
-Write one master post from the logged title and description. The photo is the picture. It is not a substitute for the words.
-No emojis. Never use em dashes. Never invent a person, place, number, or outcome that is not in the facts.
+Write one master post from the logged story, the way someone would actually post it. Not a report. The photo is the picture that goes with it. It is not the story.
+Never use em dashes. Never invent a person, place, number, quote, or outcome that is not in the facts.
+Emoji: use one only when it fits the moment, such as a celebration, a place, or a milestone. Skip it when the story is serious, sad, or an emoji would just decorate the sentence. Never more than two in the whole post. Never inside a quote. Never a row of them.
 
-The title and description are the source of truth. Every concrete fact in them must appear in the post, rewritten so it reads like a post, not a log. That includes who, where, what they did, what changed, and any number. Do not drop a fact to keep it short. Do not add a fact that is not there.
-If Connected claims include a real number or result, include it too. If there are no connected claims, do not invent a count.
+The title and description are the source of truth. Write the post from those words. If the description is longer than the title, the description is the story. Use it.
+Include the important pieces when they are in the title or description: who it is about, where it happened, what they did or what happened, what changed, and any number or quote. Keep a quote accurate. Do not drop one of those pieces to make it shorter. Do not add a piece that is not there.
+You may mention the scene in the photo in one short clause. Do not write a caption that only describes what is visible.
+If Connected results include a real number, include it. If there are none, do not invent a count.
 
 Return a JSON object with keys: hook, body_lines, cta.
-hook: 3-10 words. Specific. It can use a fact from the title.
-body_lines: 2-6 short sentences as an array, one sentence per entry. Use "" between sentences for a blank line. Long enough to keep the facts, usually 60-140 words. Never one paragraph.
+hook: 3-10 words. A specific piece of the story, not a description of the photo.
+body_lines: 3-6 short sentences as an array, one sentence per entry. Use "" between sentences for a blank line. Long enough to keep the important pieces, usually 70-140 words. Never one paragraph.
 cta: 3-8 words. If nothing fits, "Learn more about our work."`
 }
 
@@ -175,6 +178,7 @@ export function refineMasterPrompt(): string {
 TASK
 Rewrite ONLY the body so USER CONTEXT is woven in. Do not change the hook or the call to action.
 This is a revision of the body, not a new story. Keep every logged fact. Do not invent. Never use em dashes.
+Emoji: keep or add one only when it fits. Remove one that does not. Never more than two in the body. Never inside a quote.
 Return a JSON object with keys: body_lines.
 body_lines: 2-4 short sentences as an array, one sentence per entry. Use "" between sentences for a blank line. Same story plus the context. Never one paragraph. If Connected claims include a real number or result, keep it in a line naturally. No padding. Never invent a count.`
 }

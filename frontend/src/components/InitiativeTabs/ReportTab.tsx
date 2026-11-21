@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
 import { SectionLoader, EmptyState, Spinner, InlineAlert } from '../ui'
 import { apiService } from '../../services/api'
 import { KPI, Location, BeneficiaryGroup, InitiativeDashboard, MetricTag } from '../../types'
@@ -140,7 +140,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const [currentStep, setCurrentStep] = useState(1)
  const totalSteps = 4
  const containerRef = useRef<HTMLDivElement>(null)
- const formContentRef = useRef<HTMLDivElement>(null)
 
  // Storage key for this initiative's report
  const storageKey = `report-${initiativeId}`
@@ -251,11 +250,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
  }, [initiativeId])
 
- // Scroll to top when step changes
  useEffect(() => {
- if (formContentRef.current) {
- formContentRef.current.scrollTop = 0
- }
+ if (containerRef.current) containerRef.current.scrollTop = 0
  }, [currentStep])
 
  const handleApplyFilters = async () => {
@@ -545,8 +541,10 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  )
  }
 
+ const showWizard = !reportText || !reportDashboardData || !showDashboard
+
  return (
- <div className="h-full overflow-hidden flex flex-col relative">
+ <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative bg-page">
  {loadingReport && (
  <div className="absolute inset-0 bg-white z-50 flex items-center justify-center">
  <div className="text-center max-w-md mx-auto px-6">
@@ -559,14 +557,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  )}
 
- <div className="px-4 sm:px-6 lg:px-8 xl:px-10 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
- <div className="min-w-0 max-w-[1800px] mx-auto w-full">
- <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">AI Report</h2>
- <p className="text-sm text-gray-500 mt-1 hidden sm:block">Filter your data, preview what will be included, then generate a one-page PDF</p>
- </div>
- </div>
-
- <div ref={containerRef} className="flex-1 bg-gray-50 overflow-y-auto min-h-0">
+ <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-gray-50">
  <div className="max-w-6xl mx-auto p-4 sm:p-8 space-y-6">
  {/* Report Dashboard - Shown at top when generated */}
  {showDashboard && reportText && reportDashboardData && reportData && (
@@ -600,9 +591,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </button>
  ))}
  <button
+ type="button"
  onClick={() => {
  setShowDashboard(false)
- // Update localStorage with new showDashboard state
  try {
  const saved = localStorage.getItem(storageKey)
  if (saved) {
@@ -614,19 +605,39 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  console.error('Failed to update localStorage:', error)
  }
  }}
- className="app-btn app-btn-icon app-btn-ghost"
- title="Close dashboard"
+ className="app-btn app-btn-ghost app-btn-sm"
  >
- <X className="w-5 h-5" />
+ Adjust filters
  </button>
  </div>
  </div>
- <Suspense
- fallback={
- <div className="h-[840px] flex items-center justify-center text-sm text-gray-500">
- Loading report…
+ {isEditingReport ? (
+ <div className="space-y-4 max-w-3xl">
+ <div>
+ <label className="app-label" htmlFor="report-overview">Overview</label>
+ <textarea id="report-overview" className="app-input min-h-[120px] resize-y" value={editableOverview} onChange={(e) => setEditableOverview(e.target.value)} />
  </div>
- }
+ <div>
+ <label className="app-label" htmlFor="report-beneficiaries">Who was reached</label>
+ <textarea id="report-beneficiaries" className="app-input min-h-[96px] resize-y" value={editableBeneficiaryText} onChange={(e) => setEditableBeneficiaryText(e.target.value)} />
+ </div>
+ {selectedStory && (
+ <>
+ <div>
+ <label className="app-label" htmlFor="report-story-title">Story title</label>
+ <input id="report-story-title" className="app-input" value={editableStoryTitle} onChange={(e) => setEditableStoryTitle(e.target.value)} />
+ </div>
+ <div>
+ <label className="app-label" htmlFor="report-story-body">Story</label>
+ <textarea id="report-story-body" className="app-input min-h-[96px] resize-y" value={editableStoryDescription} onChange={(e) => setEditableStoryDescription(e.target.value)} />
+ </div>
+ </>
+ )}
+ <p className="app-help">Save to refresh the PDF with this text.</p>
+ </div>
+ ) : (
+ <Suspense
+ fallback={<SectionLoader label="Loading report…" className="h-64" />}
  >
  <ReportPdfPanel
  canDownload={canExportReports}
@@ -662,6 +673,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  mapPoints={reportData.mapPoints}
  />
  </Suspense>
+ )}
  </div>
 
  {/* Make New Report Button - Below Dashboard */}
@@ -672,7 +684,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  )}
 
  {/* Step Wizard - Only show if no report generated OR dashboard is hidden */}
- {(!reportText || !reportDashboardData || !showDashboard) && (
+ {showWizard && (
  <div className="app-card overflow-hidden p-0">
  {/* Progress Steps Indicator */}
  <div className="px-5 py-4 border-b border-gray-100 bg-white">
@@ -705,7 +717,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
 
  {/* Step Content */}
- <div ref={formContentRef} className="p-5 sm:p-6 min-h-[440px] max-h-[70vh] overflow-y-auto">
+ <div className="p-5 sm:p-6">
  {/* Step 1: Filters */}
  {currentStep === 1 && (
  <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
@@ -795,7 +807,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </h4>
  </div>
  {/* 2 rows of 112px cards + 12px gap, then scroll */}
- <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[calc(2*112px+12px)] overflow-y-auto pr-1">
+ <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
  {reportData.totals.map((total, index) => {
  const isPercentage = (total as any).metric_type === 'percentage'
  const color = colorByKpiId[total.kpi_id] || getKPIColor('output', index)
@@ -869,7 +881,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
 
  {reportData?.stories && reportData.stories.length > 0 ? (
- <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-1">
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
  {reportData.stories.map(story => {
  const isSelected = selectedStory?.id === story.id
  const thumb = story.media_type === 'video' || story.media_type === 'recording'
@@ -995,10 +1007,15 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  )}
  </div>
+ </div>
+ )}
 
- {/* Navigation Footer */}
- <div className="border-t border-gray-100 px-5 py-3 bg-gray-50/80">
- <div className="flex items-center justify-between max-w-3xl mx-auto">
+ </div>
+ </div>
+
+ {showWizard && (
+ <div className="flex-shrink-0 border-t border-gray-200 bg-white px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+ <div className="flex items-center justify-between max-w-6xl mx-auto gap-3">
  <button
  type="button"
  onClick={handleBack}
@@ -1048,15 +1065,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </>
  )}
  </button>
- ) : null}
- </div>
+ ) : (
+ <p className="text-sm text-gray-500">Your role can't generate reports.</p>
+ )}
  </div>
  </div>
  </div>
  )}
-
- </div>
- </div>
  </div>
  )
 }

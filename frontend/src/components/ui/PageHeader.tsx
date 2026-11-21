@@ -15,9 +15,9 @@ export interface PageHeaderProps {
  backTo?: string
  /** Render a back button calling this handler (takes precedence over backTo). */
  onBack?: () => void
- /** Right-aligned actions (buttons, menus). */
- actions?: React.ReactNode
- className?: string
+  /** Right-aligned actions (buttons, menus). */
+  actions?: React.ReactNode
+  className?: string
 }
 
 /**

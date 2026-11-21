@@ -36,6 +36,8 @@ export default function SocialPostPreview({
   names,
   only,
   captionEditor,
+  parts,
+  fill,
 }: {
   caption: string
   media: { url: string }[]
@@ -44,6 +46,8 @@ export default function SocialPostPreview({
   names?: Partial<Record<PreviewPlatform, string | null>>
   only?: PreviewPlatform
   captionEditor?: ReactNode
+  parts?: { hook: string; body: string; cta: string }
+  fill?: boolean
 }) {
   const [platform, setPlatform] = useState<PreviewPlatform>(only || 'instagram')
   const [index, setIndex] = useState(0)
@@ -55,7 +59,7 @@ export default function SocialPostPreview({
   const textFirst = platform !== 'instagram'
 
   const frame = (
-    <div className={`relative overflow-hidden bg-[#E7F3DF] ${platform === 'instagram' ? 'aspect-square' : 'aspect-[1.91/1]'}`}>
+    <div className={`relative w-full shrink-0 overflow-hidden bg-[var(--studio-teal-wash)] ${platform === 'instagram' ? 'aspect-[4/5]' : 'aspect-[1.91/1]'}`}>
       {photo ? (
         <img src={photo.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
@@ -103,8 +107,21 @@ export default function SocialPostPreview({
     <p className="text-[12px] font-medium text-amber-800">No caption yet. The photo would post alone.</p>
   )
 
+  const captionLines = parts
+    ? [parts.hook, parts.body, parts.cta].map(part => part.trim()).filter(Boolean)
+    : []
+  const previewParts = parts ? (
+    <div className="min-h-0 overflow-y-auto text-[13px] leading-snug text-[#1C2B24]">
+      {captionLines.length ? (
+        <p className="whitespace-pre-wrap break-words">{captionLines.join('\n\n')}</p>
+      ) : (
+        <p className="text-secondary-300">The headline, body, and call to action post as one caption.</p>
+      )}
+    </div>
+  ) : null
+
   return (
-    <div className="studio-panel overflow-hidden max-w-[340px]">
+    <div className={`studio-panel max-w-[340px] ${fill ? 'flex h-full flex-col overflow-x-hidden overflow-y-auto' : 'overflow-hidden'}`}>
       {!only && (
       <div className="flex flex-wrap gap-1.5 p-2.5">
         {(['instagram', 'facebook', 'linkedin'] as const).map(id => (
@@ -119,8 +136,8 @@ export default function SocialPostPreview({
         ))}
       </div>
       )}
-      <div className={only ? '' : 'border-t border-[#14352A]/[0.06]'}>
-        <div className="flex items-center gap-2 px-3 py-2">
+      <div className={`${only ? '' : 'border-t border-[#14352A]/[0.06]'} ${fill ? 'flex flex-col flex-1 min-h-0' : ''}`}>
+        <div className={`flex items-center gap-2 px-3 ${fill ? 'py-1.5' : 'py-2'}`}>
           <Avatar name={who} image={profileImage} />
           <span className="min-w-0">
             <span className="block text-[12px] font-semibold text-[#1C2B24] truncate">{who}</span>
@@ -129,7 +146,7 @@ export default function SocialPostPreview({
         </div>
         {textFirst && <div className="px-3 pb-2">{captionEditor || words}</div>}
         {frame}
-        <div className="px-3 py-2 flex items-center gap-3 text-[#14352A]">
+        <div className={`flex items-center gap-3 text-[#14352A] ${fill ? 'px-3 py-1' : 'px-3 py-2'}`}>
           {platform === 'linkedin' ? (
             <>
               <ThumbsUp className="w-4 h-4" />
@@ -152,10 +169,14 @@ export default function SocialPostPreview({
             </>
           )}
         </div>
-        {!textFirst && <div className="px-3 pb-2.5">{captionEditor || words}</div>}
+        {!textFirst && (
+          <div className={`px-3 pb-2.5 ${fill ? 'max-h-[36%] shrink-0 overflow-y-auto' : ''}`}>
+            {previewParts || captionEditor || words}
+          </div>
+        )}
       </div>
-      <div className="px-3 pb-3">
-        {!captionEditor && (
+      <div className={`px-3 pb-3 shrink-0 ${parts ? 'pt-1' : ''}`}>
+        {!parts && !captionEditor && (
           <p className="text-[11px] text-secondary-400 leading-snug">
             Caption under the photo, not printed on it.
           </p>

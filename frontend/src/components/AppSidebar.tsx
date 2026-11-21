@@ -245,7 +245,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
         }`}>
           <img src="/Nexuslogo.png" alt="" className="h-7 w-auto flex-shrink-0" />
           <span className={`text-[15px] font-newsreader font-extralight truncate leading-none pt-0.5 ${
-            studioMode ? 'text-[#F4F7F2]' : 'text-secondary-900'
+            studioMode ? 'text-white' : 'text-secondary-900'
           }`}>Nexus Impacts</span>
         </Link>
         <div
@@ -260,7 +260,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             className={`flex-1 h-7 rounded-full text-[11px] font-semibold tracking-tight inline-flex items-center justify-center gap-1 transition-all ${
               studioMode
                 ? 'text-white/60 hover:text-white'
-                : 'bg-white text-[#14352A] shadow-[0_1px_2px_rgba(20,53,42,0.12)]'
+                : 'bg-white text-[var(--studio-ink)] shadow-[0_1px_2px_rgba(42,51,58,0.12)]'
             }`}
           >
             <SoftHome className="w-3.5 h-3.5" />
@@ -273,7 +273,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             aria-selected={studioMode}
             className={`flex-1 h-7 rounded-full text-[11px] font-semibold tracking-tight inline-flex items-center justify-center gap-1 transition-all ${
               studioMode
-                ? 'bg-[#C0DFA1] text-[#14352A] shadow-[0_1px_2px_rgba(0,0,0,0.25)]'
+                ? 'studio-accent-fill shadow-[0_1px_2px_rgba(0,0,0,0.25)]'
                 : 'text-[#3d5c49] hover:text-[#14352A]'
             }`}
           >
@@ -362,11 +362,11 @@ export default function AppSidebar({ user }: AppSidebarProps) {
                 to="/share/public"
                 className={`flex items-center gap-1.5 min-w-0 ${
                   studioMode
-                    ? activeOrganization.is_public ? 'text-[#C0DFA1]' : 'text-amber-200'
+                    ? 'text-white'
                     : activeOrganization.is_public ? 'text-impact-700' : 'text-amber-700'
                 } text-[11px] font-medium`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOrganization.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOrganization.is_public ? (studioMode ? 'bg-[var(--studio-sage)]' : 'bg-impact-500') : 'bg-amber-400'}`} />
                 <span className="truncate">{activeOrganization.is_public ? 'Public page live' : 'Public page not live'}</span>
               </Link>
               {publicHref && (
@@ -375,7 +375,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
                   target="_blank"
                   rel="noreferrer"
                   title="Open public page"
-                  className={`p-1 rounded-md flex-shrink-0 ${studioMode ? 'text-[#C0DFA1] hover:bg-white/10' : 'text-impact-600 hover:bg-impact-50'}`}
+                  className={`p-1 rounded-md flex-shrink-0 ${studioMode ? 'text-white hover:bg-white/10' : 'text-impact-600 hover:bg-impact-50'}`}
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
@@ -510,7 +510,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             title={displayName}
           >
             <div className={`w-8 h-8 rounded-full text-[11px] font-semibold flex items-center justify-center flex-shrink-0 ${
-              studioMode ? 'bg-[#C0DFA1] text-[#14352A]' : 'bg-secondary-600 text-white'
+              studioMode ? 'studio-accent-fill' : 'bg-secondary-600 text-white'
             }`}>
               {initials || <UserIcon className="w-4 h-4" />}
             </div>

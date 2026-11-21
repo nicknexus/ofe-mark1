@@ -72,6 +72,7 @@ export function StudioCalendar() {
 
   return (
     <StudioFrame
+      brand
       title="Posts and schedule"
       subtitle="Every post you have made, and the socials it has gone to."
     >
@@ -102,12 +103,12 @@ export function StudioCalendar() {
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
-        <StudioPanel className="divide-y divide-[#14352A]/[0.06]">
+        <StudioPanel className="divide-y divide-[color-mix(in_srgb,var(--studio-ink)_8%,transparent)]">
           {loading ? (
             <SectionLoader />
           ) : posts.length === 0 ? (
             <div className="px-5 py-10">
-              <p className="text-sm font-semibold text-[#1C2B24]">No posts on this view</p>
+              <p className="text-sm font-semibold studio-ink-text">No posts on this view</p>
               <p className="mt-1 text-[13px] text-secondary-500">Try another day or filter.</p>
             </div>
           ) : posts.map(pkg => {
@@ -115,16 +116,16 @@ export function StudioCalendar() {
             const sent = socialSendLabel(pkg.publications)
             const queued = (pkg.publications || []).filter(item => isQueued(item))
             return (
-              <div key={pkg.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7FAF4]">
+              <div key={pkg.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--studio-teal-wash)]">
                 <Link to={`/studio/post/${pkg.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                   {pkg.image_url ? (
                     <img src={pkg.image_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
                   ) : (
-                    <span className="w-14 h-14 rounded-xl bg-[#E7F3DF] flex-shrink-0" />
+                    <span className="w-14 h-14 rounded-xl studio-teal-wash flex-shrink-0" />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-semibold text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
-                    {sent && <span className="mt-0.5 block text-[12px] font-medium text-[#2A6B4A] truncate">{sent}</span>}
+                    <span className="block text-[14px] font-semibold studio-ink-text truncate">{pkg.hook || 'Untitled post'}</span>
+                    {sent && <span className="mt-0.5 block text-[12px] font-medium studio-accent-text truncate">{sent}</span>}
                   </span>
                 </Link>
                 <SocialMarks items={pkg.publications} />
@@ -140,7 +141,7 @@ export function StudioCalendar() {
                   <button
                     key={item.platform}
                     type="button"
-                    className="text-[12px] font-semibold text-[#2A6B4A] shrink-0 disabled:opacity-50"
+                    className="text-[12px] font-semibold studio-accent-text shrink-0 disabled:opacity-50"
                     disabled={clearing === `${pkg.id}:${item.platform}`}
                     onClick={() => unschedule(pkg.id, item.platform as 'instagram' | 'facebook' | 'linkedin')}
                   >
@@ -188,15 +189,15 @@ function ScheduledList({
     .sort((a, b) => (a.item.scheduled_at || '').localeCompare(b.item.scheduled_at || ''))
   return (
     <StudioPanel className="px-4 py-4">
-      <p className="text-[13px] font-semibold text-[#1C2B24]">Scheduled</p>
+      <p className="text-[13px] font-semibold studio-ink-text">Scheduled</p>
       {queued.length === 0 ? (
         <p className="mt-1 text-[12px] text-secondary-500 leading-relaxed">Nothing is queued.</p>
       ) : (
         <div className="mt-3 space-y-2">
           {queued.map(({ pkg, item }) => (
-            <div key={`${pkg.id}-${item.platform}`} className="flex items-start gap-2 rounded-xl px-2 py-1.5 hover:bg-[#F7FAF4]">
+            <div key={`${pkg.id}-${item.platform}`} className="flex items-start gap-2 rounded-xl px-2 py-1.5 hover:bg-[var(--studio-teal-wash)]">
               <Link to={`/studio/post/${pkg.id}`} className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
+                <span className="block text-[13px] font-medium studio-ink-text truncate">{pkg.hook || 'Untitled post'}</span>
                 <span className="block text-[12px] text-secondary-500">
                   {STUDIO_PLATFORMS.find(platform => platform.id === item.platform)?.label || item.platform}
                   {queueWhen(item.scheduled_at) ? ` · ${queueWhen(item.scheduled_at)}` : ''}
@@ -204,7 +205,7 @@ function ScheduledList({
               </Link>
               <button
                 type="button"
-                className="text-[12px] font-semibold text-[#2A6B4A] shrink-0 disabled:opacity-50"
+                className="text-[12px] font-semibold studio-accent-text shrink-0 disabled:opacity-50"
                 disabled={clearing === `${pkg.id}:${item.platform}`}
                 onClick={() => onUnschedule(pkg.id, item.platform as 'instagram' | 'facebook' | 'linkedin')}
               >
@@ -283,6 +284,7 @@ export function StudioAccounts() {
 
   return (
     <StudioFrame
+      brand
       title="Connected accounts"
       subtitle="Instagram, Facebook, and LinkedIn for this organization."
     >
@@ -296,11 +298,11 @@ export function StudioAccounts() {
                 <Icon className="w-5 h-5" style={{ color: platform.color }} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-[#1C2B24]">{platform.label}</span>
+                <span className="block text-sm font-semibold studio-ink-text">{platform.label}</span>
                 {!ready ? (
-                  <span className="mt-1 block h-3 w-20 rounded-full bg-[#E7F3DF] animate-pulse" />
+                  <span className="mt-1 block h-3 w-20 rounded-full studio-teal-wash animate-pulse" />
                 ) : (
-                  <span className={`block text-[12px] font-medium truncate ${linked?.connected ? 'text-[#2A6B4A]' : 'text-secondary-500'}`}>
+                  <span className={`block text-[12px] font-medium truncate ${linked?.connected ? 'studio-accent-text' : 'text-secondary-500'}`}>
                     {linked?.connected ? (linked.label || 'Connected') : 'Not connected'}
                   </span>
                 )}
@@ -308,7 +310,7 @@ export function StudioAccounts() {
               {ready && canConnect && !linked?.connected && (
                 <button
                   type="button"
-                  className="h-10 px-3 rounded-xl bg-[#14352A] text-white text-[13px] font-semibold shrink-0 disabled:opacity-50"
+                  className="studio-accent-fill h-10 px-3 rounded-xl text-[13px] font-semibold shrink-0 disabled:opacity-50"
                   disabled={!!connecting || !!disconnecting || !account?.configured}
                   onClick={() => connect(platform.id)}
                 >
@@ -319,7 +321,7 @@ export function StudioAccounts() {
                 <button
                   type="button"
                   aria-label={`Disconnect ${platform.label}`}
-                  className="h-10 px-3 rounded-xl border border-black/10 text-[12px] font-semibold text-[#1C2B24] shrink-0 disabled:opacity-50"
+                  className="h-10 px-3 rounded-xl border border-black/10 text-[12px] font-semibold studio-ink-text shrink-0 disabled:opacity-50"
                   disabled={!!connecting || !!disconnecting}
                   onClick={() => askDisconnect(platform.id, platform.label)}
                 >
@@ -331,11 +333,11 @@ export function StudioAccounts() {
         })}
       </div>
       <StudioPanel className="mt-4 px-5 py-5 flex items-start gap-3">
-        <span className="w-10 h-10 rounded-xl bg-[#14352A] text-[#C0DFA1] inline-flex items-center justify-center flex-shrink-0">
+        <span className="studio-accent-fill w-10 h-10 rounded-xl inline-flex items-center justify-center flex-shrink-0">
           <Link2 className="w-4 h-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#1C2B24]">Connect an account</p>
+          <p className="text-sm font-semibold studio-ink-text">Connect an account</p>
           {error ? (
             <p className="mt-1 text-sm text-amber-800 leading-relaxed">{error}</p>
           ) : !ready ? (
@@ -407,7 +409,7 @@ function MonthGrid({
         <button type="button" className="p-1 rounded-lg text-secondary-500 hover:bg-black/5" aria-label="Previous month" onClick={() => onCursor(new Date(year, month - 1, 1))}>
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <p className="text-[14px] font-semibold text-[#1C2B24]">{label}</p>
+        <p className="text-[14px] font-semibold studio-ink-text">{label}</p>
         <button type="button" className="p-1 rounded-lg text-secondary-500 hover:bg-black/5" aria-label="Next month" onClick={() => onCursor(new Date(year, month + 1, 1))}>
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -430,11 +432,11 @@ function MonthGrid({
               type="button"
               onClick={() => onSelect(key)}
               className={`h-9 rounded-full text-[13px] flex flex-col items-center justify-center ${
-                selected ? 'bg-[#14352A] text-white' : isToday ? 'bg-[#E7F3DF] text-[#14352A]' : 'text-secondary-700 hover:bg-black/5'
+                selected ? 'bg-[var(--studio-green)] text-white' : isToday ? 'studio-teal-wash studio-accent-text' : 'text-secondary-700 hover:bg-black/5'
               }`}
             >
               {day}
-              {has && <span className={`w-1 h-1 rounded-full ${selected ? 'bg-[#C0DFA1]' : 'bg-[#2A6B4A]'}`} />}
+              {has && <span className={`w-1 h-1 rounded-full ${selected ? 'bg-white' : 'bg-[var(--studio-green)]'}`} />}
             </button>
           )
         })}
