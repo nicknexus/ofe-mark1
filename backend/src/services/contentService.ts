@@ -820,10 +820,9 @@ email_body: donor-email depth, line breaks, no emojis.`,
         const sections: string[] = [
             `Organization: ${org.name}`,
             org.statement?.trim() ? `Mission: ${org.statement.trim()}` : '',
-            `Photo type: ${source.source_type === 'story' ? 'story' : 'visual evidence'}`,
-            `Title: ${source.title}`,
-            `Description: ${source.description?.trim() || '(none)'}`,
-            `Date: ${source.date_represented}`,
+            `Story title: ${source.title}`,
+            `Story (this is what the post is about; do not replace it with a description of the photo): ${source.description?.trim() || '(none logged)'}`,
+            `When: ${source.date_represented}`,
             `Program: ${source.initiative_title}`,
         ]
         const extra = await this.loadOrgStoryContext(org.id)
@@ -854,7 +853,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
             const init = asObj((data as any)?.initiatives)
             if (init?.description) sections.push(`Program about: ${trimText(init.description, 400)}`)
             const range = formatDateRange((data as any)?.date_range_start, (data as any)?.date_range_end)
-            if (range) sections.push(`Photo covers: ${range}`)
+            if (range) sections.push(`This entry covers: ${range}`)
 
             const locations = collectNames((data as any)?.evidence_locations, 'locations')
             if (locations.length) sections.push(`Locations: ${locations.join(', ')}`)
@@ -869,7 +868,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
             const claimLines = claims.map((claim: any) => formatClaimLine(claim)).filter(Boolean)
             sections.push(
                 claimLines.length
-                    ? `Connected claims (this photo proves these results):\n${claimLines.join('\n')}`
+                    ? `Connected results (include a real number from here when it belongs to this story):\n${claimLines.join('\n')}`
                     : 'Connected claims: none. Do not invent a number.'
             )
 
@@ -912,7 +911,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
                 )
             }
 
-            sections.push('Connected claims: none on stories. Do not invent a number unless a program metric below is clearly about this photo.')
+            sections.push('Connected results: none. Do not invent a number.')
             }
         }
 
@@ -1181,7 +1180,7 @@ email_body: donor-email depth, line breaks, no emojis.`,
                     role: 'system',
                     content: masterWriterPrompt(storyType),
                 },
-                { role: 'user', content: notes ? `${facts}\n\n${notes}` : facts },
+                { role: 'user', content: `Write the post from the story below. The photo only illustrates it.\n\n${notes ? `${facts}\n\n${notes}` : facts}` },
             ],
         })
         const parsed = this.parseJson(completion.choices[0]?.message?.content)
@@ -1704,9 +1703,10 @@ email_body: donor-email depth, line breaks, no emojis.`,
         requestedOrgId?: string
     ): Promise<ContentPackage> {
         const { organizationId } = await this.assertStudioAccess(userId, requestedOrgId)
-        const hook = String(input.hook || '').trim()
-        const body = String(input.body || '').trim()
-        if (!hook || !body) throw httpError(400, 'Add a headline and a body first')
+        const written = String(input.body || input.hook || '').trim()
+        const hook = String(input.hook || '').trim() || written.split('\n').map(line => line.trim()).find(Boolean) || ''
+        const body = written
+        if (!hook || !body) throw httpError(400, 'Write the post first')
         const source = await this.loadSource(userId, input.source_type, input.source_id, requestedOrgId)
         if (!source) throw httpError(404, 'Source not found', 'SOURCE_NOT_FOUND')
 

@@ -43,7 +43,7 @@ import CreateKPIModal from './CreateKPIModal'
 import ExplorePage from '../pages/ExplorePage'
 import ShareTeamPage from '../pages/ShareTeamPage'
 import ModalFrame, { ModalHeader, ModalBody } from './ModalFrame'
-import { isStudioMode, isStudioComposer } from '../pages/studio/studioPaths'
+import { isStudioMode, isStudioComposer, isDarkStudioPath } from '../pages/studio/studioPaths'
 import {
   springSoft,
   springSnappy,
@@ -112,7 +112,7 @@ function MobileNavItem({
       >
         {label}
       </span>
-      {isNew && <span className="absolute right-1 top-1 rounded-full bg-claim-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none text-secondary-900">New</span>}
+      {isNew && <span className="absolute right-1 top-1 rounded-full studio-teal-wash studio-accent-text px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none">New</span>}
     </motion.button>
   )
 }
@@ -625,7 +625,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
           </Suspense>
         )}
         {view === 'content' && (
-          <div className="mobile-studio">
+          <div className={`mobile-studio ${isDarkStudioPath(location.pathname) ? '' : 'studio-canvas bg-[var(--studio-canvas)]'}`}>
             {!isStudioComposer(location.pathname) && (
               <nav aria-label="Content Studio" className="flex gap-1 overflow-x-auto border-b border-gray-100 px-4 py-3">
                 {[
@@ -633,7 +633,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                   ['/studio/accounts', 'Accounts'], ['/studio/insights', 'Insights'],
                 ].map(([path, label]) => (
                   <Link key={path} to={path} aria-current={location.pathname === path ? 'page' : undefined}
-                    className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium ${location.pathname === path ? 'bg-claim-100 text-secondary-900' : 'text-secondary-600'}`}>
+                    className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium ${location.pathname === path ? 'studio-teal-wash studio-accent-text' : 'text-secondary-600'}`}>
                     {label}
                   </Link>
                 ))}

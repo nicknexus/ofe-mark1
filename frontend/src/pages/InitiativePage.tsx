@@ -570,9 +570,20 @@ export default function InitiativePage() {
       )}
 
       {reportOpen && (
-        <ModalFrame size="full" zIndexClass="z-[70]" onClose={() => setReportOpen(false)} paddingClassName="p-0 md:p-4">
-          <ModalHeader title="AI impact report" subtitle="Generate a shareable summary from this program's claims, evidence and stories." icon={Sparkles} onClose={() => setReportOpen(false)} />
-          <div className="flex-1 min-h-0 h-[80vh]">
+        <ModalFrame
+          zIndexClass="z-[100]"
+          onClose={() => setReportOpen(false)}
+          paddingClassName="p-0"
+          panelClassName="bg-page flex h-dvh max-h-dvh w-full max-w-none flex-col overflow-hidden rounded-none border-0 shadow-none"
+        >
+          <ModalHeader
+            className="bg-white"
+            title="AI impact report"
+            subtitle={<p className="app-modal-subtitle truncate">{initiative.title}</p>}
+            icon={Sparkles}
+            onClose={() => setReportOpen(false)}
+          />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {dashboard ? <ReportTab initiativeId={id!} dashboard={dashboard} /> : <SectionLoader className="h-64" />}
           </div>
         </ModalFrame>

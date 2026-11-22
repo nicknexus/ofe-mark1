@@ -469,15 +469,71 @@
         @apply text-sm text-secondary-500 mt-1 max-w-sm;
     }
 
-    /* Content Studio shell: dark green sidebar, warm paper canvas, quiet panels.
-       The composer (.content-studio) stays on the dark band. */
+    /* Studio palette. Dark surfaces and accents follow the main site green (#c0dfa1).
+       Ink stays the dark grey used for text on white. Other studio screens still use the old greens. */
+    :root {
+        --studio-ink: #2A333A;
+        --studio-green: #c0dfa1;
+        --studio-green-deep: #a8c889;
+        --studio-green-ink: #3F6B34;
+        --studio-forest: #3E5C34;
+        --studio-forest-mid: #2A4224;
+        --studio-forest-deep: #1B2E18;
+        --studio-slate: var(--studio-forest);
+        --studio-slate-deep: var(--studio-forest-mid);
+        --studio-teal: var(--studio-green);
+        --studio-teal-deep: var(--studio-green-deep);
+        --studio-sage: var(--studio-green);
+        --studio-sand: #FAFBF9;
+        --studio-blue: var(--studio-green);
+        --studio-canvas: #F6F8F4;
+        --studio-teal-wash: #E7F3DF;
+        --studio-sage-wash: #E7F1EA;
+        --studio-blue-wash: #E6F0DE;
+    }
+
+    .studio-ink-text {
+        color: var(--studio-ink);
+    }
+
+    .studio-wash {
+        background: var(--studio-blue-wash);
+    }
+
+    .studio-teal-wash {
+        background: var(--studio-teal-wash);
+    }
+
+    .studio-canvas {
+        background-image: radial-gradient(72% 48% at 0% 0%, color-mix(in srgb, var(--studio-blue) 28%, transparent), transparent 68%);
+        background-attachment: fixed;
+    }
+
     .studio-sidebar {
-        background: #14352A;
-        color: #F4F7F2;
+        background: linear-gradient(180deg, var(--studio-forest) 0%, var(--studio-forest-mid) 46%, var(--studio-forest-deep) 100%);
+        color: white;
+    }
+
+    .studio-accent-fill {
+        background: var(--studio-teal);
+        color: white;
+    }
+
+    .studio-accent-text {
+        color: var(--studio-green-ink);
+    }
+
+    .studio-sage-text {
+        color: var(--studio-sage);
+    }
+
+    .studio-sand-text {
+        color: var(--studio-sand);
     }
 
     .studio-nav-link {
-        @apply flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium text-white/70 transition-colors;
+        @apply flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors;
+        color: rgb(255 255 255 / 0.7);
     }
 
     .studio-nav-link:hover {
@@ -485,13 +541,9 @@
         color: white;
     }
 
-    .studio-nav-link-active {
-        background: #2A6B4A;
-        color: white;
-    }
-
+    .studio-nav-link-active,
     .studio-nav-link-active:hover {
-        background: #2A6B4A;
+        background: color-mix(in srgb, var(--studio-teal) 22%, transparent);
         color: white;
     }
 
@@ -504,42 +556,53 @@
 
     .studio-hero {
         background:
-            radial-gradient(120% 90% at 100% 0%, rgba(192, 223, 161, 0.22), transparent 52%),
-            #14352A;
+            radial-gradient(38% 70% at 100% 0%, rgb(255 255 255 / 0.36) 0%, color-mix(in srgb, var(--studio-green) 50%, transparent) 34%, transparent 68%),
+            linear-gradient(160deg, var(--studio-forest) 0%, var(--studio-forest-mid) 58%, var(--studio-forest-deep) 100%);
         border-radius: 28px;
-        color: #F4F7F2;
+        color: white;
     }
 
     .studio-hero-btn {
         @apply inline-flex items-center gap-2 h-11 px-4 rounded-xl text-sm font-semibold;
         background: white;
-        color: #14352A;
+        color: var(--studio-ink);
     }
 
     .studio-hero-btn:hover {
-        background: #F4F7F2;
+        background: var(--studio-canvas);
+    }
+
+    .studio-hero-btn-teal {
+        background: var(--studio-teal);
+        color: white;
+        border-color: transparent;
+    }
+
+    .studio-hero-btn-teal:hover {
+        background: var(--studio-teal-deep);
     }
 
     .studio-hero-btn-mint {
-        background: #C0DFA1;
-        color: #14352A;
+        background: var(--studio-green);
+        color: white;
     }
 
     .studio-hero-btn-mint:hover {
-        background: #D1E7BF;
+        background: var(--studio-green-deep);
+        color: white;
     }
 
     .studio-pill {
         @apply inline-flex items-center h-8 px-3 rounded-full text-[13px] font-medium;
         background: white;
-        color: #3d4352;
-        border: 1px solid rgba(20, 53, 42, 0.08);
+        color: var(--studio-ink);
+        border: 1px solid color-mix(in srgb, var(--studio-ink) 10%, transparent);
     }
 
     .studio-pill-on {
-        background: #14352A;
+        background: var(--studio-green);
         color: white;
-        border-color: #14352A;
+        border-color: transparent;
     }
 
     /* Content studio: every content screen sits on the landing dark band.
@@ -1543,32 +1606,6 @@
 
     .mobile-studio .mobile-content-padding {
         padding-bottom: 16px !important;
-    }
-
-    /* Use the shared slate and seafoam tokens for the mobile Studio. */
-    .mobile-studio .studio-hero {
-        @apply bg-secondary-800 text-white;
-        background-image: none;
-    }
-
-    .mobile-studio .studio-hero-btn {
-        @apply text-secondary-900;
-    }
-
-    .mobile-studio .studio-hero-btn:hover {
-        @apply bg-secondary-50;
-    }
-
-    .mobile-studio .studio-hero-btn-mint {
-        @apply bg-claim-500 text-secondary-900;
-    }
-
-    .mobile-studio .studio-hero-btn-mint:hover {
-        @apply bg-claim-600;
-    }
-
-    .mobile-studio .studio-pill-on {
-        @apply bg-secondary-800 border-secondary-800;
     }
 
     /* Hide desktop sidebar on mobile */

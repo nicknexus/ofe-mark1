@@ -27,6 +27,7 @@ export default function StudioLibrary() {
 
   return (
     <StudioFrame
+      brand
       title="Library"
       subtitle="Every post you have drafted."
       actions={
@@ -63,29 +64,29 @@ export default function StudioLibrary() {
         <SectionLoader />
       ) : packages.length === 0 ? (
         <StudioPanel className="px-6 py-12 text-center">
-          <Camera className="w-5 h-5 mx-auto text-[#2A6B4A]" />
-          <p className="mt-3 text-sm font-semibold text-[#1C2B24]">No posts yet</p>
+          <Camera className="w-5 h-5 mx-auto studio-accent-text" />
+          <p className="mt-3 text-sm font-semibold studio-ink-text">No posts yet</p>
           <p className="mt-1 text-[13px] text-secondary-500">Create one and it will show up in this list.</p>
         </StudioPanel>
       ) : visible.length === 0 ? (
         <StudioPanel className="px-6 py-12 text-center">
-          <p className="text-sm font-semibold text-[#1C2B24]">Nothing matches</p>
+          <p className="text-sm font-semibold studio-ink-text">Nothing matches</p>
           <button type="button" className="studio-pill mt-3" onClick={() => { setQuery(''); setFilter('all') }}>Clear</button>
         </StudioPanel>
       ) : (
-        <StudioPanel className="divide-y divide-[#14352A]/[0.06]">
+        <StudioPanel className="divide-y divide-[color-mix(in_srgb,var(--studio-ink)_8%,transparent)]">
           {visible.map(pkg => {
             const sent = socialSendLabel(pkg.publications)
             return (
-              <div key={pkg.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7FAF4] transition-colors">
+              <div key={pkg.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--studio-teal-wash)] transition-colors">
                 <Link to={`/studio/post/${pkg.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                   {pkg.image_url ? (
                     <img src={pkg.image_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
                   ) : (
-                    <span className="w-14 h-14 rounded-xl bg-[#E7F3DF] flex-shrink-0" />
+                    <span className="w-14 h-14 rounded-xl studio-teal-wash flex-shrink-0" />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
+                    <span className="block text-[15px] font-semibold studio-ink-text truncate">{pkg.hook || 'Untitled post'}</span>
                     <span className="block text-[12px] text-secondary-500 truncate mt-0.5">
                       {formatDate(pkg.updated_at || pkg.created_at, { month: 'short', day: 'numeric' })}
                       {sent ? ` · ${sent}` : ''}
@@ -95,7 +96,7 @@ export default function StudioLibrary() {
                 <span className="ml-auto flex items-center gap-2 flex-shrink-0">
                   <SocialMarks items={pkg.publications} />
                   <span className={`inline-flex h-7 w-[108px] items-center justify-center rounded-full text-[12px] font-medium border ${
-                    pkg.published_at ? 'bg-[#14352A] text-white border-[#14352A]' : 'bg-white text-[#3d4352] border-[rgba(20,53,42,0.08)]'
+                    pkg.published_at ? 'bg-[var(--studio-green)] text-white border-transparent' : 'bg-white text-[var(--studio-ink)] border-[color-mix(in_srgb,var(--studio-ink)_10%,transparent)]'
                   }`}>
                     {pkg.published_at ? 'Posted' : 'Draft'}
                   </span>

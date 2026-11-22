@@ -40,11 +40,13 @@ export function StudioFrame({
   title,
   subtitle,
   actions,
+  brand,
   children,
 }: {
   title: string
   subtitle?: string
   actions?: ReactNode
+  brand?: boolean
   children: ReactNode
 }) {
   return (
@@ -52,12 +54,12 @@ export function StudioFrame({
       <div className="max-w-[1120px] mx-auto">
         <div className="flex items-start justify-between gap-4 mb-7">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-1.5 text-[13px] font-medium text-claim-700 md:text-[#2A6B4A]">
+            <p className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${brand ? 'studio-accent-text' : 'text-[#2A6B4A]'}`}>
               <Sparkles className="w-3.5 h-3.5" />
               Content Studio
-              <span className="md:hidden ml-1 rounded-full bg-claim-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-900">New</span>
+              <span className="md:hidden ml-1 rounded-full studio-teal-wash studio-accent-text px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">New</span>
             </p>
-            <h1 className="mt-1.5 font-fraunces text-[34px] sm:text-[42px] font-medium tracking-tight text-secondary-900 md:text-[#1C2B24] leading-[1.05]">
+            <h1 className={`mt-1.5 font-fraunces text-[34px] sm:text-[42px] font-medium tracking-tight leading-[1.05] ${brand ? 'studio-ink-text' : 'text-[#1C2B24]'}`}>
               {title}
             </h1>
             {subtitle && (

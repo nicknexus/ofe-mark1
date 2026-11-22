@@ -47,9 +47,9 @@ export default function Layout({ user, children }: LayoutProps) {
     <div className="min-h-screen">
       <AppSidebar user={user} />
       <motion.main
-        className="relative min-h-screen ml-56 desktop-main-offset overflow-x-clip overflow-y-scroll [scrollbar-gutter:stable]"
+        className={`relative min-h-screen ml-56 desktop-main-offset overflow-x-clip overflow-y-scroll [scrollbar-gutter:stable] ${isStudioMode(pathname) && !dark && !ideas ? 'studio-canvas' : ''}`}
         initial={false}
-        animate={{ backgroundColor: ideas ? '#1a2228' : dark ? '#42505B' : isStudioMode(pathname) ? '#F3F6F1' : '#F7F8FA' }}
+        animate={{ backgroundColor: ideas ? '#1a2228' : dark ? '#42505B' : isStudioMode(pathname) ? '#F6F8F4' : '#F7F8FA' }}
         transition={{ duration: reduce ? 0 : content ? 0.8 : 0.55, ease: PAGE_EASE }}
       >
         <PageFade content={content}>

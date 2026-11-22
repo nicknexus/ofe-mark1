@@ -54,7 +54,7 @@ import {
   Spinner,
 } from '../ui'
 import { patchStudioPackage, removeStudioJourney, removeStudioPackage, upsertStudioPackage } from '../../pages/studio/useStudioLibrary'
-import SocialPostPreview, { socialCaption } from '../studio/SocialPostPreview'
+import SocialPostPreview from '../studio/SocialPostPreview'
 import type {
   ContentChannel,
   ContentChannelVersion,
@@ -108,6 +108,44 @@ function parseView(pathname: string): View {
 
 const PAGE_SIZE = 21
 const MAX_PHOTOS = 10
+
+type StudioDraftCache = {
+  master: ContentMaster
+  extraContext: string
+  picked: ContentSource[]
+  programFilter: string
+  backStep: Step
+  draftIdea: ContentIdea | null
+  editingId: string | null
+}
+
+function studioDraftKey(orgId: string | undefined, pathname: string) {
+  if (!orgId) return null
+  return `studio-draft:${orgId}:${pathname}`
+}
+
+function readStudioDraft(key: string | null): StudioDraftCache | null {
+  if (!key) return null
+  try {
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StudioDraftCache
+    if (!parsed?.master?.source?.source_id) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeStudioDraft(key: string | null, draft: StudioDraftCache) {
+  if (!key) return
+  try { sessionStorage.setItem(key, JSON.stringify(draft)) } catch { /* full storage */ }
+}
+
+function clearStudioDraft(key: string | null) {
+  if (!key) return
+  try { sessionStorage.removeItem(key) } catch { /* ignore */ }
+}
 type ChannelIcon = ComponentType<{ className?: string; style?: CSSProperties }>
 
 const CHANNELS: { id: ContentChannel; label: string; body: string; icon: ChannelIcon; soon?: boolean }[] = [
@@ -140,6 +178,30 @@ function photosOf(master: ContentMaster): ContentSource[] {
 
 function emptyMaster(storyType: ContentMaster['story_type'], source: ContentSource): ContentMaster {
   return { story_type: storyType, hook: '', body: '', evidence_line: '', cta: '', why: '', layout: 'clean', source }
+}
+
+function firstLine(text: string) {
+  return text.split('\n').map(line => line.trim()).find(Boolean) || ''
+}
+
+function postCaption(master: { hook?: string | null; body?: string | null; cta?: string | null }) {
+  const hook = (master.hook || '').trim()
+  const body = master.body || ''
+  const cta = (master.cta || '').trim()
+  if (!cta && hook && body.trim().startsWith(hook)) return body
+  return [hook, body.trim(), cta].filter(Boolean).join('\n\n')
+}
+
+function applyCaption(master: ContentMaster, text: string): ContentMaster {
+  return { ...master, hook: firstLine(text), body: text, cta: '' }
+}
+
+function captionFromSource(source: ContentSource) {
+  const title = (source.title || '').trim()
+  const description = (source.description || '').trim()
+  if (!title) return description
+  if (!description || description === title || description.toLowerCase().startsWith(title.toLowerCase())) return description || title
+  return `${title}\n\n${description}`
 }
 
 function withPhotos(master: ContentMaster, photos: ContentSource[]): ContentMaster {
@@ -371,16 +433,16 @@ function SendScreen({
   const shown = done ? steps.length - 1 : index
   const progress = done ? 100 : Math.min(88, ((shown + 1) / steps.length) * 78)
   return createPortal(
-    <div className="fixed inset-0 z-[80] bg-[#F4F7F2] flex flex-col items-center justify-center px-6">
+    <div className="fixed inset-0 z-[80] bg-[var(--studio-canvas)] flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm text-center">
         <img src="/Nexuslogo.png" alt="" className="w-14 h-14 mx-auto object-contain" />
         <p className="mt-6 text-xl font-semibold tracking-tight text-secondary-900">
           {scheduling ? 'Scheduling your post' : 'Posting'}
         </p>
         <p className="mt-2 text-sm text-secondary-500 min-h-5">{steps[shown]}</p>
-        <div className="mt-6 h-1.5 rounded-full bg-[#E7F3DF] overflow-hidden">
+        <div className="mt-6 h-1.5 rounded-full studio-teal-wash overflow-hidden">
           <motion.div
-            className="h-full rounded-full bg-[#14352A]"
+            className="h-full rounded-full bg-[var(--studio-green)]"
             initial={false}
             animate={{ width: `${progress}%` }}
             transition={reduce ? { duration: 0 } : { duration: 0.45, ease: EASE }}
@@ -401,6 +463,13 @@ export function StudioBoot() {
 }
 
 export default function ContentEngine() {
+  const [compactComposer, setCompactComposer] = useState(() => window.innerWidth < 1024)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1023px)')
+    const update = () => setCompactComposer(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
   const { activeOrganization } = useTeam()
   const reduceMotion = useReducedMotion()
   const location = useLocation()
@@ -591,6 +660,21 @@ export default function ContentEngine() {
     setCopy(copyForMaster(next, activeOrganization?.name || ''))
   }
 
+  useEffect(() => {
+    const key = studioDraftKey(activeOrganization?.id, location.pathname)
+    if (!key || step !== 'master' || !master) return
+    if (route.view !== 'new' && route.view !== 'update' && route.view !== 'post') return
+    writeStudioDraft(key, {
+      master,
+      extraContext,
+      picked,
+      programFilter,
+      backStep,
+      draftIdea,
+      editingId,
+    })
+  }, [activeOrganization?.id, location.pathname, route.view, step, master, extraContext, picked, programFilter, backStep, draftIdea, editingId])
+
   const resetDraft = () => {
     setMaster(null)
     setPost(null)
@@ -622,17 +706,20 @@ export default function ContentEngine() {
       return false
     }
     const nextVersions = versionsOf(pkg)
-    applyMaster(next)
+    const cached = readStudioDraft(studioDraftKey(activeOrganization?.id, location.pathname))
+    const keepEdit = cached?.editingId === pkg.id && !!cached.master
+    applyMaster(keepEdit ? cached.master : next)
     setPost(pkg)
     setVersions(nextVersions)
     setVersionsDirty(false)
     setPickerOpen(false)
-    setEditingId(null)
-    setPicked([])
-    setExtraContext('')
+    setEditingId(keepEdit ? pkg.id : null)
+    setPicked(keepEdit ? cached.picked || [] : [])
+    setExtraContext(keepEdit ? cached.extraContext || '' : '')
     setSocialContext('')
     if (nextVersions.length) setChannels(nextVersions.map(v => v.channel))
-    setStep('post')
+    if (keepEdit) setBackStep('post')
+    setStep(keepEdit ? 'master' : 'post')
     return true
   }
 
@@ -751,13 +838,17 @@ export default function ContentEngine() {
     if (route.view === 'new' || route.view === 'update') {
       const fromIdea = location.state as { idea?: ContentIdea; photos?: ContentSource[] } | null
       const studioStart = (location.state as { studioStart?: 'diy' | 'nexus' } | null)?.studioStart
+      const draftKey = studioDraftKey(activeOrganization?.id, location.pathname)
+      const cached = readStudioDraft(draftKey)
       if (route.view === 'new' && studioStart === 'diy') {
+        clearStudioDraft(draftKey)
         resetDraft()
         setProgramFilter('')
         setStep('material')
         return
       }
       if (route.view === 'new' && studioStart === 'nexus') {
+        clearStudioDraft(draftKey)
         resetDraft()
         setBackStep('home')
         setWorkingLabel('Picking the strongest story')
@@ -776,6 +867,17 @@ export default function ContentEngine() {
             setStep('material')
           })
         return () => { cancelled = true }
+      }
+      if (!studioStart && cached?.master) {
+        applyMaster(cached.master)
+        setExtraContext(cached.extraContext || '')
+        setPicked(cached.picked || [])
+        setProgramFilter(cached.programFilter || '')
+        setBackStep(cached.backStep || 'material')
+        setDraftIdea(cached.draftIdea || null)
+        setEditingId(cached.editingId)
+        setStep('master')
+        return
       }
       if (fromIdea?.idea && current === 'idea') {
         resetDraft()
@@ -822,7 +924,7 @@ export default function ContentEngine() {
         if (!cancelled) setLoadingPost(false)
       })
     return () => { cancelled = true }
-  }, [route])
+  }, [route, activeOrganization?.id])
 
   const editPost = () => {
     if (!post) return
@@ -832,6 +934,7 @@ export default function ContentEngine() {
   }
 
   const cancelEdit = () => {
+    clearStudioDraft(studioDraftKey(activeOrganization?.id, location.pathname))
     if (editingId && post) {
       const original = masterFromPackage(post)
       if (original) applyMaster(original)
@@ -865,9 +968,12 @@ export default function ContentEngine() {
   const continueFromMaterial = () => {
     if (picked.length === 0) return
     const base = master || emptyMaster(journeyId ? 'journey' : 'moment', picked[0])
-    if (!master) setBackStep('material')
-    const next = withPhotos(base, picked)
-    if (!master || sourceKey(master.source) !== sourceKey(next.source)) applyMaster(next)
+    let next = withPhotos(base, picked)
+    if (!master) {
+      next = applyCaption(next, captionFromSource(picked[0]))
+      setBackStep('material')
+      applyMaster(next)
+    } else if (sourceKey(master.source) !== sourceKey(next.source)) applyMaster(next)
     else setMaster(next)
     setStep('master')
   }
@@ -900,9 +1006,9 @@ export default function ContentEngine() {
         extras: refsOf(current.extras),
         idea_id: ideaId || undefined,
         context: note || undefined,
-        hook: note ? current.hook : undefined,
-        body: note ? current.body : undefined,
-        cta: note ? current.cta : undefined,
+        hook: note ? firstLine(postCaption(current)) : undefined,
+        body: note ? postCaption(current) : undefined,
+        cta: note ? '' : undefined,
       })
       applyMaster({ ...next, extras: next.extras?.length ? next.extras : current.extras })
       setStep('master')
@@ -935,6 +1041,7 @@ export default function ContentEngine() {
         source_id: master.source.source_id,
       })
       notify.success(editingId ? 'Saved' : 'Saved as a draft')
+      clearStudioDraft(studioDraftKey(activeOrganization?.id, location.pathname))
       if (journeyId) loadJourneys()
       upsertPackage(pkg)
       if (draftIdea && !editingId) {
@@ -1060,9 +1167,31 @@ export default function ContentEngine() {
   }
 
   const hasVersions = versions.length > 0
-  const hasCopy = !!master && !!master.hook.trim() && !!master.body.trim()
-  const contextOn = extraContext.trim().length > 0
+  const hasCopy = !!master && !!postCaption(master).trim()
   const nexusLabel = hasCopy ? 'Redraft with Nexus' : 'Draft with Nexus'
+  const contextField = (
+    <label className="block flex-1 min-w-0">
+      <span className="block text-[11px] font-medium text-secondary-400 mb-1">Context for Nexus</span>
+      <GrowField
+        minRows={1}
+        maxRows={2}
+        value={extraContext}
+        onChange={setExtraContext}
+        placeholder="A quote, who it's for, a detail to keep."
+        className="focus:!ring-1 focus:!ring-inset"
+      />
+    </label>
+  )
+  const saveActions = (
+    <>
+      <button type="button" className="studio-hero-btn studio-hero-btn-mint justify-center shrink-0" disabled={!hasCopy || saving} onClick={() => save()}>
+        {saving ? <Spinner className="w-3.5 h-3.5" /> : null} {editingId ? 'Save changes' : 'Save draft'}
+      </button>
+      <button type="button" className="app-btn app-btn-ghost app-btn-sm shrink-0" onClick={cancelEdit}>
+        {editingId ? 'Cancel' : 'Back'}
+      </button>
+    </>
+  )
   const published = !!post?.published_at
   const draftLabel = journey ? `Update · ${journey.title}` : 'Moment'
   const subtitle =
@@ -1070,7 +1199,7 @@ export default function ContentEngine() {
       : step === 'idea' ? 'A story worth capturing. Who to find, what to ask, and how to get the photo.'
         : step === 'material' ? (journey ? `Pick photos for the next update to ${journey.title}.` : 'Pick or upload photos. The first one is the cover.')
           : step === 'post' ? 'Sending it puts it on your Nexus page. Scheduling does not.'
-            : step === 'master' ? 'Review the story. Save it when the headline, body, and call to action are right.'
+            : step === 'master' ? undefined
               : 'A post is one story. Nexus can write it, or you can.'
 
   const chooser = step === 'working'
@@ -1180,11 +1309,11 @@ export default function ContentEngine() {
           />
         ) : (
           <PageHeader
-            className={`${chooser ? 'mb-0' : step === 'master' ? 'mb-3' : 'mb-4'} shrink-0`}
+            className={`${chooser ? 'mb-0' : step === 'master' ? 'mb-2' : 'mb-4'} shrink-0`}
             title={headerTitle}
             subtitle={subtitle}
             help={<Help />}
-            actions={step === 'journey' || step === 'post' ? <NewMenu onMoment={startMoment} onJourney={newJourney} /> : undefined}
+            actions={step === 'journey' ? <NewMenu onMoment={startMoment} onJourney={newJourney} /> : undefined}
           />
         )}
 
@@ -1326,74 +1455,29 @@ export default function ContentEngine() {
           )}
 
           {step === 'master' && master && (
-            <div className="flex flex-wrap gap-4 items-start pb-8">
-              <div className="w-full lg:w-[340px] lg:shrink-0">
+            <div className="flex flex-col gap-4 pb-4 lg:grid lg:h-full lg:min-h-0 lg:grid-cols-[340px_minmax(0,1fr)] lg:overflow-hidden lg:pb-0">
+              <div className="order-2 lg:order-none lg:h-full lg:min-h-0">
                 <SocialPostPreview
                   only="instagram"
-                  caption={socialCaption([master.hook, master.body, master.cta])}
+                  fill={!compactComposer}
+                  caption={postCaption(master)}
+                  parts={{ hook: '', body: postCaption(master), cta: '' }}
                   media={[master.source, ...(master.extras || [])].filter(item => item.image_url).map(item => ({ url: item.image_url }))}
                   profileName={activeOrganization?.name || 'Your account'}
                   profileImage={activeOrganization?.logo_url}
                   names={{ instagram: socialAccount?.connections?.instagram?.label }}
-                  captionEditor={(
-                    <div className="space-y-2 md:space-y-3">
-                      <div className="md:hidden border-b border-gray-100 pb-3">
-                        <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full justify-center" onClick={draftWithNexus}>
-                          <Sparkles className="w-4 h-4" /> {nexusLabel}
-                        </button>
-                        <details className="mt-2">
-                          <summary className="cursor-pointer py-2 text-xs font-medium text-secondary-600">Draft with more context</summary>
-                          <label className="block mt-1">
-                            <span className="block text-xs font-semibold text-secondary-900 mb-1">Context</span>
-                            <GrowField minRows={2} value={extraContext} onChange={setExtraContext} placeholder="Audience, a quote, an event, a tone." />
-                          </label>
-                        </details>
-                      </div>
-                      <label className="block">
-                        <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Headline</span>
-                        <FitText
-                          value={master.hook}
-                          onChange={v => setMaster({ ...master, hook: v })}
-                          placeholder="Headline"
-                          minRows={1}
-                          className="text-[13px] font-semibold leading-snug text-[#1C2B24]"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Body</span>
-                        <FitText
-                          value={master.body}
-                          onChange={v => setMaster({ ...master, body: v })}
-                          placeholder="Write the post."
-                          minRows={4}
-                          mobileMinRows={1}
-                          className="text-[13px] leading-snug text-[#1C2B24]"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="block text-[11px] font-medium text-secondary-400 mb-0.5">Call to action</span>
-                        <FitText
-                          value={master.cta}
-                          onChange={v => setMaster({ ...master, cta: v })}
-                          placeholder="Call to action"
-                          minRows={1}
-                          className="text-[13px] font-medium leading-snug text-[#1C2B24]"
-                        />
-                      </label>
-                    </div>
-                  )}
                 />
               </div>
 
-              <div className="flex-1 min-w-[260px] space-y-4">
-                <section className="studio-panel p-4">
+              <div className="min-w-0 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-hidden">
+                <section className="studio-panel px-4 py-3 shrink-0">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[15px] font-semibold text-[#1C2B24]">Photos</p>
+                    <p className="text-[15px] font-semibold studio-ink-text">Photos</p>
                     <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={addMorePhotos}>Change photos</button>
                   </div>
                   <PhotoStrip photos={photosOf(master)} onChange={setPhotos} onAdd={addMorePhotos} />
                   {draftIdea && !editingId && (
-                    <span className="app-chip app-chip-accent text-[11px] inline-flex items-center gap-1 max-w-full mt-3">
+                    <span className="app-chip app-chip-accent text-[11px] inline-flex items-center gap-1 max-w-full mt-2">
                       <Lightbulb className="w-3 h-3 flex-shrink-0" />
                       <span className="truncate">{draftIdea.card.title}</span>
                       <button type="button" className="flex-shrink-0 p-0.5 rounded hover:bg-black/5" onClick={() => setDraftIdea(null)} aria-label="Unlink idea">
@@ -1401,47 +1485,37 @@ export default function ContentEngine() {
                       </button>
                     </span>
                   )}
-                  {master.why && <p className="mt-3 text-[12px] leading-snug text-[#2A6B4A]">{master.why}</p>}
                 </section>
 
-                <div className="flex flex-col sm:flex-row gap-3 items-start">
-                <section className="studio-panel hidden md:block p-4 flex-1 min-w-0">
-                  {!contextOn && (
-                    <>
-                      <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full" onClick={draftWithNexus}>
-                        <Sparkles className="w-4 h-4" /> {nexusLabel}
-                      </button>
-                      <p className="mt-2 text-[12px] text-secondary-500 leading-snug">Writes the headline, body, and call to action from the photo.</p>
-                    </>
-                  )}
-                  <label className={`block ${contextOn ? '' : 'mt-4'}`}>
-                    <span className="block text-[12px] font-semibold text-[#1C2B24] mb-1">Context</span>
-                    <GrowField
-                      minRows={3}
-                      value={extraContext}
-                      onChange={setExtraContext}
-                      placeholder="Audience, a quote, an event, a tone."
-                    />
-                  </label>
-                  {contextOn && (
-                    <>
-                      <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full mt-3" onClick={draftWithNexus}>
-                        <Sparkles className="w-4 h-4" /> {nexusLabel}
-                      </button>
-                      <p className="mt-2 text-[12px] text-secondary-500 leading-snug">Rewrites the post with this context.</p>
-                    </>
-                  )}
-                </section>
+                <section className="studio-panel p-4 flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                  <div className="flex flex-wrap lg:flex-nowrap items-end gap-2 shrink-0">
+                    <button type="button" className="studio-hero-btn studio-hero-btn-mint w-full lg:w-auto justify-center shrink-0" onClick={draftWithNexus}>
+                      <Sparkles className="w-4 h-4" /> {nexusLabel}
+                    </button>
+                    {compactComposer ? (
+                      <details className="w-full">
+                        <summary className="cursor-pointer py-2 text-xs font-medium text-secondary-600">Draft with more context</summary>
+                        {contextField}
+                      </details>
+                    ) : contextField}
+                    {!compactComposer && saveActions}
+                  </div>
 
-                <div className="flex sm:flex-col gap-2 shrink-0">
-                  <button type="button" className="studio-hero-btn studio-hero-btn-mint justify-center min-w-[9.5rem]" disabled={!hasCopy || saving} onClick={() => save()}>
-                    {saving ? <Spinner className="w-3.5 h-3.5" /> : null} {editingId ? 'Save changes' : 'Save draft'}
-                  </button>
-                  <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={cancelEdit}>
-                    {editingId ? 'Cancel' : 'Back'}
-                  </button>
-                </div>
-                </div>
+                  <div className="mt-2 flex flex-col px-1 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                    <label className="flex flex-col min-h-0 flex-1">
+                      <span className="block text-[11px] font-medium text-secondary-400 mb-1 shrink-0">Post Content</span>
+                      <GrowField
+                        fill={!compactComposer}
+                        value={postCaption(master)}
+                        onChange={v => setMaster(applyCaption(master, v))}
+                        placeholder="Write the post."
+                        minRows={compactComposer ? 3 : 8}
+                        className="text-[14px] leading-relaxed focus:!ring-1 focus:!ring-inset"
+                      />
+                    </label>
+                  </div>
+                  {compactComposer && <div className="mt-3 flex flex-wrap items-center gap-2">{saveActions}</div>}
+                </section>
               </div>
             </div>
           )}
@@ -1477,7 +1551,7 @@ export default function ContentEngine() {
               <div className="flex flex-wrap gap-4 items-start pb-8">
                 <div className="w-full lg:w-[340px] lg:shrink-0">
                   <SocialPostPreview
-                    caption={socialCaption([master.hook, master.body, master.cta])}
+                    caption={postCaption(master)}
                     media={[master.source, ...(master.extras || [])].filter(item => item.image_url).map(item => ({ url: item.image_url }))}
                     profileName={activeOrganization?.name || 'Your account'}
                     profileImage={activeOrganization?.logo_url}
@@ -1840,8 +1914,8 @@ function SendPanel({
             const scheduled = isQueued(item)
             const live = item.status === 'published'
             return (
-              <div key={`${item.platform}-${item.status}-${item.scheduled_at || item.created_at}`} className="rounded-xl bg-[#E7F3DF] px-3 py-2.5">
-                <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#14352A]">
+              <div key={`${item.platform}-${item.status}-${item.scheduled_at || item.created_at}`} className="rounded-xl studio-teal-wash px-3 py-2.5">
+                <p className="flex items-center gap-1.5 text-[13px] font-semibold studio-accent-text">
                   <Check className="w-3.5 h-3.5" />
                   {scheduled ? `Scheduled for ${label}` : live ? `On ${label}` : `Sent to ${label}`}
                 </p>
@@ -1853,14 +1927,14 @@ function SendPanel({
                       : `Posted ${when}. It can take a minute to show up.`}
                 </p>
                 {item.post_url && (
-                  <a href={item.post_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[12px] font-semibold text-[#2A6B4A]">
+                  <a href={item.post_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[12px] font-semibold studio-accent-text">
                     View on {label}
                   </a>
                 )}
                 {scheduled && (
                   <button
                     type="button"
-                    className="mt-2 text-[12px] font-semibold text-[#2A6B4A] disabled:opacity-50"
+                    className="mt-2 text-[12px] font-semibold studio-accent-text disabled:opacity-50"
                     disabled={unscheduling === item.platform}
                     onClick={() => unschedule(item.platform)}
                   >
@@ -1872,32 +1946,32 @@ function SendPanel({
           })}
         </div>
       )}
-      <p className="text-[15px] font-semibold text-[#1C2B24]">Send</p>
+      <p className="text-[15px] font-semibold studio-ink-text">Send</p>
       <p className="mt-1 text-[12px] text-secondary-500">Checked accounts get this post. Same words on each.</p>
       {panelError && <p className="mt-2 text-[12px] font-medium text-red-700">{panelError}</p>}
       <div className="mt-3 space-y-1">
         {!loaded && SHARE_CHANNELS.map(channel => (
-          <div key={channel.id} className="h-10 rounded-xl bg-[#E7F3DF] animate-pulse" />
+          <div key={channel.id} className="h-10 rounded-xl studio-teal-wash animate-pulse" />
         ))}
         {loaded && linked.map(channel => {
           const on = checked.includes(channel.id)
           const Icon = channel.icon
           const who = connections?.[channel.id]?.label
           return (
-            <label key={channel.id} className="flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-[#F3F6F1] cursor-pointer">
+            <label key={channel.id} className="flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-[var(--studio-teal-wash)] cursor-pointer">
               <input
                 type="checkbox"
-                className="h-4 w-4 accent-[#14352A]"
+                className="h-4 w-4 accent-[var(--studio-green)]"
                 checked={on}
                 onChange={() => toggle(channel.id)}
               />
               <Icon className="w-4 h-4" style={{ color: socialColor(channel.id) }} />
               <span className="min-w-0">
-                <span className="block text-[13px] font-semibold text-[#1C2B24]">{channel.label}</span>
+                <span className="block text-[13px] font-semibold studio-ink-text">{channel.label}</span>
                 {who && <span className="block text-[12px] text-secondary-500 truncate">{who}</span>}
               </span>
               {sentKey.split(',').filter(Boolean).includes(channel.id) && (
-                <span className="ml-auto text-[11px] font-semibold text-[#2A6B4A]">
+                <span className="ml-auto text-[11px] font-semibold studio-accent-text">
                   {(publications || []).some(item => item.platform === channel.id && item.status === 'scheduled') ? 'Scheduled' : 'Sent'}
                 </span>
               )}
@@ -1907,7 +1981,7 @@ function SendPanel({
         {loaded && missing.map(channel => (
           <div key={channel.id} className="flex items-center justify-between gap-2 px-2 py-2">
             <span className="text-[13px] text-secondary-400">{channel.label}</span>
-            <Link to="/studio/accounts" className="text-[12px] font-semibold text-[#2A6B4A]">Connect</Link>
+            <Link to="/studio/accounts" className="text-[12px] font-semibold studio-accent-text">Connect</Link>
           </div>
         ))}
       </div>
@@ -1915,7 +1989,7 @@ function SendPanel({
         type="button"
         aria-pressed={scheduling}
         className={scheduling
-          ? 'app-btn mt-3 w-full bg-[#E7F3DF] text-[#14352A] border border-[#14352A]/15'
+          ? 'app-btn mt-3 w-full studio-teal-wash studio-accent-text border border-[color-mix(in_srgb,var(--studio-green)_30%,transparent)]'
           : 'app-btn app-btn-secondary mt-3 w-full'}
         onClick={() => setScheduling(value => !value)}
       >
@@ -1995,7 +2069,7 @@ function PublicPostPreview({
     <article className="app-card studio-panel overflow-hidden">
       <PhotoCarousel extras={master.extras || []} aspect="square" onDownloadExtra={onDownload}>
         <GraphicHover onDownload={() => onDownload(master.source)}>
-          <div className="relative w-full aspect-[4/3] overflow-hidden bg-[#E7F3DF]">
+          <div className="relative w-full aspect-[4/3] overflow-hidden studio-teal-wash">
             <img src={master.source.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
           </div>
         </GraphicHover>
@@ -2135,6 +2209,7 @@ function GrowField({
   maxRows,
   className,
   plain,
+  fill,
 }: {
   value: string
   onChange: (v: string) => void
@@ -2143,29 +2218,40 @@ function GrowField({
   maxRows?: number
   className?: string
   plain?: boolean
+  fill?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
-  const floor = useRef(0)
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    el.style.height = 'auto'
-    const next = Math.max(el.scrollHeight, floor.current, minRows * 24)
-    const cap = maxRows ? maxRows * 24 : next
-    el.style.height = `${Math.min(next, cap)}px`
-    el.style.overflowY = next > cap ? 'auto' : 'hidden'
-  }, [value, minRows, maxRows])
+    if (fill) {
+      el.style.height = ''
+      el.style.overflowY = ''
+      return
+    }
+    const resize = () => {
+      el.style.height = 'auto'
+      const row = 22
+      const chrome = 22
+      const next = Math.max(el.scrollHeight, minRows * row + chrome)
+      const cap = maxRows ? maxRows * row + chrome : next
+      el.style.height = `${Math.min(next, cap)}px`
+      el.style.overflowY = next > cap ? 'auto' : 'hidden'
+    }
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [value, minRows, maxRows, fill])
   return (
     <textarea
       ref={ref}
       rows={minRows}
       value={value}
       onChange={e => onChange(e.target.value)}
-      onMouseUp={() => { if (ref.current) floor.current = ref.current.offsetHeight }}
       placeholder={placeholder}
       className={plain
         ? `w-full bg-transparent border-0 p-0 shadow-none resize-none overflow-hidden focus:outline-none focus:ring-0 placeholder:text-secondary-300 ${className || ''}`
-        : `app-input text-[13px] leading-relaxed resize-y overflow-hidden whitespace-pre-wrap ${className || ''}`}
+        : `app-input text-[13px] leading-relaxed resize-none whitespace-pre-wrap ${fill ? 'h-full min-h-0 overflow-y-auto' : 'overflow-hidden'} ${className || ''}`}
     />
   )
 }
@@ -2614,8 +2700,8 @@ function PhotoStrip({
             onDrop={dropOn(i)}
             onDragEnd={() => { dragFrom.current = null; setOver(null) }}
             className={`group/thumb relative w-12 h-12 rounded-lg overflow-hidden border cursor-grab active:cursor-grabbing ${
-              i === 0 ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200/80'
-            } ${over === i ? 'ring-2 ring-primary-400' : ''}`}
+              i === 0 ? 'border-primary-500 ring-1 ring-inset ring-primary-400' : 'border-gray-200/80'
+            } ${over === i ? 'ring-1 ring-inset ring-primary-500' : ''}`}
           >
             <img src={photo.thumb_url || photo.image_url} alt="" className="w-full h-full object-cover pointer-events-none" />
             {i === 0 ? (
@@ -2742,29 +2828,21 @@ function FitText({
   onChange,
   className,
   minRows = 2,
-  mobileMinRows = minRows,
   placeholder,
 }: {
   value: string
   onChange: (v: string) => void
   className?: string
   minRows?: number
-  mobileMinRows?: number
   placeholder?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const resize = () => {
-      el.rows = window.innerWidth < 768 ? mobileMinRows : minRows
-      el.style.height = 'auto'
-      el.style.height = `${el.scrollHeight}px`
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [value, minRows, mobileMinRows])
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(el.scrollHeight, minRows * 16)}px`
+  }, [value, minRows])
   return (
     <div className="group/edit relative">
       <textarea
@@ -2830,7 +2908,7 @@ function MaterialPicker({
   const order = new Map(picked.map((s, i) => [sourceKey(s), i + 1]))
   return (
     <div className="space-y-3 pb-6">
-      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 flex flex-wrap items-center gap-2 bg-[#F3F6F1]">
+      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 flex flex-wrap items-center gap-2 bg-[var(--studio-canvas)]">
         <button type="button" className="app-btn app-btn-ghost app-btn-sm" onClick={onBack}>
           <ChevronLeft className="w-4 h-4" /> Back
         </button>

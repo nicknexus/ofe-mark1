@@ -46,6 +46,7 @@ export default function StudioHome() {
 
   return (
     <StudioFrame
+      brand
       title="Create content from your impact"
       subtitle="Turn logged photos and updates into posts you can keep, or schedule once an account is connected."
     >
@@ -62,7 +63,7 @@ export default function StudioHome() {
               <Link to="/studio/new" state={{ studioStart: 'diy' }} className="studio-hero-btn">
                 <FolderOpen className="w-4 h-4" /> Choose materials yourself
               </Link>
-              <Link to="/studio/new" state={{ studioStart: 'nexus' }} className="studio-hero-btn studio-hero-btn-mint">
+              <Link to="/studio/new" state={{ studioStart: 'nexus' }} className="studio-hero-btn studio-hero-btn-teal">
                 <Sparkles className="w-4 h-4" /> Draft with Nexus
               </Link>
             </div>
@@ -74,12 +75,12 @@ export default function StudioHome() {
               return (
                 <div key={step.title} className="studio-panel px-4 py-4">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-claim-100 md:bg-[#E7F3DF] text-secondary-900 md:text-[#14352A] text-[12px] font-semibold inline-flex items-center justify-center">
+                    <span className="studio-teal-wash studio-accent-text w-6 h-6 rounded-full text-[12px] font-semibold inline-flex items-center justify-center">
                       {index + 1}
                     </span>
-                    <Icon className="w-3.5 h-3.5 text-claim-700 md:text-[#2A6B4A]" />
+                    <Icon className="studio-accent-text w-3.5 h-3.5" />
                   </div>
-                  <p className="mt-3 text-[14px] font-semibold text-secondary-900 md:text-[#1C2B24]">{step.title}</p>
+                  <p className="studio-ink-text mt-3 text-[14px] font-semibold">{step.title}</p>
                   <p className="mt-1 text-[12px] text-secondary-500 leading-relaxed">{step.body}</p>
                 </div>
               )
@@ -96,11 +97,11 @@ export default function StudioHome() {
                     <Icon className="w-5 h-5" style={{ color: platform.color }} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-semibold text-secondary-900 md:text-[#1C2B24]">{platform.label}</span>
+                    <span className="studio-ink-text block text-[13px] font-semibold">{platform.label}</span>
                     {!accountsReady ? (
-                      <span className="mt-1 block h-3 w-16 rounded-full bg-claim-100 md:bg-[#E7F3DF] animate-pulse" />
+                      <span className="studio-teal-wash mt-1 block h-3 w-16 rounded-full animate-pulse" />
                     ) : (
-                      <span className={`block text-[12px] truncate ${linked?.connected ? 'text-claim-700 md:text-[#2A6B4A]' : 'text-secondary-500'}`}>
+                      <span className={`block text-[12px] truncate ${linked?.connected ? 'studio-accent-text' : 'text-secondary-500'}`}>
                         {linked?.connected ? (linked.label || 'Connected') : 'Not connected'}
                       </span>
                     )}
@@ -109,7 +110,7 @@ export default function StudioHome() {
                     <Link
                       to="/studio/accounts"
                       aria-label={`Connect ${platform.label}`}
-                      className="h-10 w-10 rounded-xl bg-secondary-800 md:bg-[#14352A] text-white inline-flex items-center justify-center shrink-0"
+                      className="studio-accent-fill h-10 w-10 rounded-xl inline-flex items-center justify-center shrink-0"
                     >
                       <Link2 className="w-4 h-4" />
                     </Link>
@@ -122,12 +123,12 @@ export default function StudioHome() {
 
         <StudioPanel className="p-5 flex flex-col min-h-[320px]">
           <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-            <h2 className="text-[15px] font-semibold text-secondary-900 md:text-[#1C2B24]">Upcoming posts</h2>
-            <Link to="/studio/calendar" className="text-[12px] font-medium text-claim-700 md:text-[#2A6B4A]">Calendar</Link>
+            <h2 className="studio-ink-text text-[15px] font-semibold">Upcoming posts</h2>
+            <Link to="/studio/calendar" className="studio-accent-text text-[12px] font-medium">Calendar</Link>
           </div>
           {upcoming.length === 0 ? (
             <div className="flex-1 flex flex-col justify-center py-4">
-              <p className="text-sm font-medium text-secondary-900 md:text-[#1C2B24]">Nothing scheduled</p>
+              <p className="studio-ink-text text-sm font-medium">Nothing scheduled</p>
               <p className="mt-1 text-[13px] text-secondary-500 leading-relaxed">
                 Scheduled posts show up here after you pick a time.
               </p>
@@ -140,10 +141,10 @@ export default function StudioHome() {
                     {pkg.image_url ? (
                       <img src={pkg.image_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
                     ) : (
-                      <span className="w-14 h-14 rounded-xl bg-claim-100 md:bg-[#E7F3DF] flex-shrink-0" />
+                      <span className="studio-wash w-14 h-14 rounded-xl flex-shrink-0" />
                     )}
                     <span className="min-w-0">
-                      <span className="block text-[13px] font-semibold text-secondary-900 md:text-[#1C2B24] truncate">{pkg.hook || 'Untitled post'}</span>
+                      <span className="studio-ink-text block text-[13px] font-semibold truncate">{pkg.hook || 'Untitled post'}</span>
                       <span className="block text-[12px] text-secondary-500 truncate mt-0.5">
                         {STUDIO_PLATFORMS.find(platform => platform.id === item.platform)?.label || item.platform}
                         {item.scheduled_at ? ` · ${scheduleWhen(item.scheduled_at)}` : ''}
@@ -152,7 +153,7 @@ export default function StudioHome() {
                   </Link>
                   <button
                     type="button"
-                    className="text-[12px] font-semibold text-claim-700 md:text-[#2A6B4A] shrink-0 disabled:opacity-50"
+                    className="studio-accent-text text-[12px] font-semibold shrink-0 disabled:opacity-50"
                     disabled={clearing === `${pkg.id}:${item.platform}`}
                     onClick={() => unschedule(pkg.id, item.platform as 'instagram' | 'facebook' | 'linkedin')}
                   >
@@ -168,33 +169,33 @@ export default function StudioHome() {
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-8 items-start">
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[18px] font-semibold text-secondary-900 md:text-[#1C2B24]">In progress</h2>
-            <Link to="/studio/library" className="text-[13px] font-medium text-claim-700 md:text-[#2A6B4A]">View all</Link>
+            <h2 className="studio-ink-text text-[18px] font-semibold">In progress</h2>
+            <Link to="/studio/library" className="studio-accent-text text-[13px] font-medium">View all</Link>
           </div>
           {loading ? (
             <SectionLoader />
           ) : drafts.length === 0 ? (
             <StudioPanel className="px-5 py-8">
-              <p className="text-sm font-medium text-secondary-900 md:text-[#1C2B24]">No drafts yet</p>
+              <p className="studio-ink-text text-sm font-medium">No drafts yet</p>
               <p className="mt-1 text-[13px] text-secondary-500">Create a post and it will sit here until you schedule it.</p>
             </StudioPanel>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {drafts.slice(0, 3).map(pkg => (
                   <Link key={pkg.id} to={`/studio/post/${pkg.id}`} className="studio-panel overflow-hidden block">
-                    <div className="relative h-36 bg-claim-100 md:bg-[#E7F3DF]">
+                    <div className="studio-wash relative h-36">
                       {pkg.image_url && <img src={pkg.image_url} alt="" className="w-full h-full object-cover" />}
-                      <span className="absolute top-2.5 left-2.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-medium text-secondary-900 md:text-[#14352A]">
+                      <span className="studio-ink-text absolute top-2.5 left-2.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-medium">
                         Draft
                       </span>
                     </div>
                     <div className="px-3.5 py-3">
-                      <p className="text-[15px] font-semibold text-secondary-900 md:text-[#1C2B24] leading-snug line-clamp-2">{pkg.hook || 'Untitled post'}</p>
+                      <p className="studio-ink-text text-[15px] font-semibold leading-snug line-clamp-2">{pkg.hook || 'Untitled post'}</p>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <span className="text-[12px] text-secondary-500 truncate">
                           {formatDate(pkg.updated_at || pkg.created_at, { month: 'short', day: 'numeric' })}
                         </span>
-                        <span className="text-[12px] font-semibold text-claim-700 md:text-[#2A6B4A] flex-shrink-0">Continue</span>
+                        <span className="studio-accent-text text-[12px] font-semibold flex-shrink-0">Continue</span>
                       </div>
                     </div>
                   </Link>
@@ -204,7 +205,7 @@ export default function StudioHome() {
         </section>
 
         <StudioPanel className="p-5">
-          <h2 className="text-[15px] font-semibold text-secondary-900 md:text-[#1C2B24]">Quick results</h2>
+          <h2 className="studio-ink-text text-[15px] font-semibold">Quick results</h2>
           <p className="mt-0.5 text-[12px] text-secondary-500">From the posts in this studio</p>
           <div className="mt-4 grid grid-cols-3 gap-2">
             <Stat label="Drafts" value={loading ? '–' : String(drafts.length)} />
@@ -229,8 +230,8 @@ function scheduleWhen(value?: string | null) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-secondary-50 md:bg-[#F3F6F1] px-2 py-3 text-center">
-      <p className="font-fraunces text-[26px] leading-none text-secondary-900 md:text-[#1C2B24]">{value}</p>
+    <div className="studio-wash rounded-2xl px-2 py-3 text-center">
+      <p className="studio-ink-text font-fraunces text-[26px] leading-none">{value}</p>
       <p className="mt-1.5 text-[11px] text-secondary-500">{label}</p>
     </div>
   )
