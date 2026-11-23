@@ -24,7 +24,7 @@ export default function MobileHome({
     <main className="mobile-home mx-auto flex flex-1 flex-col justify-center w-full max-w-lg px-4 pb-4">
       <div className="flex flex-col items-center justify-center gap-2 px-2 py-4">
         {showLogo ? (
-          <img src={logoUrl} alt={organizationName} className="h-12 max-w-[220px] w-full object-contain" onError={() => setFailedLogo(logoUrl)} />
+          <img src={logoUrl} alt={organizationName} className="h-12 w-auto max-w-[220px] rounded-md object-contain" onError={() => setFailedLogo(logoUrl)} />
         ) : (
           <div className="flex max-w-full items-center gap-2.5">
             <span className="app-icon-tile app-icon-tile-sm app-icon-tile-accent"><Building2 className="h-4 w-4" aria-hidden="true" /></span>
