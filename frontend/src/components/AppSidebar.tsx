@@ -249,7 +249,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
           }`}>Nexus Impacts</span>
         </Link>
         <div
-          className={`mt-2.5 flex p-0.5 rounded-full ${studioMode ? 'bg-black/30 ring-1 ring-white/10' : 'bg-[#EEF2EA]'}`}
+          className={`relative mt-3 flex p-0.5 rounded-full overflow-visible ${studioMode ? 'bg-black/30 ring-1 ring-white/10' : 'bg-[#EEF2EA]'}`}
           role="tablist"
           aria-label="App"
         >
@@ -271,14 +271,15 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             to="/studio"
             role="tab"
             aria-selected={studioMode}
-            className={`flex-1 h-7 rounded-full text-[11px] font-semibold tracking-tight inline-flex items-center justify-center gap-1 transition-all ${
+            className={`relative flex-1 h-7 rounded-full text-[11px] font-semibold tracking-tight inline-flex items-center justify-center gap-1 whitespace-nowrap transition-all ${
               studioMode
                 ? 'studio-accent-fill shadow-[0_1px_2px_rgba(0,0,0,0.25)]'
                 : 'text-[#3d5c49] hover:text-[#14352A]'
             }`}
           >
             <PenLine className="w-3.5 h-3.5" />
-            Studio
+            Content
+            <span className={`pointer-events-none absolute left-[70%] -translate-x-1/2 -top-2 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none ${studioMode ? 'bg-white text-[#3F6B34]' : 'studio-teal-wash studio-accent-text'}`}>New!</span>
           </Link>
           )}
         </div>

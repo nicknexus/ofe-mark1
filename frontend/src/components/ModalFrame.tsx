@@ -17,6 +17,8 @@ interface ModalFrameProps {
  animate?: boolean
  /** Close on backdrop click and Escape. */
  onClose?: () => void
+ /** Inline overlay box. Used to pin a mobile sheet to the visual viewport when the keyboard is open. */
+ overlayStyle?: React.CSSProperties
 }
 
 // Roomier scale so modals breathe (SaaS standard).
@@ -42,6 +44,7 @@ export default function ModalFrame({
  paddingClassName = 'p-4',
  animate = true,
  onClose,
+ overlayStyle,
 }: ModalFrameProps) {
  useEffect(() => {
  const prev = document.body.style.overflow
@@ -62,6 +65,7 @@ export default function ModalFrame({
 
  return (
  <div
+ style={overlayStyle}
  className={cn('fixed inset-0 flex items-center justify-center', paddingClassName, zIndexClass, backdropClassName, animate && 'animate-fade-in')}
  onClick={onClose ? (e) => { if (e.target === e.currentTarget) onClose() } : undefined}
  >

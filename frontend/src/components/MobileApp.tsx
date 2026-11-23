@@ -599,7 +599,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             canCreatePost={canUseContentStudio}
             onAddLog={() => handleCapture('log')}
             onAddStory={() => handleCapture('story')}
-            onCreatePost={() => navigate('/studio/new', { state: { studioStart: 'diy' } })}
+            onCreatePost={() => setView('content')}
           />
         )}
         {view === 'initiatives' && (
@@ -719,7 +719,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             <dl className="space-y-5 text-sm text-secondary-600 leading-relaxed">
               <div><dt className="font-semibold text-secondary-900">Add log</dt><dd>Record a result or upload evidence. Choose a program, add the details, then review and save.</dd></div>
               <div><dt className="font-semibold text-secondary-900">Add story</dt><dd>Capture a meaningful moment with a photo, video, audio recording or written story.</dd></div>
-              <div><dt className="font-semibold text-secondary-900">Create social post</dt><dd>Choose materials from your work, craft your post and pick where to share it in Content Studio.</dd></div>
+              <div><dt className="font-semibold text-secondary-900">Create social post</dt><dd>Opens Content, where you can draft a post from your stories and evidence.</dd></div>
             </dl>
             <a href="mailto:support@nexusimpacts.com" className="app-btn app-btn-secondary w-full mt-6"><Mail className="h-4 w-4" /> Contact support</a>
           </ModalBody>

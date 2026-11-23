@@ -1195,7 +1195,7 @@ export default function UploadWizard({
  </div>
 
  {/* Footer */}
- <div className="relative z-10 flex items-center justify-between px-5 py-3 flex-shrink-0 bg-white/80 backdrop-blur border-t border-gray-200/80">
+ <div className="relative z-10 flex items-center justify-between px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex-shrink-0 bg-white/80 backdrop-blur border-t border-gray-200/80">
  <div className="min-w-0 mr-4">
  {stepError && <p role="alert" className="text-xs text-red-600">{stepError}</p>}
  {submitting && <p role="status" className="text-xs text-secondary-600">Saving {saveProgress.saved} of {saveProgress.total} items. Keep this window open.</p>}
